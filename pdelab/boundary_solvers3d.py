@@ -65,6 +65,8 @@ def _lod(operator, tol, max_iter):
     rhs = operator.rhs()
     residual = rhs - operator.apply(u)
     scale = float(np.max(np.abs(residual)))
+    u = operator.correct_constant(u)
+    residual = rhs - operator.apply(u)
     # Reuse the cube's constant-coefficient shift as an iteration parameter.
     # Its Dirichlet modal convergence prediction does NOT apply to mixed faces.
     tau, _ = splitting_parameter3d(operator.problem.n)
@@ -86,8 +88,7 @@ def _lod(operator, tol, max_iter):
         _sweep(first, second, *factors[1], beta, 1)
         _sweep(second, first, *factors[0], beta, 0)
         u += first
-        if operator.pure_neumann:
-            u = operator.normalize(u)
+        u = operator.correct_constant(u)
         residual = rhs - operator.apply(u)
     return Result(
         "lod_serial",

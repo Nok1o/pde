@@ -107,6 +107,7 @@ def _lod(operator, tol, max_iter, record):
     rhs = operator.rhs()
     initial = rhs - operator.apply(u)
     scale = float(np.max(np.abs(initial)))
+    u = operator.correct_constant(u)
     tau = 1 / (2 * np.pi * n)
     x_factors = _directional_factors(operator, tau, 0)
     y_factors = _directional_factors(operator, tau, 1)
@@ -127,8 +128,7 @@ def _lod(operator, tol, max_iter, record):
         _sweep(tau * residual, first, *x_factors, beta, 0)
         _sweep(first, correction, *y_factors, beta, 1)
         u += correction
-        if operator.pure_neumann:
-            u = operator.normalize(u)
+        u = operator.correct_constant(u)
         if not np.isfinite(u).all():
             raise RuntimeError("ЛОМ вернул неконечное поле")
     return Result(

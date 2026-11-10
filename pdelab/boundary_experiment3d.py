@@ -21,6 +21,7 @@ from .boundary_experiment import (
     boundary_metrics,
     boundary_payload,
     selected_boundary_methods,
+    validate_boundary_budgets,
 )
 from .boundary_solvers3d import solve_boundary3d, warmup_boundary3d
 from .experiment3d import rows_csv
@@ -78,7 +79,7 @@ class BoundaryExperiment3D:
     metrics: list
 
 
-def _prepare(config, methods):
+def _prepare(config, methods, budgets=None, tolerances=None):
     problem = problem_from_config3d(config)
     if problem.exact is None and problem.n > DIRECT_MAX_N:
         raise ValueError(
@@ -87,6 +88,8 @@ def _prepare(config, methods):
     operator = BoundaryOperator3D(problem)
     operator.check_compatibility()
     methods = selected_boundary_methods(operator, methods)
+    if budgets is not None and tolerances is not None:
+        validate_boundary_budgets(methods, budgets, tolerances)
     points = select_boundary_points3d(
         problem.n, config.mode, config.point, config.plane, config.index
     )
@@ -197,7 +200,9 @@ def benchmark_boundary3d(
 ):
     if isinstance(repeats, (bool, np.bool_)) or int(repeats) != repeats or repeats < 2:
         raise ValueError("Нужно минимум два независимых повтора")
-    problem, points, grid, reference, methods = _prepare(config, methods)
+    problem, points, grid, reference, methods = _prepare(
+        config, methods, budgets, tolerances
+    )
     rows = []
     for method in methods:
         for budget in (tolerances if method == "lod_serial" else budgets):

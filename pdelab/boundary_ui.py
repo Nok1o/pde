@@ -314,7 +314,8 @@ def render_boundary_app():
             "repeats": repeats,
             "methods": methods,
         }
-        if st.button("Запустить серию", key="bc_benchmark", disabled=not methods):
+        disabled = not methods or ("mc" in methods and not budgets)
+        if st.button("Запустить серию", key="bc_benchmark", disabled=disabled):
             warning = workload_message(
                 config,
                 methods,
@@ -335,7 +336,7 @@ def render_boundary_app():
                 except (ValueError, RuntimeError) as exc:
                     st.error(str(exc))
         saved = st.session_state.get("bc_benchmark_result")
-        if saved is not None:
+        if saved is not None and saved[1]:
             if saved[0] != benchmark_settings:
                 st.info("Показана серия с прежними настройками.")
             table = pd.DataFrame(saved[1])

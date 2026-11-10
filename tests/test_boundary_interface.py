@@ -13,7 +13,63 @@ from pdelab.boundary_experiment import (
     benchmark_boundary,
     run_boundary_experiment,
 )
+from pdelab.boundary_experiment3d import BoundaryConfig3D, benchmark_boundary3d
 from pdelab.boundary_ui import workload_message
+
+
+@pytest.mark.parametrize(
+    "config,benchmark",
+    [
+        (BoundaryConfig(n=4), benchmark_boundary),
+        (BoundaryConfig3D(n=4), benchmark_boundary3d),
+    ],
+)
+@pytest.mark.parametrize("methods", [["mc"], ["lod_serial", "mc"]])
+def test_mc_series_requires_a_budget(config, benchmark, methods):
+    with pytest.raises(ValueError, match="бюджет"):
+        benchmark(config, budgets=[], methods=methods, repeats=2)
+
+
+@pytest.mark.parametrize(
+    "config,benchmark",
+    [
+        (BoundaryConfig(n=4), benchmark_boundary),
+        (BoundaryConfig3D(n=4), benchmark_boundary3d),
+    ],
+)
+def test_lod_only_series_does_not_require_mc_budgets(config, benchmark):
+    rows = benchmark(
+        config, budgets=[], methods=["lod_serial"], tolerances=[1e-4], repeats=2
+    )
+    assert len(rows) == 2 and all(row["method"] == "lod_serial" for row in rows)
+    with pytest.raises(ValueError, match="допуск"):
+        benchmark(config, methods=["lod_serial"], tolerances=[], repeats=2)
+
+
+@pytest.mark.parametrize("dimension,prefix", [("2D", "bc"), ("3D", "bc3d")])
+def test_ui_disables_series_with_mc_and_no_budgets(dimension, prefix):
+    app = AppTest.from_file(
+        Path(__file__).parents[1] / "app.py", default_timeout=60
+    ).run()
+    app.radio(key="dimension").set_value(dimension).run()
+    mode_key = "boundary_mode" if dimension == "2D" else "cube_boundary_mode"
+    app.radio(key=mode_key).set_value("Смешанные I / II / III").run()
+    app.select_slider(key=f"{prefix}_n").set_value(8).run()
+    app.multiselect(key=f"{prefix}_methods").set_value(["mc"])
+    app.multiselect(key=f"{prefix}_budgets").set_value([]).run()
+    assert app.button(key=f"{prefix}_benchmark").disabled
+    assert not app.exception
+    # A session that hit the old bug may still contain an empty saved series.
+    result_key = "bc_benchmark_result" if dimension == "2D" else "bc3d_series"
+    app.session_state[result_key] = ({}, [])
+    app.run()
+    assert not app.exception
+    app.multiselect(key=f"{prefix}_methods").set_value(["lod_serial", "mc"]).run()
+    assert app.button(key=f"{prefix}_benchmark").disabled
+    app.multiselect(key=f"{prefix}_methods").set_value(["lod_serial"]).run()
+    assert not app.button(key=f"{prefix}_benchmark").disabled
+    app.button(key=f"{prefix}_benchmark").click().run()
+    assert not app.exception and not app.error
 
 
 def test_cli_exports_boundary_coefficients_and_reference(tmp_path):

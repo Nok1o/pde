@@ -260,7 +260,7 @@ def _benchmark(config, methods):
             except (ValueError, RuntimeError) as exc:
                 st.error(str(exc))
     saved = st.session_state.get("bc3d_series")
-    if saved is not None:
+    if saved is not None and saved[1]:
         if saved[0] != settings:
             st.info("Показана серия с прежними настройками.")
         figure = px.scatter(

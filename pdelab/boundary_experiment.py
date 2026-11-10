@@ -112,6 +112,13 @@ def selected_boundary_methods(operator, methods=None):
     return methods
 
 
+def validate_boundary_budgets(methods, budgets, tolerances):
+    if "mc" in methods and len(budgets) == 0:
+        raise ValueError("Выберите хотя бы один бюджет MC")
+    if "lod_serial" in methods and len(tolerances) == 0:
+        raise ValueError("Выберите хотя бы один допуск ЛОМ")
+
+
 def run_boundary_experiment(config=None, methods=None):
     config = BoundaryConfig() if config is None else config
     problem = problem_from_config(config)
@@ -217,6 +224,7 @@ def benchmark_boundary(
     operator = BoundaryOperator(problem)
     operator.check_compatibility()
     methods = selected_boundary_methods(operator, methods)
+    validate_boundary_budgets(methods, budgets, tolerances)
     points = select_boundary_points(problem.n, config.mode, config.point)
     grid = operator.solve()
     reference = grid if problem.exact is None else operator.normalize(problem.exact)

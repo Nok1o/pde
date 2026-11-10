@@ -6,6 +6,7 @@ positive. See docs/boundaries.md for the one-dimensional derivation.
 """
 
 from dataclasses import dataclass
+from math import fsum
 from types import MappingProxyType
 
 import numpy as np
@@ -192,12 +193,34 @@ class BoundaryOperator:
         if not np.isfinite(self.diagonal).all() or not np.isfinite(self.b).all():
             raise ValueError("Слишком большие коэффициенты граничной задачи")
         self.pure_neumann = not fixed.any() and not self.reaction.any()
+        self._balance_nodes = None
+        if not fixed.any() and not self.pure_neumann:
+            # Diffusion cancels in the volume-weighted sum. Robin then fixes
+            # the constant mode through sum(V*s*u) = sum(V*b), even for tiny κ.
+            self._balance_nodes = np.flatnonzero(self.reaction)
+            weights = (self.volumes * self.reaction).ravel()[self._balance_nodes]
+            mass = fsum(weights)
+            self._balance_weights = weights / mass
+            self._balance_target = fsum((self.volumes * self.b).ravel()) / mass
 
     def normalize(self, values):
         values = np.array(values, dtype=float, copy=True)
         if self.pure_neumann:
             values -= np.sum(self.volumes * values) / self.volumes.sum()
         return values
+
+    def correct_constant(self, values):
+        """Fix the constant mode without changing gradients or the analytic reference.
+
+        With Dirichlet nodes no shift is allowed. Pure Neumann uses the chosen
+        zero-mean gauge; otherwise the Robin integral balance fixes the shift.
+        """
+        if self.pure_neumann:
+            return self.normalize(values)
+        if self._balance_nodes is None:
+            return values
+        mean = np.dot(self._balance_weights, values.ravel()[self._balance_nodes])
+        return values + (self._balance_target - mean)
 
     def check_compatibility(self):
         if not self.pure_neumann:
@@ -215,11 +238,14 @@ class BoundaryOperator:
         u = np.asarray(values, dtype=float)
         if u.shape != self.b.shape or not np.isfinite(u).all():
             raise ValueError(f"Ожидается конечное поле формы {self.b.shape}")
-        out = self.diagonal * u
+        # Difference form keeps diffusion exactly zero on a constant field.
+        # diag*u - sum(w*u_neighbor) would hide a weak Robin term in roundoff.
+        out = self.reaction * u
         for axis in range(u.ndim):
             lower, upper = adjacent_slices(u.ndim, axis)
-            out[lower] -= self.weights[lower + (2 * axis,)] * u[upper]
-            out[upper] -= self.weights[upper + (2 * axis + 1,)] * u[lower]
+            difference = u[lower] - u[upper]
+            out[lower] += self.weights[lower + (2 * axis,)] * difference
+            out[upper] -= self.weights[upper + (2 * axis + 1,)] * difference
         out[self.fixed] = u[self.fixed]
         return out
 
@@ -257,13 +283,23 @@ class BoundaryOperator:
         self.check_compatibility()
         matrix, rhs = self.assemble()
         unknown = ~self.fixed
-        if self.pure_neumann:
+        if not self.fixed.any():
             mass = self.volumes.ravel()
             constraint = csr_matrix(mass[:, None])
+            if self.pure_neumann:
+                balance = constraint.T
+                target = 0.0
+            else:
+                # An equivalent integral row pins the near-null constant mode
+                # without relying on small Robin terms surviving sparse LU.
+                weights = np.zeros_like(mass)
+                weights[self._balance_nodes] = self._balance_weights
+                balance = csr_matrix(weights[None, :])
+                target = self._balance_target
             augmented = bmat(
-                [[diags(mass) @ matrix, constraint], [constraint.T, None]], format="csr"
+                [[diags(mass) @ matrix, constraint], [balance, None]], format="csr"
             )
-            values = spsolve(augmented, np.append(mass * rhs, 0.0))[:-1]
+            values = spsolve(augmented, np.append(mass * rhs, target))[:-1]
         else:
             values = spsolve(matrix, rhs)
         result = self.boundary.copy()
