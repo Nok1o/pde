@@ -12,10 +12,10 @@ from .boundary3d import (
     make_boundary_problem3d,
     select_boundary_points3d,
 )
-from .boundary_solvers import _factor_lines
+from .boundary_solvers import METHODS_BOUNDARY, _factor_lines
 from .problem3d import Problem3D, validate_points3d
 from .solvers import NUMBA_LOCK, Result
-from .solvers3d import METHODS_3D, solve3d, splitting_parameter3d, warmup3d
+from .solvers3d import solve3d, splitting_parameter3d, warmup3d
 
 
 def _factors(operator, tau, axis):
@@ -212,7 +212,11 @@ def solve_boundary3d(
 ):
     if not isinstance(problem, BoundaryProblem3D):
         raise ValueError("Ожидается BoundaryProblem3D")
-    if method not in METHODS_3D:
+    if method in ("wos", "graded"):
+        from .stationary_extensions import solve_extended
+
+        return solve_extended(problem, points, method, walks, seed, max_steps)
+    if method not in METHODS_BOUNDARY:
         raise ValueError("В 3D доступны только ЛОМ и обычный MC")
     points = validate_points3d(problem.n, points)
     for name, value, minimum, maximum in (
@@ -281,7 +285,9 @@ def warmup_boundary3d():
         if _warmed:
             return
         p = make_boundary_problem3d(n=4)
-        for method in METHODS_3D:
+        for method in METHODS_BOUNDARY:
+            if method in ("wos", "graded"):
+                continue
             solve_boundary3d(p, [[2, 2, 2]], method, walks=4, max_iter=1)
         warmup3d()
         _warmed = True

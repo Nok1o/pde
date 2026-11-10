@@ -20,7 +20,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(
         description="2D: Дирихле, Нейман и Робин по сторонам"
     )
-    parser.add_argument("command", choices=["run", "benchmark"])
+    parser.add_argument("command", choices=["run", "benchmark", "study"])
     parser.add_argument(
         "--problem", choices=[*PRESETS_BOUNDARY, "custom"], default="polynomial"
     )
@@ -71,6 +71,21 @@ def main(argv=None):
             experiment = run_boundary_experiment(config, args.methods)
             export_boundary(experiment, args.out)
             print(rows_csv(experiment.metrics))
+        elif args.command == "study":
+            from .boundary_research import boundary_accuracy_study
+
+            study = boundary_accuracy_study(
+                config, args.methods, args.repeats, args.budgets
+            )
+            args.out.mkdir(parents=True, exist_ok=True)
+            (args.out / "timings.csv").write_bytes(
+                rows_csv(study["rows"]).encode("utf-8-sig")
+            )
+            (args.out / "study.json").write_text(
+                json.dumps(study, ensure_ascii=False, allow_nan=False, indent=2),
+                encoding="utf-8",
+            )
+            print(rows_csv(study["rows"]))
         else:
             rows = benchmark_boundary(
                 config, args.budgets, args.repeats, methods=args.methods

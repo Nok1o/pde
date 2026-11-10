@@ -65,4 +65,4 @@ def test_upgrade_discards_retired_method_and_obsolete_config_fields():
     assert "workers" not in upgraded.metadata
     assert upgraded.metadata["metrics_policy"] == METRICS_POLICY
     assert upgraded.metrics[0]["relative_error_pct"] is not None
-    assert len(METHODS) == 5
+    assert len(METHODS) == 7

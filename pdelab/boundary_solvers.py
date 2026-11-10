@@ -9,7 +9,12 @@ from .boundary import BoundaryOperator, BoundaryProblem, make_boundary_problem
 from .problem import Problem
 from .solvers import NUMBA_LOCK, Result, solve
 
-METHODS_BOUNDARY = {"lod_serial": "ЛОМ", "mc": "Монте-Карло"}
+METHODS_BOUNDARY = {
+    "lod_serial": "ЛОМ",
+    "mc": "Монте-Карло",
+    "graded": "MC · сгущённая сетка",
+    "wos": "WoS · Дирихле",
+}
 
 
 def select_boundary_points(n, mode="point", point=None):
@@ -291,6 +296,10 @@ def solve_boundary(
 ):
     if not isinstance(problem, BoundaryProblem):
         raise ValueError("Ожидается BoundaryProblem")
+    if method in ("wos", "graded"):
+        from .stationary_extensions import solve_extended
+
+        return solve_extended(problem, points, method, walks, seed, max_steps)
     if method not in METHODS_BOUNDARY:
         raise ValueError("Для смешанной границы доступны только ЛОМ и обычный MC")
     points = validate_boundary_points(problem.n, points)
@@ -337,6 +346,8 @@ def warmup_boundary():
         problem = make_boundary_problem(n=4)
         points = select_boundary_points(4)
         for method in METHODS_BOUNDARY:
+            if method in ("wos", "graded"):
+                continue
             solve_boundary(problem, points, method, walks=4, max_iter=2, record=False)
         from .solvers import warmup
 

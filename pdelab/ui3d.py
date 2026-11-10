@@ -218,6 +218,9 @@ def render_3d_app():
                 "Плоскость расчёта", ["xy", "xz", "yz"], key="cube_plane"
             )
             index = st.slider("Узел среза", 0, n, n // 2, key=f"cube_index_{n}")
+        from .stationary_extensions import render_method_scope
+
+        render_method_scope(3)
         methods = st.multiselect(
             "Методы",
             list(METHODS_3D),

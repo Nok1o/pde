@@ -69,7 +69,12 @@ def test_cube_ui_runs_queries_switches_planes_and_invalidates_export():
     ).run()
     app.radio(key="dimension").set_value("3D").run()
     assert not app.exception
-    assert app.multiselect(key="cube_methods").value == ["lod_serial", "mc"]
+    assert app.multiselect(key="cube_methods").value == [
+        "lod_serial",
+        "mc",
+        "graded",
+        "wos",
+    ]
     app.select_slider(key="cube_n").set_value(8)
     app.select_slider(key="cube_walks").set_value(64)
     app.run()
@@ -107,7 +112,7 @@ def test_cube_ui_study_runs_without_main_calculation():
     app.button(key="study3d_run").click().run()
     assert not app.exception
     assert "cube_result" not in app.session_state
-    assert app.dataframe[0].value.shape == (3, 3)
+    assert app.dataframe[0].value.shape == (3, 5)
 
 
 def test_cli_study_respects_selected_method(tmp_path):

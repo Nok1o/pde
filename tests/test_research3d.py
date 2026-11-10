@@ -11,13 +11,13 @@ from pdelab.solvers import Result
 
 
 def test_validation_failure_never_restarts_selection(monkeypatch):
-    calls = {"mc": 0, "lod_serial": 0}
+    calls = {"mc": 0, "lod_serial": 0, "graded": 0, "wos": 0}
 
     def fake_solve(problem, points, method, **kwargs):
         calls[method] += 1
         values = blank_field3d(problem)
         values[tuple(points.T)] = (
-            1.0 if calls[method] <= (2 if method == "mc" else 1) else 1.2
+            1.0 if calls[method] <= (2 if method != "lod_serial" else 1) else 1.2
         )
         return Result(
             method,
@@ -34,7 +34,7 @@ def test_validation_failure_never_restarts_selection(monkeypatch):
     assert all(
         row["status"] == "Не достигнута на контрольной серии" for row in study.rows
     )
-    assert calls == {"mc": 4, "lod_serial": 3}
+    assert calls == {"mc": 4, "lod_serial": 3, "graded": 4, "wos": 4}
     for method in calls:
         calibration = {
             trial["seed"]
@@ -53,7 +53,7 @@ def test_real_study_and_export(tmp_path):
     study = accuracy_study3d(
         StudySettings3D(Config3D(problem="constant", n=8), repeats=2, max_walks=64)
     )
-    assert len(study.rows) == 6
+    assert len(study.rows) == 12
     assert all(row["status"] == "Достигнута" for row in study.rows)
     for row in study.rows:
         matching = [

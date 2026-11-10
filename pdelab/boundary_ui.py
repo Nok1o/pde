@@ -33,7 +33,7 @@ KIND_LABELS = {
 
 
 def workload_message(config, methods, walks=None, repeats=1):
-    if "mc" not in methods:
+    if not any(m != "lod_serial" for m in methods):
         return None
     points = select_boundary_points(config.n, config.mode, config.point)
     operator = BoundaryOperator(problem_from_config(config))
@@ -196,6 +196,9 @@ def render_boundary_app():
             max_iter,
             max_steps,
         )
+    from .stationary_extensions import render_method_scope
+
+    render_method_scope(2, mixed=True)
     _formulas(config)
     try:
         model = problem_from_config(config)
@@ -205,6 +208,8 @@ def render_boundary_app():
         st.error(str(exc))
         return
     available = ["lod_serial"] if operator.pure_neumann else list(METHODS_BOUNDARY)
+    if any(kind != "dirichlet" for kind in config.kinds):
+        available = [m for m in available if m != "wos"]
     if operator.pure_neumann:
         st.caption(
             "Чистый Нейман: среднее с весами объёмов равно нулю. MC без поглощения пока не поддерживается."
@@ -230,8 +235,8 @@ def render_boundary_app():
                     )
             except (ValueError, RuntimeError) as exc:
                 st.error(str(exc))
-    comparison_tab, trace_tab, benchmark_tab = st.tabs(
-        ["Сравнение", "Траектория", "Серия измерений"]
+    comparison_tab, trace_tab, benchmark_tab, research_tab = st.tabs(
+        ["Сравнение", "Траектория", "Серия измерений", "Исследование"]
     )
     with comparison_tab:
         experiment = st.session_state.get("bc_result")
@@ -314,7 +319,9 @@ def render_boundary_app():
             "repeats": repeats,
             "methods": methods,
         }
-        disabled = not methods or ("mc" in methods and not budgets)
+        disabled = not methods or (
+            any(m != "lod_serial" for m in methods) and not budgets
+        )
         if st.button("Запустить серию", key="bc_benchmark", disabled=disabled):
             warning = workload_message(
                 config,
@@ -361,3 +368,8 @@ def render_boundary_app():
                 "boundary-benchmark-settings.json",
                 "application/json",
             )
+
+    with research_tab:
+        from .boundary_research import render_boundary_research
+
+        render_boundary_research(config, methods, "bc_research")

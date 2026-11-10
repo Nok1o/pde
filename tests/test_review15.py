@@ -32,7 +32,7 @@ def test_csv_exports_disable_windows_translation(tmp_path, monkeypatch):
     )
     export_study3d(study, tmp_path)
     for name, expected in (
-        ("metrics", 2),
+        ("metrics", 4),
         ("timings", 3),
         ("thresholds", 3),
         ("trials", len(study.trials)),

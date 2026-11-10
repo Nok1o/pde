@@ -114,7 +114,7 @@ def test_parameter_validation_and_failed_convergence():
     p = make_problem(n=8)
     q = select_points(8)
     with pytest.raises(ValueError):
-        solve(p, [(0, 0)])
+        solve(p, [(-1, 0)])
     with pytest.raises(ValueError):
         solve(p, q, "layers", walks=4, batches=8)
     with pytest.raises(ValueError):

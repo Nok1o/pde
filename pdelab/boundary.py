@@ -13,8 +13,6 @@ import numpy as np
 from scipy.sparse import bmat, coo_matrix, csr_matrix, diags
 from scipy.sparse.linalg import spsolve
 
-from .operator import FrozenOperator
-
 SIDES = ("left", "right", "bottom", "top")
 KINDS = ("dirichlet", "neumann", "robin")
 PRESETS_BOUNDARY = {"polynomial": "Полином", "smooth": "Косинусы и линейное поле"}
@@ -120,7 +118,7 @@ class BoundaryOperator:
 
     face_axes = {"left": (1, 0), "right": (1, -1), "bottom": (0, 0), "top": (0, -1)}
 
-    def __init__(self, problem):
+    def __init__(self, problem, axis=None):
         self.problem = problem
         n = problem.n
         size = n + 1
@@ -129,31 +127,48 @@ class BoundaryOperator:
         if problem.f.shape != shape:
             raise ValueError(f"Оператор ожидает поле формы {shape}")
         self.face_indices = {}
-        volumes = np.full(shape, 1 / n**dimension)
+        uniform = axis is None
+        axis = problem.axis if uniform else np.asarray(axis, dtype=float)
+        if (
+            axis.shape != (size,)
+            or not np.isfinite(axis).all()
+            or axis[0] != 0
+            or axis[-1] != 1
+            or np.any(np.diff(axis) <= 0)
+        ):
+            raise ValueError("Ось должна строго возрастать от 0 до 1")
+        widths = np.diff(axis)
+        dual = np.concatenate((widths[:1], widths[:-1] + widths[1:], widths[-1:])) / 2
+        volumes = np.ones(shape)
+        for coordinate in range(dimension):
+            broadcast = [1] * dimension
+            broadcast[coordinate] = size
+            volumes *= dual.reshape(broadcast)
         for side, (axis, end) in self.face_axes.items():
             index = [slice(None)] * dimension
             index[axis] = end
             self.face_indices[side] = tuple(index)
-            volumes[tuple(index)] *= 0.5
+        if uniform:
+            volumes = np.full(shape, 1 / n**dimension)
+            for indices in self.face_indices.values():
+                volumes[indices] *= 0.5
         self.volumes = _frozen(volumes)
-        # Reuse issue #8's face coefficients. Half boundary cells change only
-        # the volume-to-face ratio; the interior stencil remains identical.
-        core = (
-            FrozenOperator.from_nodes(np.ones(shape), -problem.f, 0.0)
-            if dimension == 2
-            else None
-        )
         weights = np.zeros((*shape, 2 * dimension))
-        for axis in range(dimension):
-            lower, upper = adjacent_slices(dimension, axis)
-            face_weights = (
-                (core.wy if axis == 0 else core.wx) if core is not None else n**2
+        for coordinate in range(dimension):
+            lower, upper = adjacent_slices(dimension, coordinate)
+            broadcast = [1] * dimension
+            broadcast[coordinate] = n
+            weights[lower + (2 * coordinate,)] = (1 / (widths * dual[:-1])).reshape(
+                broadcast
             )
-            weights[lower + (2 * axis,)] = face_weights
-            weights[upper + (2 * axis + 1,)] = face_weights
-        for side, (axis, end) in self.face_axes.items():
-            inward = 2 * axis + (end == -1)
-            weights[self.face_indices[side] + (inward,)] *= 2
+            weights[upper + (2 * coordinate + 1,)] = (1 / (widths * dual[1:])).reshape(
+                broadcast
+            )
+        if uniform:
+            weights[weights > 0] = float(n * n)
+            for side, (coordinate, end) in self.face_axes.items():
+                inward = 2 * coordinate + (end == -1)
+                weights[self.face_indices[side] + (inward,)] *= 2
         fixed = np.zeros(shape, dtype=bool)
         values = np.zeros(shape)
         reactions = [np.zeros(shape) for _ in range(dimension)]
@@ -174,8 +189,12 @@ class BoundaryOperator:
                 values[indices] = condition.value
                 fixed[indices] = True
             else:
-                boundary_load[indices] += 2 * n * condition.value
-                reactions[self.face_axes[side][0]][indices] += 2 * n * condition.kappa
+                boundary_load[indices] += condition.value * (
+                    2 * n if uniform else 1 / dual[self.face_axes[side][1]]
+                )
+                reactions[self.face_axes[side][0]][indices] += condition.kappa * (
+                    2 * n if uniform else 1 / dual[self.face_axes[side][1]]
+                )
         # Dirichlet takes precedence in a corner adjoining a derivative side.
         boundary_load[fixed] = 0
         for reaction in reactions:

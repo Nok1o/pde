@@ -19,6 +19,8 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
 COLORS = {
+    "wos": "#ec4899",
+    "graded": "#14b8a6",
     "lod_serial": "#3156a3",
     "mc": "#168477",
     "mc_control": "#b74167",

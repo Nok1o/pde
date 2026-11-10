@@ -103,8 +103,8 @@ with st.sidebar:
     )
     point = None
     if mode == "point":
-        ix = st.slider("Узел по x", 1, n - 1, n // 2)
-        iy = st.slider("Узел по y", 1, n - 1, n // 2)
+        ix = st.slider("Узел по x", 0, n, n // 2)
+        iy = st.slider("Узел по y", 0, n, n // 2)
         point = (ix, iy)
         st.caption(f"Координаты: ({ix/n:.3f}, {iy/n:.3f})")
     top, bottom, left, right, source = 100.0, 0.0, 0.0, 0.0, 0.0
@@ -116,6 +116,9 @@ with st.sidebar:
             right = st.number_input("Право", value=0.0)
             source = st.number_input("Постоянная правая часть f", value=0.0)
     st.header("Расчёт")
+    from pdelab.stationary_extensions import render_method_scope
+
+    render_method_scope(2)
     methods = st.multiselect(
         "Методы", list(METHODS), default=list(METHODS), format_func=METHODS.get
     )

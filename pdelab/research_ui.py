@@ -51,16 +51,16 @@ def render_research_tab(config):
         for key in ("research_x", "research_y"):
             previous_index = st.session_state.get(key, previous_n // 2)
             st.session_state[key] = min(
-                n - 1, max(1, round(previous_index * n / previous_n))
+                n, max(0, round(previous_index * n / previous_n))
             )
     st.session_state["research_point_grid"] = n
 
     with st.expander("Точка и лимиты поиска"):
         x_column, y_column = st.columns(2)
         with x_column:
-            x = st.slider("Узел x", 1, n - 1, n // 2, key="research_x")
+            x = st.slider("Узел x", 0, n, n // 2, key="research_x")
         with y_column:
-            y = st.slider("Узел y", 1, n - 1, n // 2, key="research_y")
+            y = st.slider("Узел y", 0, n, n // 2, key="research_y")
         st.caption(f"Точка: ({x / n:.4g}, {y / n:.4g})")
         max_walks = st.select_slider(
             "Максимум путей на точку",
