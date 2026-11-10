@@ -41,6 +41,31 @@ class Result:
 
 
 @njit(inline="always")
+def solve_tridiagonal(a, b, c, rhs):
+    """Solve A[i]*v[i-1]+B[i]*v[i]+C[i]*v[i+1]=rhs[i].
+
+    Endpoints outside the line are zero; nonzero Dirichlet values must first
+    be moved into rhs. A[0] and C[-1] are unused.
+    """
+    size = len(rhs)
+    if size == 0 or len(a) != size or len(b) != size or len(c) != size:
+        raise ValueError("tridiagonal arrays must have the same nonzero length")
+    alpha = np.zeros(size + 1)
+    beta = np.zeros(size + 1)
+    for index in range(size):
+        denominator = a[index] * alpha[index] + b[index]
+        if denominator == 0 or not np.isfinite(denominator):
+            raise ValueError("invalid tridiagonal pivot")
+        alpha[index + 1] = -c[index] / denominator
+        beta[index + 1] = (rhs[index] - a[index] * beta[index]) / denominator
+    solution = np.empty(size)
+    solution[-1] = beta[size]
+    for index in range(size - 2, -1, -1):
+        solution[index] = alpha[index + 1] * solution[index + 1] + beta[index + 1]
+    return solution
+
+
+@njit(inline="always")
 def _solve_line(rhs, solution, diffusion_ratio, axis, line_index):
     """Прогонка системы A*v[i-1] + B*v[i] + C*v[i+1] = F[i].
 
@@ -49,40 +74,13 @@ def _solve_line(rhs, solution, diffusion_ratio, axis, line_index):
     равна нулю, поэтому alpha[0] = beta[0] = 0, а последний ответ = beta[size].
     """
     size = rhs.shape[0]
-    a = -diffusion_ratio
-    b = 1 + 2 * diffusion_ratio
-    c = -diffusion_ratio
-    alpha = np.empty(size + 1)
-    beta = np.empty(size + 1)
-
-    # Левая граница: поправка равна нулю.
-    alpha[0] = 0.0
-    beta[0] = 0.0
-
-    # Прямой ход: alpha[i+1] = -C / (A*alpha[i] + B),
-    # beta[i+1] = (F[i] - A*beta[i]) / (A*alpha[i] + B).
-    for index in range(size):
-        rhs_value = rhs[line_index, index] if axis == 0 else rhs[index, line_index]
-        denominator = a * alpha[index] + b
-        alpha[index + 1] = -c / denominator
-        beta[index + 1] = (rhs_value - a * beta[index]) / denominator
-
-    # Правая граница нулевая, поэтому v[size-1] = beta[size].
+    a = np.full(size, -diffusion_ratio)
+    b = np.full(size, 1 + 2 * diffusion_ratio)
+    c = np.full(size, -diffusion_ratio)
     if axis == 0:
-        solution[line_index, size - 1] = beta[size]
+        solution[line_index, :] = solve_tridiagonal(a, b, c, rhs[line_index, :])
     else:
-        solution[size - 1, line_index] = beta[size]
-
-    # Обратный ход: восстанавливаем решение от последнего узла к первому.
-    for index in range(size - 2, -1, -1):
-        if axis == 0:
-            solution[line_index, index] = (
-                alpha[index + 1] * solution[line_index, index + 1] + beta[index + 1]
-            )
-        else:
-            solution[index, line_index] = (
-                alpha[index + 1] * solution[index + 1, line_index] + beta[index + 1]
-            )
+        solution[:, line_index] = solve_tridiagonal(a, b, c, rhs[:, line_index])
 
 
 @njit(cache=True, nogil=True)
