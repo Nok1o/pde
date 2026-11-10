@@ -19,11 +19,12 @@ def manufactured(n):
     return FrozenOperator.from_nodes(k, b, u, sigma), u
 
 
-def test_operator_matrix_fluxes_and_probabilities():
-    op, exact = manufactured(8)
+@pytest.mark.parametrize("n", [2, 3, 8])
+def test_operator_matrix_fluxes_and_probabilities(n):
+    op, exact = manufactured(n)
     rng = np.random.default_rng(11)
     u = exact.copy()
-    u[1:-1, 1:-1] = rng.normal(size=(7, 7))
+    u[1:-1, 1:-1] = rng.normal(size=(n - 1, n - 1))
     matrix, rhs = op.assemble()
     np.testing.assert_allclose(
         matrix @ u[1:-1, 1:-1].ravel() - rhs,
@@ -37,7 +38,7 @@ def test_operator_matrix_fluxes_and_probabilities():
     diffusion = op.apply(u) - op.sigma[1:-1, 1:-1] * u[1:-1, 1:-1]
     boundary_flux = (qx[1:-1, -1] - qx[1:-1, 0]).sum()
     boundary_flux += (qy[-1, 1:-1] - qy[0, 1:-1]).sum()
-    assert diffusion.sum() == pytest.approx(8 * boundary_flux)
+    assert diffusion.sum() == pytest.approx(n * boundary_flux)
     p, reward, killing = op.mc_coefficients()
     assert np.all(p > 0) and np.all(killing >= 0)
     np.testing.assert_allclose(p.sum(axis=-1) + killing, 1)

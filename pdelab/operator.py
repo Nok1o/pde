@@ -110,28 +110,40 @@ class FrozenOperator:
         """Independently assemble interior CSR matrix and Dirichlet-adjusted RHS."""
         n = self.b.shape[0] - 1
         m = n - 1
-        rows, cols, data = [], [], []
+        indices = np.arange(m * m).reshape(m, m)
+        horizontal = -self.wx[1:-1, 1:-1].ravel()
+        vertical = -self.wy[1:-1, 1:-1].ravel()
+        diagonal = (
+            self.sigma[1:-1, 1:-1]
+            + self.wx[1:-1, :-1]
+            + self.wx[1:-1, 1:]
+            + self.wy[:-1, 1:-1]
+            + self.wy[1:, 1:-1]
+        ).ravel()
+        rows = np.concatenate(
+            (
+                indices.ravel(),
+                indices[:, :-1].ravel(),
+                indices[:, 1:].ravel(),
+                indices[:-1, :].ravel(),
+                indices[1:, :].ravel(),
+            )
+        )
+        cols = np.concatenate(
+            (
+                indices.ravel(),
+                indices[:, 1:].ravel(),
+                indices[:, :-1].ravel(),
+                indices[1:, :].ravel(),
+                indices[:-1, :].ravel(),
+            )
+        )
+        data = np.concatenate((diagonal, horizontal, horizontal, vertical, vertical))
         rhs = self.b[1:-1, 1:-1].copy()
-        for y in range(1, n):
-            for x in range(1, n):
-                i = (y - 1) * m + x - 1
-                diagonal = self.sigma[y, x]
-                for yy, xx, w in (
-                    (y + 1, x, self.wy[y, x]),
-                    (y - 1, x, self.wy[y - 1, x]),
-                    (y, x + 1, self.wx[y, x]),
-                    (y, x - 1, self.wx[y, x - 1]),
-                ):
-                    diagonal += w
-                    if 0 < yy < n and 0 < xx < n:
-                        rows.append(i)
-                        cols.append((yy - 1) * m + xx - 1)
-                        data.append(-w)
-                    else:
-                        rhs[y - 1, x - 1] += w * self.boundary[yy, xx]
-                rows.append(i)
-                cols.append(i)
-                data.append(diagonal)
+        rhs[0, :] += self.wy[0, 1:-1] * self.boundary[0, 1:-1]
+        rhs[-1, :] += self.wy[-1, 1:-1] * self.boundary[-1, 1:-1]
+        rhs[:, 0] += self.wx[1:-1, 0] * self.boundary[1:-1, 0]
+        rhs[:, -1] += self.wx[1:-1, -1] * self.boundary[1:-1, -1]
         return (
             coo_matrix((data, (rows, cols)), shape=(m * m, m * m)).tocsr(),
             rhs.ravel(),
