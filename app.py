@@ -48,9 +48,28 @@ dimension = st.sidebar.radio(
     "Размерность задачи", ["2D", "3D"], horizontal=True, key="dimension"
 )
 if dimension == "3D":
-    from pdelab.ui3d import render_3d_app
+    cube_boundary_mode = st.sidebar.radio(
+        "Граничные условия",
+        ["Дирихле", "Смешанные I / II / III"],
+        key="cube_boundary_mode",
+    )
+    if cube_boundary_mode == "Смешанные I / II / III":
+        from pdelab.boundary_ui3d import render_boundary_app3d
 
-    render_3d_app()
+        render_boundary_app3d()
+    else:
+        from pdelab.ui3d import render_3d_app
+
+        render_3d_app()
+    st.stop()
+
+boundary_mode = st.sidebar.radio(
+    "Граничные условия", ["Дирихле", "Смешанные I / II / III"], key="boundary_mode"
+)
+if boundary_mode == "Смешанные I / II / III":
+    from pdelab.boundary_ui import render_boundary_app
+
+    render_boundary_app()
     st.stop()
 
 st.title("Сеточный метод и Монте-Карло")
