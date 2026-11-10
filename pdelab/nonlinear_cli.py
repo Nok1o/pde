@@ -2,6 +2,7 @@
 
 import argparse
 import platform
+import sys
 from dataclasses import asdict
 from importlib.metadata import version
 from pathlib import Path
@@ -43,7 +44,20 @@ def main(argv=None):
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--budgets", nargs="+", type=int, default=[32, 128, 512])
     parser.add_argument("--out", type=Path, default=Path("runs/nonlinear"))
+    argv = sys.argv[1:] if argv is None else list(argv)
     args = parser.parse_args(argv)
+    if args.command == "study":
+        allowed = {"--repeats", "--seed", "--out"}
+        rejected = [
+            token.split("=")[0]
+            for token in argv
+            if token.startswith("--") and token.split("=")[0] not in allowed
+        ]
+        if rejected:
+            parser.error(
+                "study использует фиксированные случаи; неприменимые аргументы: "
+                + ", ".join(rejected)
+            )
     settings = NonlinearSettings(
         tolerance=args.mc_tol,
         change_tolerance=args.mc_tol,
@@ -111,20 +125,56 @@ def main(argv=None):
             print(
                 f"Исследование: {len(accuracy)} проверок ошибок, {len(rows)} строк сравнения."
             )
+        study_cases = (
+            [
+                {
+                    key: row[key]
+                    for key in (
+                        "case",
+                        "method",
+                        "n",
+                        "alpha",
+                        "dt",
+                        "T",
+                        "tolerance",
+                        "change_tolerance",
+                        "linear_tolerance",
+                        "relaxation",
+                        "max_outer",
+                        "max_inner",
+                        "initial_walks",
+                        "max_walks",
+                        "schedule",
+                        "max_steps",
+                        "max_total_walks",
+                        "seed",
+                    )
+                }
+                for row in rows
+            ]
+            if args.command == "study"
+            else None
+        )
         (args.out / "settings.json").write_bytes(
             json_bytes(
                 dict(
                     command=args.command,
-                    n=args.n,
-                    alpha=args.alpha,
-                    dt=args.dt,
-                    T=args.T,
-                    point=args.point,
+                    **(
+                        dict(cases=study_cases, accuracy_cases=accuracy)
+                        if args.command == "study"
+                        else dict(
+                            n=args.n,
+                            alpha=args.alpha,
+                            dt=args.dt,
+                            T=args.T,
+                            point=args.point,
+                            mc=asdict(settings),
+                            picard=asdict(deterministic),
+                            budgets=args.budgets,
+                        )
+                    ),
                     repeats=args.repeats,
-                    mc=asdict(settings),
-                    picard=asdict(deterministic),
                     seed=args.seed,
-                    budgets=args.budgets,
                     python=platform.python_version(),
                     platform=platform.platform(),
                     versions={

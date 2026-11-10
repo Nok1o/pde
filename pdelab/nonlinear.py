@@ -359,7 +359,7 @@ def newton_layer(problem, initial, b, boundary, sigma, tolerance=1e-11, max_iter
         max(np.max(np.abs(b[1:-1, 1:-1])), np.max(np.abs(residual + b[1:-1, 1:-1])))
     )
     history = []
-    for iteration in range(max_iter + 1):
+    for iteration in range(int(max_iter) + 1):
         relative = relative_norm(residual, scale)
         if relative <= tolerance:
             return LayerResult(u, True, "newton_residual", history, iteration)

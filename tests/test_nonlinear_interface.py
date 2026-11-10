@@ -118,3 +118,33 @@ def test_ui_comparison_history_targets_export_and_old_modes():
     assert not app.exception and app.button(key="heat_run")
     app.radio(key="evolution").set_value("Стационарный").run()
     assert not app.exception and app.button(key="main_run")
+
+
+def test_fixed_study_rejects_ignored_arguments(tmp_path):
+    for option, value in (("--max-total-walks", "1"), ("--n", "8"), ("--dt", ".01")):
+        with pytest.raises(SystemExit) as error:
+            main(["study", option, value, "--out", str(tmp_path)])
+        assert error.value.code == 2
+    assert not list(tmp_path.iterdir())
+
+
+def test_fixed_study_records_actual_method_settings(monkeypatch, tmp_path):
+    import pdelab.nonlinear_cli as cli
+    import pdelab.nonlinear_study as study
+
+    real_compare = study.compare_nonlinear
+
+    def cheap_compare(problem, dt, T, **kwargs):
+        return real_compare(problem, dt, 0, **kwargs)
+
+    monkeypatch.setattr(study, "compare_nonlinear", cheap_compare)
+    monkeypatch.setattr(cli, "nonlinear_accuracy_study", lambda: [])
+    main(["study", "--repeats", "2", "--out", str(tmp_path)])
+    data = json.loads((tmp_path / "settings.json").read_text())
+    assert "n" not in data and "mc" not in data
+    last = [row for row in data["cases"] if row["case"] == 30]
+    lod, mc = last
+    assert lod["method"] == "picard" and lod["tolerance"] == 1e-7
+    assert lod["max_outer"] == 100 and lod["initial_walks"] is None
+    assert mc["max_outer"] == 1 and mc["tolerance"] == 1e-10
+    assert mc["max_total_walks"] == 20_000_000

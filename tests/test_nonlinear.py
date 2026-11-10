@@ -364,3 +364,13 @@ def test_alpha_zero_agrees_with_merged_space_time_mc(T):
     np.testing.assert_allclose(stochastic.fields[-1][indices], target, atol=2e-4)
     np.testing.assert_array_equal(stochastic.times, reference.times)
     assert stochastic.times[-1] == T
+
+
+def test_integral_float_iteration_limit_works_for_newton():
+    result = solve_nonlinear(
+        make_nonlinear_problem(4),
+        T=0.02,
+        method="newton",
+        settings=NonlinearSettings(max_outer=12.0),
+    )
+    assert result.completed

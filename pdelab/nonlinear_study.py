@@ -359,13 +359,28 @@ def nonlinear_mc_study(repeats=4, seed=42):
             max_outer=max_outer,
         )
         for metric in comparison.metrics:
-            rows.append({**parameters, **metric})
+            actual = (
+                comparison.deterministic.settings
+                if metric["method"] == "picard"
+                else settings
+            )
+            rows.append(
+                {
+                    **parameters,
+                    **asdict(actual),
+                    "initial_walks": actual.walks if metric["method"] == "mc" else None,
+                    "max_walks": actual.max_walks if metric["method"] == "mc" else None,
+                    "schedule": actual.schedule if metric["method"] == "mc" else None,
+                    **metric,
+                }
+            )
         target = comparison.reference.fields[-1, n // 2, n // 2]
         for repeat, result in enumerate(comparison.stochastic):
             runs.append(
                 {
                     **parameters,
                     "repeat": repeat,
+                    "settings": asdict(result.settings),
                     "seed": result.settings.seed,
                     "completed": result.completed,
                     "reason": result.reason,
