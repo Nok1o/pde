@@ -72,7 +72,9 @@ def main(argv=None):
             export_boundary(experiment, args.out)
             print(rows_csv(experiment.metrics))
         else:
-            rows = benchmark_boundary(config, args.budgets, args.repeats)
+            rows = benchmark_boundary(
+                config, args.budgets, args.repeats, methods=args.methods
+            )
             args.out.mkdir(parents=True, exist_ok=True)
             (args.out / "benchmark.csv").write_text(
                 rows_csv(rows), encoding="utf-8-sig"
@@ -84,6 +86,7 @@ def main(argv=None):
                         "budgets": args.budgets,
                         "repeats": args.repeats,
                         "tolerances": [1e-3, 1e-6, 1e-9],
+                        "methods": list(dict.fromkeys(row["method"] for row in rows)),
                     },
                     ensure_ascii=False,
                     indent=2,

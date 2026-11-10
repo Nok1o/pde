@@ -1,8 +1,10 @@
+import csv
 import json
 from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
+import pytest
 from streamlit.testing.v1 import AppTest
 
 from pdelab.boundary_cli import main
@@ -45,6 +47,38 @@ def test_benchmark_seeds_and_neumann_default():
     assert all(r["converged"] for r in rows)
     pure = run_boundary_experiment(BoundaryConfig(n=8, kinds=("neumann",) * 4))
     assert list(pure.results) == ["lod_serial"]
+
+
+@pytest.mark.parametrize(
+    "method,limits", [("lod_serial", ["--max-steps", "1"]), ("mc", ["--max-iter", "1"])]
+)
+def test_cli_benchmark_honors_method_selection(tmp_path, method, limits):
+    main(
+        [
+            "benchmark",
+            "--n",
+            "8",
+            "--methods",
+            method,
+            "--budgets",
+            "8",
+            "--repeats",
+            "2",
+            "--out",
+            str(tmp_path),
+            *limits,
+        ]
+    )
+    with (tmp_path / "benchmark.csv").open(encoding="utf-8-sig") as stream:
+        rows = list(csv.DictReader(stream))
+    assert rows and {r["method"] for r in rows} == {method}
+    assert json.loads((tmp_path / "settings.json").read_text())["methods"] == [method]
+
+
+@pytest.mark.parametrize("methods", [[], ["unknown"], ["mc", "mc"]])
+def test_benchmark_rejects_invalid_methods(methods):
+    with pytest.raises(ValueError, match="Выберите"):
+        benchmark_boundary(BoundaryConfig(n=8), methods=methods)
 
 
 def test_ui_workload_limit():

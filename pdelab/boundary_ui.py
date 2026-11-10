@@ -312,11 +312,12 @@ def render_boundary_app():
             "config": asdict(config),
             "budgets": budgets,
             "repeats": repeats,
+            "methods": methods,
         }
-        if st.button("Запустить серию", key="bc_benchmark"):
+        if st.button("Запустить серию", key="bc_benchmark", disabled=not methods):
             warning = workload_message(
                 config,
-                available,
+                methods,
                 max(budgets, default=0),
                 repeats * max(1, len(budgets)),
             )
@@ -327,7 +328,9 @@ def render_boundary_app():
                     with st.spinner("Серия расчётов…"):
                         st.session_state["bc_benchmark_result"] = (
                             benchmark_settings,
-                            benchmark_boundary(config, budgets, repeats),
+                            benchmark_boundary(
+                                config, budgets, repeats, methods=methods
+                            ),
                         )
                 except (ValueError, RuntimeError) as exc:
                     st.error(str(exc))

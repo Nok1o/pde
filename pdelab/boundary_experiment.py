@@ -93,13 +93,10 @@ def boundary_metrics(result, points, reference, grid_reference):
     }
 
 
-def run_boundary_experiment(config=None, methods=None):
-    config = BoundaryConfig() if config is None else config
-    problem = problem_from_config(config)
-    operator = BoundaryOperator(problem)
-    operator.check_compatibility()
+def selected_boundary_methods(operator, methods=None):
     if methods is None:
         methods = ["lod_serial"] if operator.pure_neumann else list(METHODS_BOUNDARY)
+    methods = list(methods)
     if (
         not methods
         or len(set(methods)) != len(methods)
@@ -108,6 +105,15 @@ def run_boundary_experiment(config=None, methods=None):
         raise ValueError("Выберите ЛОМ и/или обычный MC")
     if operator.pure_neumann and "mc" in methods:
         raise ValueError("MC для чистого Неймана пока не поддерживается")
+    return methods
+
+
+def run_boundary_experiment(config=None, methods=None):
+    config = BoundaryConfig() if config is None else config
+    problem = problem_from_config(config)
+    operator = BoundaryOperator(problem)
+    operator.check_compatibility()
+    methods = selected_boundary_methods(operator, methods)
     points = select_boundary_points(problem.n, config.mode, config.point)
     grid = operator.solve()
     reference = grid if problem.exact is None else operator.normalize(problem.exact)
@@ -187,7 +193,12 @@ def export_boundary(experiment, folder):
 
 
 def benchmark_boundary(
-    config, budgets=(128, 512, 2048), repeats=3, tolerances=(1e-3, 1e-6, 1e-9)
+    config,
+    budgets=(128, 512, 2048),
+    repeats=3,
+    tolerances=(1e-3, 1e-6, 1e-9),
+    *,
+    methods=None,
 ):
     """Independent runs: compare error/cost, without selecting on validation data."""
     if isinstance(repeats, bool) or int(repeats) != repeats or repeats < 2:
@@ -195,13 +206,16 @@ def benchmark_boundary(
     problem = problem_from_config(config)
     operator = BoundaryOperator(problem)
     operator.check_compatibility()
+    methods = selected_boundary_methods(operator, methods)
     points = select_boundary_points(problem.n, config.mode, config.point)
     grid = operator.solve()
     reference = grid if problem.exact is None else operator.normalize(problem.exact)
     warmup_boundary()
-    jobs = [("lod_serial", tol) for tol in tolerances]
-    if not operator.pure_neumann:
-        jobs += [("mc", walks) for walks in budgets]
+    jobs = [
+        (method, budget)
+        for method in methods
+        for budget in (tolerances if method == "lod_serial" else budgets)
+    ]
     rows = []
     for method, budget in jobs:
         for repeat in range(int(repeats)):
