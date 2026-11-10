@@ -5,3 +5,23 @@ __pycache__/
 .pytest_cache/
 .cache/
 runs/
+
+# Local environments and packaging output.
+.venv/
+venv/
+*.egg-info/
+build/
+dist/
+
+# Tool caches, coverage and editor settings.
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+htmlcov/
+.vscode/
+.idea/
+
+# macOS metadata.
+.DS_Store
+._*

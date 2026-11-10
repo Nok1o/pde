@@ -35,6 +35,15 @@ from pdelab.views import (
 )
 
 st.set_page_config(page_title="PDE Lab · Сеточный метод и Монте-Карло", layout="wide")
+dimension = st.sidebar.radio(
+    "Размерность задачи", ["2D", "3D"], horizontal=True, key="dimension"
+)
+if dimension == "3D":
+    from pdelab.ui3d import render_3d_app
+
+    render_3d_app()
+    st.stop()
+
 st.title("Сеточный метод и Монте-Карло")
 with st.sidebar:
     st.header("Задача")
@@ -178,7 +187,7 @@ tabs = st.tabs(
         "Поле и ошибка",
         "Как идёт расчёт",
         "Улучшения",
-        "3D",
+        "Поверхность",
         "Серия экспериментов",
         "Исследование",
         "Сохранить",
