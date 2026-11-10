@@ -1,6 +1,7 @@
 """Reproducible Poisson laboratory with grid solvers and Monte Carlo."""
 
 from .boundary import BoundaryCondition, BoundaryOperator, BoundaryProblem
+from .boundary3d import BoundaryOperator3D, BoundaryProblem3D
 from .control import ControlApproximation, prepare_control
 from .operator import FrozenOperator
 from .problem import Problem, make_problem, reference_solution, select_points
@@ -10,6 +11,8 @@ __all__ = [
     "BoundaryCondition",
     "BoundaryOperator",
     "BoundaryProblem",
+    "BoundaryOperator3D",
+    "BoundaryProblem3D",
     "ControlApproximation",
     "prepare_control",
     "Problem",

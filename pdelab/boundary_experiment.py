@@ -84,7 +84,11 @@ def boundary_metrics(result, points, reference, grid_reference):
         "seconds": result.elapsed,
         "rmse": rmse,
         "relative_error_pct": 100 * rmse / scale if scale > 0 else None,
-        "rmse_grid": float(np.sqrt(np.mean((value - grid_reference[indices]) ** 2))),
+        "rmse_grid": (
+            None
+            if grid_reference is None
+            else float(np.sqrt(np.mean((value - grid_reference[indices]) ** 2)))
+        ),
         "iterations": result.iterations,
         "walks": result.walks,
         "steps": result.steps,
@@ -148,8 +152,14 @@ def run_boundary_experiment(config=None, methods=None):
 
 
 def boundary_payload(experiment):
-    operator = BoundaryOperator(experiment.problem)
+    dimension = experiment.problem.f.ndim
+    pure_neumann = all(
+        c.kind != "dirichlet" and not np.any(c.kappa)
+        for c in experiment.problem.sides.values()
+    )
     return {
+        "dimension": dimension,
+        "array_order": "zyx" if dimension == 3 else "yx",
         "config": asdict(experiment.config),
         "reference_kind": experiment.reference_kind,
         "metrics": experiment.metrics,
@@ -158,8 +168,8 @@ def boundary_payload(experiment):
             for side, c in experiment.problem.sides.items()
         },
         "normal_convention": "outward derivative du/dn; physical flux q=-du/dn for k=1",
-        "corner_rule": "Dirichlet takes precedence; two Dirichlet values must agree; otherwise both side fluxes contribute",
-        "normalization": "volume_weighted_zero_mean" if operator.pure_neumann else None,
+        "corner_rule": "Dirichlet takes precedence; intersecting Dirichlet values must agree; otherwise all incident fluxes contribute",
+        "normalization": "volume_weighted_zero_mean" if pure_neumann else None,
         "mc_pure_neumann_supported": False,
         "scheme": "nodal_half_cell_finite_volume_k1_v1",
         "timing": "Includes operator preparation and solver; excludes reference, JIT and plots",

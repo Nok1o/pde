@@ -43,8 +43,9 @@ class BoundaryCondition:
     def sampled(self, size):
         if self.kind not in KINDS:
             raise ValueError(f"Неизвестное граничное условие: {self.kind}")
-        value = _field(self.value, (size,), "Граничные данные")
-        kappa = _field(self.kappa, (size,), "κ")
+        shape = (size,) if np.isscalar(size) else tuple(size)
+        value = _field(self.value, shape, "Граничные данные")
+        kappa = _field(self.kappa, shape, "κ")
         if np.any(kappa < 0) or (self.kind != "robin" and np.any(kappa != 0)):
             raise ValueError("κ ≥ 0 задаётся только для условия Робина")
         return BoundaryCondition(self.kind, value, kappa)
@@ -116,32 +117,47 @@ class BoundaryOperator:
     This MVP has k=1. Neumann/Robin nodes remain unknowns.
     """
 
+    face_axes = {"left": (1, 0), "right": (1, -1), "bottom": (0, 0), "top": (0, -1)}
+
     def __init__(self, problem):
         self.problem = problem
         n = problem.n
         size = n + 1
-        shape = (size, size)
-        volume_axis = np.ones(size)
-        volume_axis[[0, -1]] = 0.5
-        self.volumes = _frozen(np.outer(volume_axis, volume_axis) / n**2)
+        dimension = len(self.face_axes) // 2
+        shape = (size,) * dimension
+        if problem.f.shape != shape:
+            raise ValueError(f"Оператор ожидает поле формы {shape}")
+        self.face_indices = {}
+        volumes = np.full(shape, 1 / n**dimension)
+        for side, (axis, end) in self.face_axes.items():
+            index = [slice(None)] * dimension
+            index[axis] = end
+            self.face_indices[side] = tuple(index)
+            volumes[tuple(index)] *= 0.5
+        self.volumes = _frozen(volumes)
         # Reuse issue #8's face coefficients. Half boundary cells change only
         # the volume-to-face ratio; the interior stencil remains identical.
-        core = FrozenOperator.from_nodes(np.ones(shape), -problem.f, 0.0)
-        weights = np.zeros((*shape, 4))
-        weights[:-1, :, 0] = core.wy
-        weights[1:, :, 1] = core.wy
-        weights[:, :-1, 2] = core.wx
-        weights[:, 1:, 3] = core.wx
-        weights[0, :, 0] *= 2
-        weights[-1, :, 1] *= 2
-        weights[:, 0, 2] *= 2
-        weights[:, -1, 3] *= 2
+        core = (
+            FrozenOperator.from_nodes(np.ones(shape), -problem.f, 0.0)
+            if dimension == 2
+            else None
+        )
+        weights = np.zeros((*shape, 2 * dimension))
+        for axis in range(dimension):
+            lower, upper = adjacent_slices(dimension, axis)
+            face_weights = (
+                (core.wy if axis == 0 else core.wx) if core is not None else n**2
+            )
+            weights[lower + (2 * axis,)] = face_weights
+            weights[upper + (2 * axis + 1,)] = face_weights
+        for side, (axis, end) in self.face_axes.items():
+            inward = 2 * axis + (end == -1)
+            weights[self.face_indices[side] + (inward,)] *= 2
         fixed = np.zeros(shape, dtype=bool)
         values = np.zeros(shape)
-        reaction_x = np.zeros(shape)
-        reaction_y = np.zeros(shape)
+        reactions = [np.zeros(shape) for _ in range(dimension)]
         boundary_load = np.zeros(shape)
-        for side, indices in side_indices(n).items():
+        for side, indices in self.face_indices.items():
             condition = problem.sides[side]
             if condition.kind == "dirichlet":
                 overlap = fixed[indices]
@@ -151,23 +167,25 @@ class BoundaryOperator:
                     rtol=1e-12,
                     atol=1e-12,
                 ):
-                    raise ValueError("В углу заданы несовместимые значения Дирихле")
+                    raise ValueError(
+                        "На ребре или в углу заданы несовместимые значения Дирихле"
+                    )
                 values[indices] = condition.value
                 fixed[indices] = True
             else:
                 boundary_load[indices] += 2 * n * condition.value
-                reaction = reaction_x if side in ("left", "right") else reaction_y
-                reaction[indices] += 2 * n * condition.kappa
+                reactions[self.face_axes[side][0]][indices] += 2 * n * condition.kappa
         # Dirichlet takes precedence in a corner adjoining a derivative side.
         boundary_load[fixed] = 0
-        reaction_x[fixed] = 0
-        reaction_y[fixed] = 0
+        for reaction in reactions:
+            reaction[fixed] = 0
         self.weights = _frozen(weights)
         self.fixed = _frozen(fixed)
         self.boundary = _frozen(values)
-        self.reaction_x = _frozen(reaction_x)
-        self.reaction_y = _frozen(reaction_y)
-        self.reaction = _frozen(reaction_x + reaction_y)
+        self.reaction_axes = tuple(_frozen(reaction) for reaction in reactions)
+        self.reaction_x = self.reaction_axes[-1]
+        self.reaction_y = self.reaction_axes[-2]
+        self.reaction = _frozen(sum(reactions))
         self.boundary_load = _frozen(boundary_load)
         self.diagonal = _frozen(weights.sum(axis=-1) + self.reaction)
         self.b = _frozen(-problem.f + boundary_load)
@@ -196,12 +214,12 @@ class BoundaryOperator:
     def apply(self, values):
         u = np.asarray(values, dtype=float)
         if u.shape != self.b.shape or not np.isfinite(u).all():
-            raise ValueError("Ожидается конечное поле формы (n+1, n+1)")
+            raise ValueError(f"Ожидается конечное поле формы {self.b.shape}")
         out = self.diagonal * u
-        out[:-1, :] -= self.weights[:-1, :, 0] * u[1:, :]
-        out[1:, :] -= self.weights[1:, :, 1] * u[:-1, :]
-        out[:, :-1] -= self.weights[:, :-1, 2] * u[:, 1:]
-        out[:, 1:] -= self.weights[:, 1:, 3] * u[:, :-1]
+        for axis in range(u.ndim):
+            lower, upper = adjacent_slices(u.ndim, axis)
+            out[lower] -= self.weights[lower + (2 * axis,)] * u[upper]
+            out[upper] -= self.weights[upper + (2 * axis + 1,)] * u[lower]
         out[self.fixed] = u[self.fixed]
         return out
 
@@ -211,23 +229,23 @@ class BoundaryOperator:
     def assemble(self):
         """Independent sparse assembly on unknown nodes; fixed nodes eliminated."""
         unknown = ~self.fixed
-        size = self.b.shape[0]
-        indices = np.arange(size * size).reshape(size, size)
+        size = self.b.size
+        indices = np.arange(size).reshape(self.b.shape)
         rows = [indices.ravel()]
         columns = [indices.ravel()]
         data = [self.diagonal.ravel()]
-        for origin, target, direction in (
-            ((slice(None, -1), slice(None)), (slice(1, None), slice(None)), 0),
-            ((slice(1, None), slice(None)), (slice(None, -1), slice(None)), 1),
-            ((slice(None), slice(None, -1)), (slice(None), slice(1, None)), 2),
-            ((slice(None), slice(1, None)), (slice(None), slice(None, -1)), 3),
-        ):
-            rows.append(indices[origin].ravel())
-            columns.append(indices[target].ravel())
-            data.append(-self.weights[origin][..., direction].ravel())
+        for axis in range(self.b.ndim):
+            lower, upper = adjacent_slices(self.b.ndim, axis)
+            for origin, target, direction in (
+                (lower, upper, 2 * axis),
+                (upper, lower, 2 * axis + 1),
+            ):
+                rows.append(indices[origin].ravel())
+                columns.append(indices[target].ravel())
+                data.append(-self.weights[origin + (direction,)].ravel())
         matrix = coo_matrix(
             (np.concatenate(data), (np.concatenate(rows), np.concatenate(columns))),
-            shape=(size * size, size * size),
+            shape=(size, size),
         ).tocsr()
         mask = unknown.ravel()
         rhs = (
@@ -261,6 +279,12 @@ class BoundaryOperator:
         reward[self.fixed] = self.boundary[self.fixed]
         killing[self.fixed] = 1
         return probabilities, reward, killing
+
+
+def adjacent_slices(dimension, axis):
+    lower, upper = [slice(None)] * dimension, [slice(None)] * dimension
+    lower[axis], upper[axis] = slice(None, -1), slice(1, None)
+    return tuple(lower), tuple(upper)
 
 
 def make_boundary_problem(kind="polynomial", n=24, kinds=None, kappas=None):
