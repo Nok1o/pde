@@ -2,8 +2,8 @@ from dataclasses import dataclass
 from typing import Callable
 
 import numpy as np
-from scipy.sparse import diags, kronsum
-from scipy.sparse.linalg import spsolve
+
+from .operator import FrozenOperator
 
 PRESETS = {
     "hot_top": "Нагретый верхний край",
@@ -182,25 +182,5 @@ def laplacian(u, h):
 
 
 def reference_solution(p):
-    """Independent sparse direct solution of exactly the same 5-point system."""
-    interior_size = p.n - 1
-    line_matrix = diags(
-        [
-            -np.ones(interior_size - 1),
-            2 * np.ones(interior_size),
-            -np.ones(interior_size - 1),
-        ],
-        [-1, 0, 1],
-        format="csr",
-    )
-    system_matrix = kronsum(line_matrix, line_matrix, format="csr")
-    rhs = -p.h**2 * p.f[1:-1, 1:-1].copy()
-    rhs[0, :] += p.boundary[0, 1:-1]
-    rhs[-1, :] += p.boundary[-1, 1:-1]
-    rhs[:, 0] += p.boundary[1:-1, 0]
-    rhs[:, -1] += p.boundary[1:-1, -1]
-    u = blank_field(p)
-    u[1:-1, 1:-1] = spsolve(system_matrix, rhs.ravel()).reshape(
-        interior_size, interior_size
-    )
-    return u
+    """Sparse direct solution via the shared conservative operator adapter."""
+    return FrozenOperator.from_problem(p).solve()

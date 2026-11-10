@@ -43,6 +43,31 @@ class Result:
 
 
 @njit(inline="always")
+def solve_tridiagonal(a, b, c, rhs):
+    """Solve A[i]*v[i-1]+B[i]*v[i]+C[i]*v[i+1]=rhs[i].
+
+    Endpoints outside the line are zero; nonzero Dirichlet values must first
+    be moved into rhs. A[0] and C[-1] are unused.
+    """
+    size = len(rhs)
+    if size == 0 or len(a) != size or len(b) != size or len(c) != size:
+        raise ValueError("tridiagonal arrays must have the same nonzero length")
+    alpha = np.zeros(size + 1)
+    beta = np.zeros(size + 1)
+    for index in range(size):
+        denominator = a[index] * alpha[index] + b[index]
+        if denominator == 0 or not np.isfinite(denominator):
+            raise ValueError("invalid tridiagonal pivot")
+        alpha[index + 1] = -c[index] / denominator
+        beta[index + 1] = (rhs[index] - a[index] * beta[index]) / denominator
+    solution = np.empty(size)
+    solution[-1] = beta[size]
+    for index in range(size - 2, -1, -1):
+        solution[index] = alpha[index + 1] * solution[index + 1] + beta[index + 1]
+    return solution
+
+
+@njit(inline="always")
 def _solve_line(
     rhs, solution, diffusion_ratio, axis, line_index, alpha, denominators, beta
 ):
