@@ -7,7 +7,7 @@ from .workload3d import MAX_INTERACTIVE_EXPECTED_STEPS, MAX_INTERACTIVE_WALKS
 
 
 def boundary_workload3d(config, methods, walks=None, repeats=1):
-    if "mc" not in methods:
+    if not any(m != "lod_serial" for m in methods):
         return 0, 0.0
     points = select_boundary_points3d(
         config.n, config.mode, config.point, config.plane, config.index

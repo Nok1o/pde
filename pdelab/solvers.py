@@ -21,6 +21,8 @@ METHODS = {
     "mc_control": "MC с контрольным приближением",
     "reuse": "MК хвосты путей",
     "layers": "MК слои от границы",
+    "wos": "WoS · Дирихле",
+    "graded": "MC · сгущённая сетка",
 }
 LOD_STOPPING_RULE = "relative_rhs_inf_v1"
 NUMBA_LOCK = threading.RLock()
@@ -452,6 +454,10 @@ def solve(
     варианты Монте-Карло — заданное число новых путей walks.
     """
     points = validate_points(p.n, points)
+    if method in ("wos", "graded"):
+        from .stationary_extensions import solve_extended
+
+        return solve_extended(p, points, method, walks, seed, max_steps)
     if method not in METHODS:
         raise ValueError(f"Неизвестный метод: {method}")
     if int(walks) != walks or walks < 2:
@@ -469,6 +475,39 @@ def solve(
         int(batches) != batches or batches < 2 or walks < 2 * batches
     ):
         raise ValueError("Для слоёв batches >=2 и walks >=2*batches")
+    boundary_points = np.any((points == 0) | (points == p.n), axis=1)
+    if boundary_points.any():
+        started = perf_counter()
+        interior = points[~boundary_points]
+        if len(interior):
+            result = solve(
+                p,
+                interior,
+                method,
+                walks,
+                seed,
+                tol,
+                max_iter,
+                batches,
+                max_steps,
+                record,
+                coarse_n,
+                control,
+            )
+        else:
+            result = Result(
+                method,
+                blank_field(p),
+                np.zeros_like(p.f),
+                np.zeros_like(p.f, dtype=np.int64),
+            )
+        indices = tuple(points[boundary_points].T)
+        result.values[indices] = p.boundary[indices]
+        result.stderr[indices] = 0
+        if boundary_points[0] and method in ("mc", "mc_control"):
+            result.extras["samples"] = np.full(int(walks), p.boundary[tuple(points[0])])
+        result.elapsed = perf_counter() - started
+        return result
     # Блокировка изолирует генератор случайных чисел между сессиями интерфейса.
     with NUMBA_LOCK:
         started_at = perf_counter()
@@ -559,6 +598,8 @@ def warmup():
         problem = make_problem(n=4)
         points = select_points(4)
         for method in METHODS:
+            if method in ("wos", "graded"):
+                continue
             solve(problem, points, method, walks=8, batches=2, max_iter=2, record=False)
         _warmed = True
 
@@ -567,6 +608,14 @@ def trace_walk(p, point=None, seed=2026, max_steps=None):
     """Отдельная траектория с историей вклада источника для визуализации."""
     y, x = (p.n // 2, p.n // 2) if point is None else point
     validate_points(p.n, [(y, x)])
+    if y in (0, p.n) or x in (0, p.n):
+        value = float(p.boundary[y, x])
+        return dict(
+            points=np.array([(y, x)]),
+            source=np.array([0.0]),
+            boundary=value,
+            reward=value,
+        )
     rng = np.random.default_rng(seed)
     path = [(y, x)]
     source_history = [0.0]

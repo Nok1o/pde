@@ -89,7 +89,7 @@ def test_cli_exports_boundary_coefficients_and_reference(tmp_path):
     payload = json.loads((tmp_path / "experiment.json").read_text())
     assert payload["boundary"]["left"]["kind"] == "neumann"
     assert payload["reference_kind"] == "analytic"
-    assert len(payload["metrics"]) == 2
+    assert len(payload["metrics"]) == 3
     fields = np.load(tmp_path / "fields.npz")
     assert fields["points_yx"].tolist() == [[4, 4]]
     assert (tmp_path / "field.html").is_file()
@@ -99,7 +99,7 @@ def test_benchmark_seeds_and_neumann_default():
     rows = benchmark_boundary(
         BoundaryConfig(n=8), budgets=(32, 64), repeats=2, tolerances=(1e-4,)
     )
-    assert len(rows) == 6 and len({r["seed"] for r in rows}) == 2
+    assert len(rows) == 10 and len({r["seed"] for r in rows}) == 2
     assert all(r["converged"] for r in rows)
     pure = run_boundary_experiment(BoundaryConfig(n=8, kinds=("neumann",) * 4))
     assert list(pure.results) == ["lod_serial"]

@@ -13,15 +13,15 @@ from .boundary_experiment3d import (
     export_boundary3d,
     run_boundary_experiment3d,
 )
+from .boundary_solvers import METHODS_BOUNDARY
 from .experiment3d import rows_csv
-from .solvers3d import METHODS_3D
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(
         description="3D: Дирихле, Нейман и Робин на шести гранях"
     )
-    parser.add_argument("command", choices=["run", "benchmark"])
+    parser.add_argument("command", choices=["run", "benchmark", "study"])
     parser.add_argument(
         "--problem", choices=[*PRESETS_BOUNDARY3D, "custom"], default="polynomial"
     )
@@ -48,7 +48,7 @@ def main(argv=None):
     parser.add_argument("--tol", type=float, default=1e-8)
     parser.add_argument("--max-iter", type=int, default=20000)
     parser.add_argument("--max-steps", type=int)
-    parser.add_argument("--methods", choices=METHODS_3D, nargs="+")
+    parser.add_argument("--methods", choices=METHODS_BOUNDARY, nargs="+")
     parser.add_argument("--budgets", nargs="+", type=int, default=[128, 512, 2048])
     parser.add_argument("--repeats", type=int, default=3)
     parser.add_argument("--out", type=Path, default=Path("runs/boundary3d"))
@@ -66,6 +66,21 @@ def main(argv=None):
             experiment = run_boundary_experiment3d(config, args.methods)
             export_boundary3d(experiment, args.out)
             print(rows_csv(experiment.metrics))
+        elif args.command == "study":
+            from .boundary_research import boundary_accuracy_study
+
+            study = boundary_accuracy_study(
+                config, args.methods, args.repeats, args.budgets
+            )
+            args.out.mkdir(parents=True, exist_ok=True)
+            (args.out / "timings.csv").write_bytes(
+                rows_csv(study["rows"]).encode("utf-8-sig")
+            )
+            (args.out / "study.json").write_text(
+                json.dumps(study, ensure_ascii=False, allow_nan=False, indent=2),
+                encoding="utf-8",
+            )
+            print(rows_csv(study["rows"]))
         else:
             rows = benchmark_boundary3d(
                 config, args.budgets, args.repeats, methods=args.methods

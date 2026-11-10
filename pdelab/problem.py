@@ -158,11 +158,11 @@ def validate_points(n, points):
         raise ValueError("Точки задаются непустым списком целых индексов (y,x)")
     indices = np.ascontiguousarray(indices, dtype=np.int64)
     if (
-        np.any(indices < 1)
-        or np.any(indices >= n)
+        np.any(indices < 0)
+        or np.any(indices > n)
         or len(np.unique(indices, axis=0)) != len(indices)
     ):
-        raise ValueError("Нужны уникальные внутренние узлы сетки")
+        raise ValueError("Нужны уникальные узлы сетки от 0 до n")
     return indices
 
 

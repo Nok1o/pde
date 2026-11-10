@@ -65,6 +65,9 @@ def metrics3d(result, points, reference, grid_reference=None):
     target_rms = float(np.sqrt(np.mean(target**2)))
     return {
         "method": result.method,
+        "scheme": result.extras.get("scheme", "uniform_finite_difference"),
+        "data_model": result.extras.get("data_model", "nodal_input_data"),
+        "wos_epsilon": result.extras.get("epsilon"),
         "name": METHODS_3D[result.method],
         "value": float(np.mean(values)),
         "reference_value": float(np.mean(target)),

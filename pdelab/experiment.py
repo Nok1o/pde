@@ -62,6 +62,9 @@ def metrics(result, problem, points, ref):
     relative_error = 100 * rmse / reference_rms if reference_rms > 0 else None
     row = {
         "method": result.method,
+        "scheme": result.extras.get("scheme", "uniform_finite_difference"),
+        "data_model": result.extras.get("data_model", "nodal_input_data"),
+        "wos_epsilon": result.extras.get("epsilon"),
         "name": METHODS[result.method],
         "seconds": result.elapsed,
         "preparation_seconds": result.extras.get("preparation_seconds", 0.0),

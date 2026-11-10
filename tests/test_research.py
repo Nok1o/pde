@@ -50,7 +50,7 @@ def test_independent_confirmation_is_required_and_mean_runtime_is_reported(monke
     study = accuracy_study(StudySettings(Config(n=8), repeats=2, max_walks=128))
     assert study.reference_kind == "analytic_point"
     assert study.reference_value == 25
-    assert len(study.rows) == 15
+    assert len(study.rows) == 21
     assert [row["Относительная ошибка, %"] for row in timing_rows(study)] == [1, 5, 10]
 
     for row in study.rows:
@@ -107,7 +107,7 @@ def test_real_study_checks_one_point_and_exports_metadata(tmp_path, preset):
     )
     with (tmp_path / "timings.csv").open(encoding="utf-8-sig") as stream:
         table = list(csv.DictReader(stream))
-    assert len(table) == 3 and len(table[0]) == 6
+    assert len(table) == 3 and len(table[0]) == 8
 
 
 def test_reference_falls_back_to_grid_for_noncentral_point(monkeypatch):

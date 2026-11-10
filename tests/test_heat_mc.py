@@ -131,7 +131,7 @@ def test_transition_limit_never_returns_truncated_paths():
         dict(seed=-1),
         dict(seed=2**32),
         dict(max_transitions=0),
-        dict(points=[[0, 0]]),
+        dict(points=[[-1, 0]]),
         dict(dt=0),
         dict(T=-1),
     ],

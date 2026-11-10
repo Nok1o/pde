@@ -215,7 +215,7 @@ def benchmark_boundary3d(
                     points,
                     method,
                     seed=seed,
-                    walks=budget if method == "mc" else config.walks,
+                    walks=budget if method != "lod_serial" else config.walks,
                     tol=budget if method == "lod_serial" else config.tol,
                     max_iter=config.max_iter,
                     max_steps=config.max_steps,
@@ -227,7 +227,7 @@ def benchmark_boundary3d(
                     seed=seed,
                     budget_kind=(
                         "walks_per_start"
-                        if method == "mc"
+                        if method != "lod_serial"
                         else "relative_residual_tolerance"
                     ),
                 )

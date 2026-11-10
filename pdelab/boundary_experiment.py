@@ -78,6 +78,9 @@ def boundary_metrics(result, points, reference, grid_reference):
     scale = float(np.sqrt(np.mean(target**2)))
     return {
         "method": result.method,
+        "scheme": result.extras.get("scheme", "uniform_finite_difference"),
+        "data_model": result.extras.get("data_model", "nodal_input_data"),
+        "wos_epsilon": result.extras.get("epsilon"),
         "name": METHODS_BOUNDARY[result.method],
         "value": float(np.mean(value)),
         "reference_value": float(np.mean(target)),
@@ -99,7 +102,16 @@ def boundary_metrics(result, points, reference, grid_reference):
 
 def selected_boundary_methods(operator, methods=None):
     if methods is None:
-        methods = ["lod_serial"] if operator.pure_neumann else list(METHODS_BOUNDARY)
+        methods = (
+            ["lod_serial"]
+            if operator.pure_neumann
+            else [
+                m
+                for m in METHODS_BOUNDARY
+                if m != "wos"
+                or all(c.kind == "dirichlet" for c in operator.problem.sides.values())
+            ]
+        )
     methods = list(methods)
     if (
         not methods
@@ -107,13 +119,17 @@ def selected_boundary_methods(operator, methods=None):
         or any(m not in METHODS_BOUNDARY for m in methods)
     ):
         raise ValueError("Выберите ЛОМ и/или обычный MC")
-    if operator.pure_neumann and "mc" in methods:
+    if operator.pure_neumann and any(m != "lod_serial" for m in methods):
         raise ValueError("MC для чистого Неймана пока не поддерживается")
+    if "wos" in methods and any(
+        c.kind != "dirichlet" for c in operator.problem.sides.values()
+    ):
+        raise ValueError("WoS требует Дирихле на всех сторонах/гранях")
     return methods
 
 
 def validate_boundary_budgets(methods, budgets, tolerances):
-    if "mc" in methods and len(budgets) == 0:
+    if any(m != "lod_serial" for m in methods) and len(budgets) == 0:
         raise ValueError("Выберите хотя бы один бюджет MC")
     if "lod_serial" in methods and len(tolerances) == 0:
         raise ValueError("Выберите хотя бы один допуск ЛОМ")

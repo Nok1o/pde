@@ -56,7 +56,7 @@ def _series3d(study, problem, points, method, budget, budget_index, phase, deadl
             np.random.SeedSequence(
                 [
                     int(config.seed),
-                    int(method == "mc"),
+                    int(method != "lod_serial"),
                     budget_index,
                     int(phase == "validation"),
                     repeat,
@@ -67,7 +67,7 @@ def _series3d(study, problem, points, method, budget, budget_index, phase, deadl
             problem,
             points,
             method,
-            walks=int(budget) if method == "mc" else 2,
+            walks=int(budget) if method != "lod_serial" else 2,
             tol=float(budget) if method == "lod_serial" else config.tol,
             seed=seed,
             max_iter=config.max_iter,

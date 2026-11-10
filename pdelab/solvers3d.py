@@ -8,7 +8,12 @@ from numba import njit
 from .problem3d import blank_field3d, laplacian3d, make_problem3d, validate_points3d
 from .solvers import NUMBA_LOCK, Result
 
-METHODS_3D = {"lod_serial": "ЛОМ", "mc": "Монте-Карло"}
+METHODS_3D = {
+    "lod_serial": "ЛОМ",
+    "mc": "Монте-Карло",
+    "graded": "MC · сгущённая сетка",
+    "wos": "WoS · Дирихле",
+}
 STOPPING_RULE_3D = "relative_rhs_inf_3d_v1"
 
 
@@ -187,6 +192,10 @@ def solve3d(
     tau=None,
 ):
     points = validate_points3d(problem.n, points)
+    if method in ("wos", "graded"):
+        from .stationary_extensions import solve_extended
+
+        return solve_extended(problem, points, method, walks, seed, max_steps)
     if method not in METHODS_3D:
         raise ValueError(
             "В 3D доступны только lod_serial и mc; хвосты и слои ещё не перенесены"
@@ -251,5 +260,7 @@ def warmup3d():
             return
         problem = make_problem3d(n=4)
         for method in METHODS_3D:
+            if method in ("wos", "graded"):
+                continue
             solve3d(problem, [(2, 2, 2)], method, walks=4, max_iter=1)
         _warmed = True

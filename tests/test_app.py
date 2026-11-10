@@ -19,7 +19,7 @@ def test_default_center_app_runs_without_debug_output():
     assert not app.exception
     exp = app.session_state["experiment"]
     assert exp.points.tolist() == [[12, 12]]
-    assert len(exp.results) == 5
+    assert len(exp.results) == 7
     assert len(app.dataframe) == 1
     columns = app.dataframe[0].value.columns
     assert "Значение u" in columns and "Отн. ошибка, %" in columns
@@ -30,7 +30,7 @@ def test_default_center_app_runs_without_debug_output():
                 widget for widget in app.multiselect if widget.label == "Методы"
             ).options
         )
-        == 5
+        == 7
     )
     assert not any("параллел" in slider.label.lower() for slider in app.slider)
     assert not any("Диагностика" in expander.label for expander in app.expander)
@@ -75,7 +75,7 @@ def test_research_runs_without_main_calculation_and_detects_changed_settings():
     assert study.settings.config.point == (4, 4)
     assert study.settings.repeats == 2
     table = app.dataframe[0].value
-    assert table.shape == (3, 6)
+    assert table.shape == (3, 8)
     assert table.iloc[:, 0].tolist() == [1, 5, 10]
     app.number_input(key="research_repeats").set_value(3).run()
     assert not app.exception

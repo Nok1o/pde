@@ -16,7 +16,7 @@ def interactive_mc_workload(config, methods):
     границы любой координатой, поэтому E[T] <= min(V(x), V(y), V(z)).
     Это оценка математического ожидания, не предел фактического времени.
     """
-    if "mc" not in methods:
+    if not any(m != "lod_serial" for m in methods):
         return 0, 0
     points = select_points3d(
         config.n, config.mode, config.point, config.plane, config.index

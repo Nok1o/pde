@@ -16,12 +16,12 @@ from .boundary_experiment3d import (
     problem_from_config3d,
     run_boundary_experiment3d,
 )
+from .boundary_solvers import METHODS_BOUNDARY
 from .boundary_solvers3d import trace_boundary_walk3d
 from .boundary_ui import KIND_LABELS
 from .boundary_views3d import boundary_trace_figure3d
 from .boundary_workload3d import boundary_limit_message3d
 from .experiment3d import rows_csv
-from .solvers3d import METHODS_3D
 from .views3d import PLANES, residual_figure3d, slice_figure3d
 
 
@@ -236,7 +236,7 @@ def _benchmark(config, methods):
         [64, 256, 1024, 4096],
         default=[64, 256, 1024],
         key="bc3d_budgets",
-        disabled="mc" not in methods,
+        disabled=not any(m != "lod_serial" for m in methods),
     )
     settings = {
         "config": asdict(config),
@@ -245,7 +245,7 @@ def _benchmark(config, methods):
         "repeats": repeats,
         "tolerances": [1e-3, 1e-6, 1e-9],
     }
-    disabled = not methods or ("mc" in methods and not budgets)
+    disabled = not methods or (any(m != "lod_serial" for m in methods) and not budgets)
     if st.button("Запустить серию", key="bc3d_benchmark", disabled=disabled):
         warning = boundary_limit_message3d(config, methods, sum(budgets), repeats)
         if warning:
@@ -300,7 +300,9 @@ def render_boundary_app3d():
         return
     pure_neumann = operator.pure_neumann
     del operator
-    available = ["lod_serial"] if pure_neumann else list(METHODS_3D)
+    available = ["lod_serial"] if pure_neumann else list(METHODS_BOUNDARY)
+    if any(kind != "dirichlet" for kind in config.kinds):
+        available = [m for m in available if m != "wos"]
     if pure_neumann:
         st.caption(
             "Чистый Нейман: среднее с весами объёмов равно нулю. MC без поглощения пока не поддерживается."
@@ -310,7 +312,7 @@ def render_boundary_app3d():
             "Методы",
             available,
             default=available,
-            format_func=METHODS_3D.get,
+            format_func=METHODS_BOUNDARY.get,
             key="bc3d_methods",
         )
         run = st.button(
@@ -330,8 +332,11 @@ def render_boundary_app3d():
                     st.session_state.pop(key, None)
             except (ValueError, RuntimeError) as exc:
                 st.error(str(exc))
-    comparison, trace_tab, series = st.tabs(
-        ["Сравнение и срезы", "Траектория", "Серия измерений"]
+    from .stationary_extensions import render_method_scope
+
+    render_method_scope(3, mixed=True)
+    comparison, trace_tab, series, research_tab = st.tabs(
+        ["Сравнение и срезы", "Траектория", "Серия измерений", "Исследование"]
     )
     with comparison:
         experiment = st.session_state.get("bc3d_result")
@@ -357,3 +362,8 @@ def render_boundary_app3d():
                 )
     with series:
         _benchmark(config, methods)
+
+    with research_tab:
+        from .boundary_research import render_boundary_research
+
+        render_boundary_research(config, methods, "bc3_research")
