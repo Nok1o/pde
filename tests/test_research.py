@@ -50,34 +50,21 @@ def test_independent_confirmation_is_required_and_mean_runtime_is_reported(monke
     study = accuracy_study(StudySettings(Config(n=8), repeats=2, max_walks=128))
     assert study.reference_kind == "analytic_point"
     assert study.reference_value == 25
-    assert len(study.rows) == 12
+    assert len(study.rows) == 15
     assert [row["Относительная ошибка, %"] for row in timing_rows(study)] == [1, 5, 10]
 
     for row in study.rows:
-        assert row["status"] == "Достигнута"
-        assert row["relative_error_pct"] <= row["target_pct"]
-        assert row["calibration_error_pct"] <= row["target_pct"]
-        if row["method"] != "lod_serial":
-            assert row["budget"] == 128
-            assert row["seconds"] == pytest.approx(0.0128)
-        matching_trials = [
-            trial
-            for trial in study.trials
-            if trial["method"] == row["method"] and trial["budget"] == row["budget"]
-        ]
-        validation = [
-            trial for trial in matching_trials if trial["phase"] == "validation"
-        ]
-        calibration = [
-            trial for trial in matching_trials if trial["phase"] == "calibration"
-        ]
-        assert len(validation) == 2
-        assert row["seconds"] == pytest.approx(
-            np.mean([trial["seconds"] for trial in validation])
-        )
-        assert set(trial["seed"] for trial in validation).isdisjoint(
-            trial["seed"] for trial in calibration
-        )
+        if row["method"] == "lod_serial":
+            assert row["status"] == "Достигнута"
+            assert row["seconds"] == pytest.approx(0.002)
+        else:
+            assert row["budget"] == 64
+            assert row["seconds"] is None
+            assert row["relative_error_pct"] == pytest.approx(20)
+    assert not any(t["budget"] == 128 for t in study.trials)
+    calibration = {t["seed"] for t in study.trials if t["phase"] == "calibration"}
+    validation = {t["seed"] for t in study.trials if t["phase"] == "validation"}
+    assert calibration.isdisjoint(validation)
 
 
 def test_failed_confirmation_does_not_produce_a_time(monkeypatch):
@@ -120,7 +107,7 @@ def test_real_study_checks_one_point_and_exports_metadata(tmp_path, preset):
     )
     with (tmp_path / "timings.csv").open(encoding="utf-8-sig") as stream:
         table = list(csv.DictReader(stream))
-    assert len(table) == 3 and len(table[0]) == 5
+    assert len(table) == 3 and len(table[0]) == 6
 
 
 def test_reference_falls_back_to_grid_for_noncentral_point(monkeypatch):

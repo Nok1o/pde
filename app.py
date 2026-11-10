@@ -93,6 +93,13 @@ with st.sidebar:
         batches = st.selectbox(
             "Независимых полных расчётов слоёв", [4, 8, 16, 32], index=1
         )
+        coarse_n = st.number_input(
+            "Интервалов контрольной сетки",
+            min_value=4,
+            max_value=n,
+            value=max(4, n // 4),
+            step=1,
+        )
         seed = st.number_input(
             "Seed", min_value=0, max_value=2**32 - 1, value=42, step=1
         )
@@ -104,6 +111,7 @@ with st.sidebar:
         walks=walks,
         batches=batches,
         seed=seed,
+        coarse_n=coarse_n,
         tol=tol,
         top=top,
         bottom=bottom,

@@ -47,7 +47,7 @@ def test_benchmark_varies_budgets_and_seeds():
         repeats=2,
         tolerances=[1e-2, 1e-4],
     )
-    assert len(rows) == 16
+    assert len(rows) == 20
     assert set(r["repeat"] for r in rows) == {0, 1}
     assert all(r["converged"] for r in rows)
-    assert len(benchmark_figure(rows).data) == 4
+    assert len(benchmark_figure(rows).data) == 5
