@@ -332,3 +332,35 @@ def test_full_chain_statistics_targets_and_disjoint_validation_seeds():
         problem, T=0.02, repeats=2, stochastic=NonlinearSettings(max_total_walks=1)
     )
     assert failed.metrics[1]["rmse"] is None and not failed.metrics[1]["completed"]
+
+
+@pytest.mark.parametrize("T", [0.013, 0.04])
+def test_alpha_zero_agrees_with_merged_space_time_mc(T):
+    from pdelab.heat_mc import solve_heat_mc
+
+    problem = make_nonlinear_problem(4, 0.0)
+    points = np.array([[1, 1], [2, 2], [1, 3]])
+    settings = NonlinearSettings(
+        tolerance=1e-5,
+        change_tolerance=1e-5,
+        walks=256,
+        max_walks=4096,
+    )
+    reference = solve_nonlinear(problem, dt=0.013, T=T, method="newton")
+    stochastic = solve_nonlinear(problem, dt=0.013, T=T, method="mc", settings=settings)
+    assert reference.completed and stochastic.completed
+    samples = np.array(
+        [
+            solve_heat_mc(
+                problem, dt=0.013, T=T, points=points, walks=4096, seed=seed
+            ).values
+            for seed in range(16)
+        ]
+    )
+    indices = tuple(points.T)
+    target = reference.fields[-1][indices]
+    uncertainty = samples.std(axis=0, ddof=1) / np.sqrt(len(samples))
+    assert np.all(np.abs(samples.mean(axis=0) - target) <= 5 * uncertainty + 1e-10)
+    np.testing.assert_allclose(stochastic.fields[-1][indices], target, atol=2e-4)
+    np.testing.assert_array_equal(stochastic.times, reference.times)
+    assert stochastic.times[-1] == T
