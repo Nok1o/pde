@@ -14,6 +14,8 @@ from .heat_mc import _settings, _warmup, solve_heat_mc
 from .problem import validate_points
 from .research import TARGETS_PCT, _walk_budgets
 
+VALIDATION_POLICY = "one_final_check_per_target_v1"
+
 
 def heat_mc_study(
     problem,
@@ -75,6 +77,7 @@ def heat_mc_study(
         reference=float(reference),
         reference_kind="analytic" if problem.exact else "discrete",
         grid_reference=float(grid.fields[-1, y, x]),
+        validation_policy=VALIDATION_POLICY,
         timing="Full solve to T including all known-data preparation; JIT/reference excluded.",
     )
     trials, rows = [], []
@@ -157,20 +160,22 @@ def heat_mc_study(
                 if not candidates:
                     continue
                 validation, seconds = series(budget, budget_index, "validation")
+                # Calibration fixes the budget; validation never sends a target
+                # back into the search, even if its final check fails.
                 for target in candidates:
-                    if validation <= target:
-                        rows.append(
-                            dict(
-                                method=method,
-                                target_pct=target,
-                                seconds=seconds,
-                                budget=float(budget),
-                                calibration_error_pct=calibration,
-                                validation_error_pct=validation,
-                                status="reached",
-                            )
+                    confirmed = validation <= target
+                    rows.append(
+                        dict(
+                            method=method,
+                            target_pct=target,
+                            seconds=seconds if confirmed else None,
+                            budget=float(budget),
+                            calibration_error_pct=calibration,
+                            validation_error_pct=validation,
+                            status="reached" if confirmed else "not_confirmed",
                         )
-                        pending.remove(target)
+                    )
+                    pending.remove(target)
                 if not pending:
                     break
             except TimeoutError:

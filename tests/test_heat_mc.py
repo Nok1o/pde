@@ -221,6 +221,10 @@ def test_ui_mc_and_research_work_without_grid_calculation():
     app.button(key="heat_study_run").click().run()
     assert not app.exception
     assert len(app.session_state["heat_mc_study"][0]["rows"]) == 6
+    app.session_state["heat_mc_study"][0]["settings"].pop("validation_policy")
+    app.run()
+    assert "heat_mc_study" not in app.session_state
+    assert any("Протокол проверки" in item.value for item in app.info)
 
 
 def test_research_reports_transition_failure_without_publishing_times():
@@ -233,3 +237,44 @@ def test_research_reports_transition_failure_without_publishing_times():
         row["status"].startswith("solver_failed") and row["seconds"] is None
         for row in rows
     )
+
+
+def test_failed_final_validation_never_restarts_budget_search(monkeypatch):
+    from types import SimpleNamespace
+
+    import pdelab.heat_mc_study as module
+
+    p = HeatProblem.from_functions(
+        8,
+        lambda x, y: 1,
+        lambda x, y, t: 0,
+        lambda x, y, t: 1,
+        exact=lambda x, y, t: 1,
+    )
+    budgets = []
+
+    def estimate(*args, walks, **kwargs):
+        budgets.append(walks)
+        # Calibration passes all targets; final validation fails all targets.
+        # Larger budgets would pass if incorrectly revisited after validation.
+        value = (1.005 if len(budgets) <= 2 else 1.12) if walks == 64 else 1.0
+        return SimpleNamespace(
+            values=np.array([value]),
+            seconds=0.01,
+            preparation_seconds=0.002,
+            spatial_transitions=10,
+            temporal_transitions=4,
+            memory_bytes=100,
+        )
+
+    monkeypatch.setattr(module, "solve_heat_mc", estimate)
+    study = module.heat_mc_study(p, dt=0.01, T=0.02, repeats=2, max_walks=256)
+    rows = [row for row in study["rows"] if row["method"] == "mc"]
+    assert budgets == [64] * 4
+    assert len(rows) == 3
+    assert all(
+        row["status"] == "not_confirmed" and row["seconds"] is None for row in rows
+    )
+    assert all(row["budget"] == 64 for row in rows)
+    assert all(row["calibration_error_pct"] == pytest.approx(0.5) for row in rows)
+    assert all(row["validation_error_pct"] == pytest.approx(12) for row in rows)

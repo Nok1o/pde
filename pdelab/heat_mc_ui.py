@@ -9,7 +9,7 @@ import streamlit as st
 
 from .heat import make_heat_problem, solve_heat, time_grid
 from .heat_mc import heat_mc_step, solve_heat_mc
-from .heat_mc_study import heat_mc_study
+from .heat_mc_study import VALIDATION_POLICY, heat_mc_study
 from .heat_mc_views import heat_mc_archive
 
 
@@ -176,6 +176,10 @@ def render_heat_mc_study(settings):
     if stored is None:
         return
     study, previous = stored
+    if study["settings"].get("validation_policy") != VALIDATION_POLICY:
+        st.session_state.pop("heat_mc_study", None)
+        st.info("Протокол проверки точности изменён. Выполните новую серию.")
+        return
     if current != previous:
         st.info("Настройки исследования изменены. Выполните новую серию.")
     table = pd.DataFrame(study["rows"])
