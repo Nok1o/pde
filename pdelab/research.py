@@ -1,11 +1,14 @@
-"""Время достижения заданной относительной точности в одной точке."""
+"""Время достижения заданной относительной точности на выбранных узлах."""
 
 import csv
 import json
+import platform
+import subprocess
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from time import perf_counter
 
+import numba
 import numpy as np
 
 from .experiment import Config
@@ -43,7 +46,7 @@ class StudyResult:
     settings: StudySettings
     reference_kind: str
     reference_label: str
-    reference_value: float
+    reference_value: float | list[float]
     rows: list[dict] = field(default_factory=list)
     trials: list[dict] = field(default_factory=list)
     search_seconds: float = 0.0
@@ -68,12 +71,22 @@ def _trial_seed(seed, budget_index, phase, repeat_index):
 
 def _relative_rmse(values, reference):
     """Ошибка отдельных запусков, без взаимного сокращения ошибок их среднего."""
-    relative_errors = (np.asarray(values) - reference) / abs(reference)
+    reference = np.asarray(reference)
+    relative_errors = (np.asarray(values) - reference) / np.sqrt(np.mean(reference**2))
     return float(100 * np.sqrt(np.mean(relative_errors**2)))
 
 
 def _measure_budget(
-    study, problem, points, method, budget, budget_index, phase, deadline, progress
+    study,
+    problem,
+    points,
+    method,
+    budget,
+    budget_index,
+    phase,
+    deadline,
+    progress,
+    grid_values,
 ):
     config = study.settings.config
     is_lod = method == "lod_serial"
@@ -103,11 +116,14 @@ def _measure_budget(
             max_iter=config.max_iter,
             batches=config.batches,
             record=False,
+            coarse_n=config.coarse_n,
         )
         if not result.converged:
             raise RuntimeError("ЛОМ не достиг допуска невязки")
-        value = float(result.values[tuple(points[0])])
-        if not np.isfinite(value):
+        value = result.values[tuple(points.T)]
+        if len(points) == 1:
+            value = float(value[0])
+        if not np.isfinite(value).all():
             raise RuntimeError("Решатель вернул неконечное значение")
         values.append(value)
         times.append(result.elapsed)
@@ -122,15 +138,30 @@ def _measure_budget(
                 "budget_kind": (
                     "relative_residual_tolerance" if is_lod else "walks_per_start"
                 ),
-                "value": value,
+                "value": np.asarray(value).tolist(),
                 "reference_value": study.reference_value,
-                "relative_error_pct": 100
-                * abs(value - study.reference_value)
-                / abs(study.reference_value),
+                "relative_error_pct": _relative_rmse([value], study.reference_value),
+                "preparation_seconds": result.extras.get("preparation_seconds", 0.0),
+                "path_seconds": result.extras.get("path_seconds", result.elapsed),
                 "seconds": result.elapsed,
                 "walks": result.walks,
                 "steps": result.steps,
                 "iterations": result.iterations,
+                "residual": result.residual,
+                "coarse_n": result.extras.get("coarse_n"),
+                "grid_rmse": float(
+                    np.sqrt(np.mean((np.asarray(value) - grid_values) ** 2))
+                ),
+                "mean_path_variance": (
+                    float(
+                        np.nanmean(
+                            result.stderr[tuple(points.T)] ** 2
+                            * result.sample_count[tuple(points.T)]
+                        )
+                    )
+                    if not is_lod
+                    else None
+                ),
             }
         )
 
@@ -149,8 +180,6 @@ def accuracy_study(settings: StudySettings, progress=None):
     Это эмпирическая точность на сериях, не вероятностная гарантия.
     """
     config = settings.config
-    if config.mode != "point":
-        raise ValueError("Исследование выполняется в одной точке")
     if int(settings.repeats) != settings.repeats or settings.repeats < 2:
         raise ValueError("Нужно минимум два независимых запуска")
     if int(config.batches) != config.batches or config.batches < 2:
@@ -176,11 +205,14 @@ def accuracy_study(settings: StudySettings, progress=None):
         config.right,
         config.source,
     )
-    points = select_points(config.n, "point", config.point)
+    points = select_points(config.n, config.mode, config.point)
     grid_reference = reference_solution(problem)
     reference = choose_reference(problem, points, grid_reference)
-    reference_value = float(reference.values[tuple(points[0])])
-    if reference_value == 0:
+    reference_values = reference.values[tuple(points.T)]
+    reference_value = (
+        float(reference_values[0]) if len(points) == 1 else reference_values.tolist()
+    )
+    if not np.any(reference_values):
         raise ValueError(
             "Эталон в этой точке равен нулю: относительная точность не определена. Выберите другую точку или задачу."
         )
@@ -233,6 +265,7 @@ def accuracy_study(settings: StudySettings, progress=None):
                     "calibration",
                     deadline,
                     report,
+                    grid_reference[tuple(points.T)],
                 )
                 for row in pending:
                     row.update(
@@ -258,10 +291,11 @@ def accuracy_study(settings: StudySettings, progress=None):
                     "validation",
                     deadline,
                     report,
+                    grid_reference[tuple(points.T)],
                 )
-                for row in pending:
-                    row["relative_error_pct"] = validation["relative_error_pct"]
                 for row in candidates:
+                    row["relative_error_pct"] = validation["relative_error_pct"]
+                    pending.remove(row)
                     if validation["relative_error_pct"] <= row["target_pct"]:
                         row.update(
                             seconds=validation["seconds"],
@@ -270,7 +304,6 @@ def accuracy_study(settings: StudySettings, progress=None):
                             budget=budget,
                             status="Достигнута",
                         )
-                        pending.remove(row)
                 if not pending:
                     break
         except (TimeoutError, RuntimeError) as exc:
@@ -312,16 +345,26 @@ def export_study(study, folder):
                 writer = csv.DictWriter(stream, fieldnames=list(rows[0]))
                 writer.writeheader()
                 writer.writerows(rows)
+    try:
+        commit = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], text=True, stderr=subprocess.DEVNULL
+        ).strip()
+    except (OSError, subprocess.CalledProcessError):
+        commit = None
     metadata = {
+        "commit": commit,
+        "python": platform.python_version(),
+        "numpy": np.__version__,
+        "numba": numba.__version__,
         "settings": asdict(study.settings),
         "targets_pct": TARGETS_PCT,
         "reference_kind": study.reference_kind,
         "reference_label": study.reference_label,
         "reference_value": study.reference_value,
         "search_seconds": study.search_seconds,
-        "accuracy": "100 * RMS(u_run - reference) / abs(reference), checked on calibration and independent validation series",
+        "accuracy": "100 * RMS(u_run - reference) / RMS(reference), across runs and queried points; independent validation",
         "timing": "Mean solver time of validation runs; search, reference and JIT excluded; all layer preparation included",
-        "selection": "First tested budget passing both series; empirical estimate, not a probability guarantee",
+        "selection": "First budget passing calibration; validation never changes the selected budget; empirical estimate",
     }
     (folder / "settings.json").write_text(
         json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8"

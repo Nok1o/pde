@@ -9,7 +9,7 @@ from .problem import make_problem, reference_solution, select_points
 from .reference import REFERENCE_POLICY, choose_reference
 from .solvers import LOD_STOPPING_RULE, METHODS, solve, trace_walk, warmup
 
-METRICS_POLICY = "four-methods-relative-v2"
+METRICS_POLICY = "control-mc-relative-v3"
 LOD_TOLERANCES = (1e-2, 1e-4, 1e-6, 1e-8)
 
 
@@ -29,6 +29,7 @@ class Config:
     left: float = 0.0
     right: float = 0.0
     source: float = 0.0
+    coarse_n: int | None = None
 
 
 @dataclass
@@ -63,6 +64,14 @@ def metrics(result, problem, points, ref):
         "method": result.method,
         "name": METHODS[result.method],
         "seconds": result.elapsed,
+        "preparation_seconds": result.extras.get("preparation_seconds", 0.0),
+        "path_seconds": result.extras.get("path_seconds"),
+        "coarse_n": result.extras.get("coarse_n"),
+        "mean_path_variance": (
+            float(np.nanmean(result.stderr[y, x] ** 2 * result.sample_count[y, x]))
+            if result.method != "lod_serial"
+            else None
+        ),
         "query_mean": float(values.mean()),
         "reference_mean": float(reference_values.mean()),
         "reference_kind": comparison.kind,
@@ -166,6 +175,7 @@ def run_experiment(cfg=None, methods=None, progress=None, record=True):
             tol=cfg.tol,
             max_iter=cfg.max_iter,
             batches=cfg.batches,
+            coarse_n=cfg.coarse_n,
             record=record,
         )
         if not result.converged:
@@ -240,6 +250,7 @@ def benchmark(
                 tol=float(budget) if is_lod else cfg.tol,
                 max_iter=cfg.max_iter,
                 batches=cfg.batches,
+                coarse_n=cfg.coarse_n,
                 record=False,
             )
             if not result.converged:

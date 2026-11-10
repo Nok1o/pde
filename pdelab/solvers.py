@@ -12,11 +12,13 @@ from time import perf_counter
 import numpy as np
 from numba import njit
 
+from .control import prepare_control
 from .problem import Problem, blank_field, laplacian, validate_points
 
 METHODS = {
     "lod_serial": "ЛОМ",
     "mc": "Монте-Карло",
+    "mc_control": "MC с контрольным приближением",
     "reuse": "MК хвосты путей",
     "layers": "MК слои от границы",
 }
@@ -41,7 +43,9 @@ class Result:
 
 
 @njit(inline="always")
-def _solve_line(rhs, solution, diffusion_ratio, axis, line_index):
+def _solve_line(
+    rhs, solution, diffusion_ratio, axis, line_index, alpha, denominators, beta
+):
     """Прогонка системы A*v[i-1] + B*v[i] + C*v[i+1] = F[i].
 
     Прогоночные коэффициенты задают v[i] = alpha[i+1]*v[i+1] + beta[i+1].
@@ -50,22 +54,15 @@ def _solve_line(rhs, solution, diffusion_ratio, axis, line_index):
     """
     size = rhs.shape[0]
     a = -diffusion_ratio
-    b = 1 + 2 * diffusion_ratio
-    c = -diffusion_ratio
-    alpha = np.empty(size + 1)
-    beta = np.empty(size + 1)
 
     # Левая граница: поправка равна нулю.
-    alpha[0] = 0.0
     beta[0] = 0.0
 
     # Прямой ход: alpha[i+1] = -C / (A*alpha[i] + B),
     # beta[i+1] = (F[i] - A*beta[i]) / (A*alpha[i] + B).
     for index in range(size):
         rhs_value = rhs[line_index, index] if axis == 0 else rhs[index, line_index]
-        denominator = a * alpha[index] + b
-        alpha[index + 1] = -c / denominator
-        beta[index + 1] = (rhs_value - a * beta[index]) / denominator
+        beta[index + 1] = (rhs_value - a * beta[index]) / denominators[index]
 
     # Правая граница нулевая, поэтому v[size-1] = beta[size].
     if axis == 0:
@@ -85,12 +82,30 @@ def _solve_line(rhs, solution, diffusion_ratio, axis, line_index):
             )
 
 
+@njit(cache=True)
+def _line_coefficients(size, diffusion_ratio):
+    alpha = np.zeros(size + 1)
+    denominators = np.empty(size)
+    for index in range(size):
+        denominators[index] = 1 + 2 * diffusion_ratio - diffusion_ratio * alpha[index]
+        alpha[index + 1] = diffusion_ratio / denominators[index]
+    return alpha, denominators
+
+
+@njit(cache=True, nogil=True)
+def _sweep_into(rhs, solution, diffusion_ratio, axis, alpha, denominators, beta):
+    for line_index in range(rhs.shape[0]):
+        _solve_line(
+            rhs, solution, diffusion_ratio, axis, line_index, alpha, denominators, beta
+        )
+
+
 @njit(cache=True, nogil=True)
 def _sweep_serial(rhs, diffusion_ratio, axis):
-    """Последовательно решаем все линии: axis=0 по x, axis=1 по y."""
     solution = np.empty_like(rhs)
-    for line_index in range(rhs.shape[0]):
-        _solve_line(rhs, solution, diffusion_ratio, axis, line_index)
+    alpha, denominators = _line_coefficients(rhs.shape[0], diffusion_ratio)
+    beta = np.empty(rhs.shape[0] + 1)
+    _sweep_into(rhs, solution, diffusion_ratio, axis, alpha, denominators, beta)
     return solution
 
 
@@ -323,6 +338,10 @@ def _lod(problem, method, tol, max_iter, record):
     u[1:-1, 1:-1] = 0.0
     tau = problem.h / (2 * np.pi)
     diffusion_ratio = tau / problem.h**2
+    alpha, denominators = _line_coefficients(problem.n - 1, diffusion_ratio)
+    beta = np.empty(problem.n)
+    x_correction = np.empty((problem.n - 1, problem.n - 1))
+    correction = np.empty_like(x_correction)
     # При нулевом внутреннем поле начальная невязка равна правой части b.
     # В неё уже входят граничные значения, поэтому нормировка работает при f=0.
     initial_residual = laplacian(u, problem.h) - problem.f[1:-1, 1:-1]
@@ -357,8 +376,12 @@ def _lod(problem, method, tol, max_iter, record):
             break
 
         # 3. Решаем линии по x, затем по y и добавляем полученную поправку.
-        x_correction = _sweep_serial(tau * residual, diffusion_ratio, axis=0)
-        correction = _sweep_serial(x_correction, diffusion_ratio, axis=1)
+        _sweep_into(
+            tau * residual, x_correction, diffusion_ratio, 0, alpha, denominators, beta
+        )
+        _sweep_into(
+            x_correction, correction, diffusion_ratio, 1, alpha, denominators, beta
+        )
         u[1:-1, 1:-1] += correction
 
     if record and (not history or history[-1][0] != iterations):
@@ -395,6 +418,8 @@ def solve(
     batches=8,
     max_steps=None,
     record=True,
+    coarse_n=None,
+    control=None,
 ):
     """Проверяем параметры, запускаем выбранный метод и измеряем его время.
 
@@ -424,6 +449,40 @@ def solve(
         started_at = perf_counter()
         if method == "lod_serial":
             result = _lod(p, method, tol, max_iter, record)
+        elif method == "mc_control":
+            prepared = control if control is not None else prepare_control(p, coarse_n)
+            prepared.validate(p)
+            path_started = perf_counter()
+            sums, squares, counts, steps, samples = _mc(
+                prepared.source,
+                prepared.boundary,
+                points,
+                int(walks),
+                int(seed),
+                int(limit),
+            )
+            path_seconds = perf_counter() - path_started
+            values, errors, counts = _put_stats(p, points, sums, squares, counts)
+            y, x = points.T
+            values[y, x] += prepared.values[y, x]
+            result = Result(
+                method,
+                values,
+                errors,
+                counts,
+                steps=steps,
+                walks=len(points) * walks,
+                extras={
+                    "samples": samples + prepared.values[tuple(points[0])],
+                    "preparation_seconds": (
+                        prepared.preparation_seconds if control is None else 0.0
+                    ),
+                    "control_build_seconds": prepared.preparation_seconds,
+                    "path_seconds": path_seconds,
+                    "coarse_n": prepared.coarse_n,
+                    "control_reused": control is not None,
+                },
+            )
         elif method == "mc":
             sums, squared_sums, observation_counts, steps, samples = _mc(
                 p.f, p.boundary, points, int(walks), int(seed), int(limit)

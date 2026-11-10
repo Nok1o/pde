@@ -20,10 +20,10 @@ from .views import benchmark_plot, export
 
 def main(argv=None):
     parser = argparse.ArgumentParser(
-        description="PDE Lab: Δu=f, сеточный метод и три варианта Монте-Карло"
+        description="PDE Lab: Δu=f, сеточный метод и варианты Монте-Карло"
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
-    for cmd in ["run", "benchmark"]:
+    for cmd in ["run", "benchmark", "study"]:
         command_parser = subparsers.add_parser(cmd)
         command_parser.add_argument(
             "--problem", choices=list(PRESETS), default="hot_top"
@@ -53,6 +53,7 @@ def main(argv=None):
             default=8,
             help="Независимых полных реализаций метода слоёв",
         )
+        command_parser.add_argument("--coarse-n", type=int, default=None)
         command_parser.add_argument("--seed", type=int, default=42)
         command_parser.add_argument(
             "--tol",
@@ -82,6 +83,10 @@ def main(argv=None):
         default=list(LOD_TOLERANCES),
         help="Относительные допуски ЛОМ",
     )
+    study_parser = subparsers.choices["study"]
+    study_parser.add_argument("--repeats", type=int, default=5)
+    study_parser.add_argument("--max-walks", type=int, default=4096)
+    study_parser.add_argument("--seconds-per-method", type=float, default=60)
     args = parser.parse_args(argv)
     config_fields = Config.__dataclass_fields__.keys()
     config = Config(**{k: getattr(args, k) for k in config_fields})
@@ -90,7 +95,17 @@ def main(argv=None):
         print(f"{frac:.0%} · {label}", flush=True)
 
     try:
-        if args.command == "run":
+        if args.command == "study":
+            from .research import StudySettings, accuracy_study, export_study
+
+            study = accuracy_study(
+                StudySettings(
+                    config, args.repeats, args.max_walks, args.seconds_per_method
+                ),
+                progress,
+            )
+            export_study(study, args.out)
+        elif args.command == "run":
             exp = run_experiment(config, progress=progress)
             export(exp, args.out, with_gifs=not args.no_gifs)
             print("\nЭталон: " + exp.comparison.label)
