@@ -44,6 +44,15 @@ if dimension == "3D":
     render_3d_app()
     st.stop()
 
+boundary_mode = st.sidebar.radio(
+    "Граничные условия", ["Дирихле", "Смешанные I / II / III"], key="boundary_mode"
+)
+if boundary_mode == "Смешанные I / II / III":
+    from pdelab.boundary_ui import render_boundary_app
+
+    render_boundary_app()
+    st.stop()
+
 st.title("Сеточный метод и Монте-Карло")
 with st.sidebar:
     st.header("Задача")
