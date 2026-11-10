@@ -87,7 +87,53 @@ def main(argv=None):
     study_parser.add_argument("--repeats", type=int, default=5)
     study_parser.add_argument("--max-walks", type=int, default=4096)
     study_parser.add_argument("--seconds-per-method", type=float, default=60)
+    heat_parser = subparsers.add_parser(
+        "heat", help="Линейная теплопроводность в физическом времени"
+    )
+    heat_parser.add_argument(
+        "--problem", choices=["decay", "manufactured"], default="decay"
+    )
+    heat_parser.add_argument("--n", type=int, default=24)
+    heat_parser.add_argument("--a2", type=float, default=1.0)
+    heat_parser.add_argument("--dt", type=float, default=0.01)
+    heat_parser.add_argument("--T", type=float, default=0.2)
+    heat_parser.add_argument("--tol", type=float, default=1e-10)
+    heat_parser.add_argument("--max-iter", type=int, default=20000)
+    heat_parser.add_argument("--method", choices=["lod", "direct"], default="lod")
+    heat_parser.add_argument("--out", type=Path, default=Path("runs/heat"))
+    heat_study_parser = subparsers.add_parser(
+        "heat-study", help="Порядки по h, dt и ошибка линейного решения"
+    )
+    heat_study_parser.add_argument(
+        "--out", type=Path, default=Path("runs/heat-study.csv")
+    )
     args = parser.parse_args(argv)
+    if args.command in ("heat", "heat-study"):
+        try:
+            if args.command == "heat-study":
+                from .heat_study import export_heat_study, heat_accuracy_study
+
+                export_heat_study(heat_accuracy_study(), args.out)
+            else:
+                from .heat import make_heat_problem, solve_heat
+                from .heat_views import export_heat
+
+                result = solve_heat(
+                    make_heat_problem(args.problem, args.n, args.a2),
+                    args.dt,
+                    args.T,
+                    args.method,
+                    args.tol,
+                    args.max_iter,
+                )
+                export_heat(result, args.out)
+                print(
+                    f"Физическое время t={result.times[-1]:g}; слоёв: {len(result.times)}"
+                )
+            print(f"Результат: {args.out.resolve()}")
+        except (ValueError, RuntimeError) as exc:
+            parser.exit(2, f"Ошибка: {exc}\n")
+        return
     config_fields = Config.__dataclass_fields__.keys()
     config = Config(**{k: getattr(args, k) for k in config_fields})
 
