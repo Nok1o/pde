@@ -36,8 +36,16 @@ from pdelab.views import (
 
 st.set_page_config(page_title="PDE Lab · Сеточный метод и Монте-Карло", layout="wide")
 evolution = st.sidebar.radio(
-    "Режим", ["Стационарный", "Теплопроводность"], key="evolution"
+    "Режим",
+    ["Стационарный", "Теплопроводность", "Нелинейная теплопроводность"],
+    key="evolution",
 )
+if evolution == "Нелинейная теплопроводность":
+    from pdelab.nonlinear_ui import render_nonlinear_app
+
+    render_nonlinear_app()
+    st.stop()
+
 if evolution == "Теплопроводность":
     from pdelab.heat_ui import render_heat_app
 
