@@ -273,6 +273,11 @@ def solve_heat(problem, dt=0.01, T=0.2, method="lod", tol=1e-10, max_iter=20000)
             raise ValueError("Правая часть слоя должна быть конечной")
         scale = float(np.max(np.abs(adjusted)))
         u = g.copy()
+        if scale == 0:
+            # The reduced system is nonsingular: A*u=0 has the exact solution 0.
+            u[1:-1, 1:-1] = 0.0
+            fields[index] = u
+            continue
         if method == "direct":
             if step not in cache:
                 m = n - 1

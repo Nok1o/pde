@@ -1,6 +1,7 @@
 import csv
 import io
 import json
+import re
 import zipfile
 from pathlib import Path
 
@@ -145,7 +146,14 @@ def test_export_and_cli_preserve_physical_times(tmp_path):
         metadata = json.loads(archive.read("experiment.json"))
         assert metadata["T"] == 0.04 and metadata["dt"] == 0.013
         html = archive.read("interactive.html").decode()
-        assert "Физическое время" in html and 'src="https://cdn.plot.ly' not in html
+        call = re.search(r'Plotly\.newPlot\(\s*"[^"]+",', html)
+        assert call is not None
+        decoder = json.JSONDecoder()
+        arguments = html[call.end() :].lstrip()
+        _, end = decoder.raw_decode(arguments)
+        layout, _ = decoder.raw_decode(arguments[end:].lstrip()[1:].lstrip())
+        assert layout["xaxis"]["title"]["text"] == "Физическое время t"
+        assert 'src="https://cdn.plot.ly' not in html
     main(["heat", "--n", "8", "--T", ".015", "--out", str(tmp_path)])
     assert (tmp_path / "heat-results.zip").is_file()
     with np.load(tmp_path / "fields.npz") as data:
@@ -195,3 +203,19 @@ def test_random_modes_match_direct_without_splitting_bias():
     a = solve_heat(p, dt=0.07, T=0.18, tol=1e-12)
     b = solve_heat(p, dt=0.07, T=0.18, method="direct")
     np.testing.assert_allclose(a.fields, b.fields, atol=1e-11)
+
+
+@pytest.mark.parametrize("method", ["lod", "direct"])
+def test_cancelled_rhs_resets_nonzero_previous_layer_without_iterations(method):
+    p = HeatProblem.from_functions(
+        32,
+        initial=lambda x, y: x * (1 - x) * y * (1 - y),
+        source=lambda x, y, t: -x * (1 - x) * y * (1 - y),
+        boundary=lambda x, y, t: 0,
+    )
+    assert np.max(p.initial) > 0
+    result = solve_heat(p, dt=1, T=1, method=method, max_iter=1)
+    np.testing.assert_array_equal(result.fields[-1], 0)
+    assert result.iterations[-1] == 0
+    assert result.relative_residuals[-1] == 0
+    assert result.factorizations == 0
