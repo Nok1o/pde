@@ -1,0 +1,7 @@
+﻿method,target_pct,seconds,budget,calibration_error_pct,validation_error_pct,status
+lod,1.0,,,,,budget_exhausted
+mc,1.0,,,,,budget_exhausted
+lod,5.0,,,,,budget_exhausted
+mc,5.0,,,,,budget_exhausted
+lod,10.0,0.0005535268006497063,0.01,7.27855860816331,7.27855860816331,reached
+mc,10.0,,128.0,9.197904968325096,11.323630853055441,not_confirmed

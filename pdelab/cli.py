@@ -107,7 +107,68 @@ def main(argv=None):
     heat_study_parser.add_argument(
         "--out", type=Path, default=Path("runs/heat-study.csv")
     )
+    for name in ("heat-mc", "heat-mc-study"):
+        command_parser = subparsers.add_parser(name)
+        command_parser.add_argument(
+            "--problem", choices=["decay", "manufactured"], default="decay"
+        )
+        command_parser.add_argument("--n", type=int, default=24)
+        command_parser.add_argument("--a2", type=float, default=1.0)
+        command_parser.add_argument("--dt", type=float, default=0.01)
+        command_parser.add_argument("--T", type=float, default=0.04)
+        command_parser.add_argument("--point", type=int, nargs=2, metavar=("X", "Y"))
+        command_parser.add_argument("--seed", type=int, default=42)
+        command_parser.add_argument("--max-transitions", type=int, default=1000000)
+        command_parser.add_argument("--out", type=Path, default=Path("runs") / name)
+    subparsers.choices["heat-mc"].add_argument("--walks", type=int, default=4096)
+    subparsers.choices["heat-mc-study"].add_argument("--repeats", type=int, default=5)
+    subparsers.choices["heat-mc-study"].add_argument(
+        "--max-walks", type=int, default=16384
+    )
+    subparsers.choices["heat-mc-study"].add_argument(
+        "--seconds-per-method", type=float, default=60.0
+    )
     args = parser.parse_args(argv)
+    if args.command in ("heat-mc", "heat-mc-study"):
+        from .heat import make_heat_problem
+        from .heat_mc import solve_heat_mc
+        from .heat_mc_study import export_heat_mc_study, heat_mc_study
+        from .heat_mc_views import export_heat_mc
+
+        try:
+            problem = make_heat_problem(args.problem, args.n, args.a2)
+            point = None if args.point is None else (args.point[1], args.point[0])
+            if args.command == "heat-mc":
+                result = solve_heat_mc(
+                    problem,
+                    args.dt,
+                    args.T,
+                    None if point is None else [point],
+                    args.walks,
+                    args.seed,
+                    args.max_transitions,
+                )
+                export_heat_mc(result, problem, args.dt, args.out)
+                print(
+                    f"MC до t={args.T:g}: {result.seconds:.4g} с, {result.spatial_transitions+result.temporal_transitions} переходов"
+                )
+            else:
+                study = heat_mc_study(
+                    problem,
+                    args.dt,
+                    args.T,
+                    point,
+                    args.repeats,
+                    args.max_walks,
+                    args.seed,
+                    args.seconds_per_method,
+                    args.max_transitions,
+                )
+                export_heat_mc_study(study, args.out)
+            print(f"Результат: {args.out.resolve()}")
+        except (ValueError, RuntimeError) as exc:
+            parser.exit(2, f"Ошибка: {exc}\n")
+        return
     if args.command in ("heat", "heat-study"):
         try:
             if args.command == "heat-study":

@@ -70,6 +70,26 @@ def render_heat_app():
     st.caption(
         "Начальное поле u₀=u*(x,y,0). Итерации линейного решателя выполняются внутри каждого временного слоя."
     )
+    from .heat_mc_ui import render_heat_mc, render_heat_mc_study
+
+    tabs = st.tabs(["Сеточный расчёт", "Монте-Карло", "Исследование по времени"])
+    with tabs[1]:
+        render_heat_mc(settings)
+    with tabs[2]:
+        render_heat_mc_study(settings)
+    with tabs[0]:
+        _render_grid(settings, run)
+
+
+def _render_grid(settings, run):
+    preset, n, a2, dt, T, tol = (
+        settings.preset,
+        settings.n,
+        settings.a2,
+        settings.dt,
+        settings.T,
+        settings.tol,
+    )
     if run:
         try:
             with st.spinner("Расчёт временных слоёв и независимая проверка…"):
