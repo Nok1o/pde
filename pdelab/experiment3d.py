@@ -178,7 +178,7 @@ def export3d(experiment, folder):
         encoding="utf-8",
     )
     (folder / "metrics.csv").write_text(
-        rows_csv(experiment.metrics), encoding="utf-8-sig"
+        rows_csv(experiment.metrics), encoding="utf-8-sig", newline=""
     )
     arrays = {
         "reference": experiment.reference,

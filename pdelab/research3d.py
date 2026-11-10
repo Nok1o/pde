@@ -187,33 +187,43 @@ def accuracy_study3d(settings, progress=None):
                             row["budget"] = budget
                 if len(selected) == len(rows):
                     break
-            confirmations = {}
+        except (TimeoutError, RuntimeError) as exc:
             for row in rows:
-                chosen = selected.get(row["target_pct"])
-                if chosen is None:
-                    continue
-                if chosen not in confirmations:
-                    if progress:
-                        progress(
-                            method_index / len(methods),
-                            f"{METHODS_3D[method]} · контроль · {chosen[0]:g}",
-                        )
+                if row["target_pct"] not in selected:
+                    row["status"] = str(exc)
+
+        # Даже после неудачи более строгого бюджета проверяем уже найденные.
+        # Общий deadline не продлевается, подбор после проверки не возобновляется.
+        confirmations = {}
+        for row in rows:
+            chosen = selected.get(row["target_pct"])
+            if chosen is None:
+                continue
+            if chosen not in confirmations:
+                if progress:
+                    progress(
+                        method_index / len(methods),
+                        f"{METHODS_3D[method]} · контроль · {chosen[0]:g}",
+                    )
+                try:
                     confirmations[chosen] = _series3d(
                         study, problem, points, method, *chosen, "validation", deadline
                     )
-                error, seconds = confirmations[chosen]
-                row["relative_error_pct"] = error
-                row["status"] = (
-                    "Достигнута"
-                    if error <= row["target_pct"]
-                    else "Не достигнута на контрольной серии"
-                )
-                if error <= row["target_pct"]:
-                    row["seconds"] = seconds
-        except (TimeoutError, RuntimeError) as exc:
-            for row in rows:
-                if row["seconds"] is None:
-                    row["status"] = str(exc)
+                except (TimeoutError, RuntimeError) as exc:
+                    confirmations[chosen] = exc
+            confirmation = confirmations[chosen]
+            if isinstance(confirmation, Exception):
+                row["status"] = f"Бюджет найден, проверка не завершена: {confirmation}"
+                continue
+            error, seconds = confirmation
+            row["relative_error_pct"] = error
+            row["status"] = (
+                "Достигнута"
+                if error <= row["target_pct"]
+                else "Не достигнута на контрольной серии"
+            )
+            if error <= row["target_pct"]:
+                row["seconds"] = seconds
         if progress:
             progress((method_index + 1) / len(methods), f"{METHODS_3D[method]}: готово")
     return study
@@ -254,7 +264,9 @@ def export_study3d(study, folder):
         ("thresholds", study.rows),
         ("trials", study.trials),
     ):
-        (folder / f"{name}.csv").write_text(rows_csv(rows), encoding="utf-8-sig")
+        (folder / f"{name}.csv").write_text(
+            rows_csv(rows), encoding="utf-8-sig", newline=""
+        )
     (folder / "settings.json").write_text(
         json.dumps(
             study_payload3d(study), ensure_ascii=False, indent=2, allow_nan=False

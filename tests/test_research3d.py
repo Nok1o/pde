@@ -96,3 +96,39 @@ def test_zero_exact_value_and_time_limit(monkeypatch):
 def test_bad_settings(changes):
     with pytest.raises(ValueError):
         accuracy_study3d(replace(StudySettings3D(Config3D(n=8)), **changes))
+
+
+def test_stricter_lod_failure_preserves_reachable_target():
+    study = accuracy_study3d(
+        StudySettings3D(Config3D(n=8, max_iter=11), repeats=2, methods=("lod_serial",))
+    )
+    loose = next(row for row in study.rows if row["target_pct"] == 10)
+    assert loose["budget"] == 0.1
+    assert loose["seconds"] is not None
+    assert loose["relative_error_pct"] < 10
+    assert len([t for t in study.trials if t["phase"] == "validation"]) == 2
+    assert all(row["seconds"] is None for row in study.rows if row["target_pct"] < 10)
+
+
+def test_expired_deadline_keeps_selected_budget_without_false_success(monkeypatch):
+    clock = [0.0]
+    monkeypatch.setattr(research3d, "perf_counter", lambda: clock[0])
+    monkeypatch.setattr(research3d, "warmup3d", lambda: None)
+
+    def series(study, problem, points, method, budget, budget_index, phase, deadline):
+        if phase == "calibration" and budget_index == 0:
+            clock[0] = 2.0
+            return 7.0, 0.01
+        assert clock[0] >= deadline
+        raise TimeoutError("Лимит времени поиска")
+
+    monkeypatch.setattr(research3d, "_series3d", series)
+    study = accuracy_study3d(
+        StudySettings3D(
+            Config3D(n=8), repeats=2, seconds_per_method=1, methods=("lod_serial",)
+        )
+    )
+    loose = next(row for row in study.rows if row["target_pct"] == 10)
+    assert loose["budget"] == 0.1 and loose["seconds"] is None
+    assert loose["relative_error_pct"] is None
+    assert "проверка не завершена" in loose["status"]

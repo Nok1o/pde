@@ -19,6 +19,7 @@ from .research3d import (
 )
 from .solvers3d import METHODS_3D
 from .views3d import residual_figure3d, slice_figure3d
+from .workload3d import interactive_mc_limit_message
 
 GRIDS = [8, 12, 16, 24, 32, 48, 64]
 
@@ -240,12 +241,18 @@ def render_3d_app():
             seed = st.number_input(
                 "Seed", min_value=0, max_value=2**32 - 1, value=42, key="cube_seed"
             )
+        config = Config3D(problem, n, mode, point, plane, index, walks, seed, tol)
+        limit_message = interactive_mc_limit_message(config, methods)
+        if limit_message:
+            st.error(limit_message)
         run = st.button(
-            "Рассчитать", key="cube_run", type="primary", disabled=not methods
+            "Рассчитать",
+            key="cube_run",
+            type="primary",
+            disabled=not methods or limit_message is not None,
         )
-    config = Config3D(problem, n, mode, point, plane, index, walks, seed, tol)
     _problem_info(problem)
-    if run:
+    if run and limit_message is None:
         try:
             with st.spinner("Расчёт в кубе…"):
                 st.session_state["cube_result"] = run_experiment3d(config, methods)
