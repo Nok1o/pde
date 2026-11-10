@@ -1,0 +1,50 @@
+{
+  "commit": "2aec67ea37896871d0d288ab3e61bfcec9e35d9f",
+  "python": "3.13.0",
+  "numpy": "2.5.4",
+  "numba": "0.68.0",
+  "settings": {
+    "config": {
+      "problem": "polynomial",
+      "n": 16,
+      "mode": "patch",
+      "point": null,
+      "walks": 2048,
+      "batches": 8,
+      "seed": 42,
+      "tol": 1e-07,
+      "max_iter": 20000,
+      "top": 100.0,
+      "bottom": 0.0,
+      "left": 0.0,
+      "right": 0.0,
+      "source": 0.0,
+      "coarse_n": null
+    },
+    "repeats": 3,
+    "max_walks": 256,
+    "seconds_per_method": 3
+  },
+  "targets_pct": [
+    1.0,
+    5.0,
+    10.0
+  ],
+  "reference_kind": "analytic",
+  "reference_label": "Точное аналитическое решение",
+  "reference_value": [
+    60.5621337890625,
+    61.5234375,
+    60.5621337890625,
+    61.5234375,
+    62.5,
+    61.5234375,
+    60.5621337890625,
+    61.5234375,
+    60.5621337890625
+  ],
+  "search_seconds": 0.14852479999535717,
+  "accuracy": "100 * RMS(u_run - reference) / RMS(reference), across runs and queried points; independent validation",
+  "timing": "Mean solver time of validation runs; search, reference and JIT excluded; all layer preparation included",
+  "selection": "First budget passing calibration; validation never changes the selected budget; empirical estimate"
+}

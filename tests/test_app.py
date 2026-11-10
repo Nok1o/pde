@@ -9,12 +9,17 @@ def test_default_center_app_runs_without_debug_output():
         str(Path(__file__).parents[1] / "app.py"), default_timeout=60
     ).run()
     assert not app.exception
-    assert app.selectbox[1].value == "point"
+    assert (
+        next(
+            widget for widget in app.selectbox if widget.label == "Что нужно вычислить"
+        ).value
+        == "point"
+    )
     app.button(key="main_run").click().run()
     assert not app.exception
     exp = app.session_state["experiment"]
     assert exp.points.tolist() == [[12, 12]]
-    assert len(exp.results) == 4
+    assert len(exp.results) == 5
     assert len(app.dataframe) == 1
     columns = app.dataframe[0].value.columns
     assert "Значение u" in columns and "Отн. ошибка, %" in columns
@@ -25,7 +30,7 @@ def test_default_center_app_runs_without_debug_output():
                 widget for widget in app.multiselect if widget.label == "Методы"
             ).options
         )
-        == 4
+        == 5
     )
     assert not any("параллел" in slider.label.lower() for slider in app.slider)
     assert not any("Диагностика" in expander.label for expander in app.expander)
@@ -70,8 +75,22 @@ def test_research_runs_without_main_calculation_and_detects_changed_settings():
     assert study.settings.config.point == (4, 4)
     assert study.settings.repeats == 2
     table = app.dataframe[0].value
-    assert table.shape == (3, 5)
+    assert table.shape == (3, 6)
     assert table.iloc[:, 0].tolist() == [1, 5, 10]
     app.number_input(key="research_repeats").set_value(3).run()
     assert not app.exception
     assert any("Настройки исследования изменены" in item.value for item in app.info)
+
+
+def test_research_patch_renders_vector_reference():
+    app = AppTest.from_file(
+        str(Path(__file__).parents[1] / "app.py"), default_timeout=60
+    ).run()
+    app.select_slider(key="research_n").set_value(8)
+    app.number_input(key="research_repeats").set_value(2)
+    app.select_slider(key="research_max_walks").set_value(64)
+    app.selectbox(key="research_mode").set_value("patch")
+    app.run()
+    app.button(key="research_run").click().run()
+    assert not app.exception
+    assert len(app.session_state["research_result"].reference_value) == 9

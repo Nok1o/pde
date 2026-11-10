@@ -21,6 +21,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 COLORS = {
     "lod_serial": "#3156a3",
     "mc": "#168477",
+    "mc_control": "#b74167",
     "reuse": "#d77923",
     "layers": "#8b53a3",
 }

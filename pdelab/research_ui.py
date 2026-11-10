@@ -29,6 +29,23 @@ def render_research_tab(config):
             key="research_repeats",
         )
 
+    mode = st.selectbox(
+        "Запрос исследования",
+        ["point", "patch", "field"],
+        format_func={
+            "point": "Одна точка",
+            "patch": "Участок 3 × 3",
+            "field": "Всё поле",
+        }.get,
+        key="research_mode",
+    )
+    coarse_n = st.number_input(
+        "Интервалов контрольной сетки исследования",
+        min_value=4,
+        max_value=n,
+        value=max(4, n // 4),
+        key="research_coarse_n",
+    )
     previous_n = st.session_state.get("research_point_grid", n)
     if previous_n != n:
         for key in ("research_x", "research_y"):
@@ -79,7 +96,8 @@ def render_research_tab(config):
     point_config = Config(
         problem=config.problem,
         n=n,
-        mode="point",
+        mode=mode,
+        coarse_n=coarse_n,
         point=(x, y),
         batches=config.batches,
         seed=config.seed,
@@ -118,7 +136,7 @@ def render_research_tab(config):
     columns = {
         name: st.column_config.NumberColumn(
             format="%.6f",
-            help="Среднее время одного запуска проверочной серии. Подбор бюджета и эталон исключены; подготовка слоёв включена.",
+            help="Среднее время одного запуска проверочной серии. Подбор бюджета и эталон исключены; подготовка слоёв и контрольного приближения включена.",
         )
         for name in table.columns[1:]
     }
@@ -144,9 +162,11 @@ def render_research_tab(config):
             f"n={saved.n}, точка ({saved_x / saved.n:.4g}, {saved_y / saved.n:.4g}), "
             f"усреднений: {study.settings.repeats}."
         )
-        st.write(f"Эталон: {study.reference_label}; u = {study.reference_value:.6g}.")
+        st.write(f"Эталон: {study.reference_label}. Запрос: {saved.mode}.")
+        if saved.mode == "point":
+            st.write(f"u = {study.reference_value:.6g}")
         st.latex(
-            r"\varepsilon_{\mathrm{rel}} = \frac{100\%}{|u_*|}\sqrt{\frac{1}{R}\sum_{r=1}^{R}(u_r-u_*)^2}"
+            r"\varepsilon_{\mathrm{rel}} = 100\%\,\frac{\operatorname{RMS}_{r,j}(u_{r,j}-u_{*,j})}{\operatorname{RMS}_j(u_{*,j})}"
         )
         st.write(
             "Бюджет проходит две серии: подбор и независимую проверку. В таблице — среднее время одного проверочного запуска. Это экспериментальная оценка точности."
