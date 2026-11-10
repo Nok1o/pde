@@ -1,0 +1,39 @@
+{
+  "config": {
+    "problem": "hot_top",
+    "n": 24,
+    "mode": "patch",
+    "point": null,
+    "walks": 2048,
+    "batches": 8,
+    "seed": 42,
+    "tol": 1e-07,
+    "max_iter": 20000,
+    "top": 100.0,
+    "bottom": 0.0,
+    "left": 0.0,
+    "right": 0.0,
+    "source": 0.0
+  },
+  "budgets": [
+    128,
+    512,
+    2048
+  ],
+  "repeats": 5,
+  "tolerances": [
+    0.01,
+    0.0001,
+    1e-06,
+    1e-08
+  ],
+  "lod_stopping_rule": "relative_rhs_inf_v1",
+  "metrics_policy": "four-methods-relative-v2",
+  "reference_policy": "exact-first-v1",
+  "reference_kind": "grid",
+  "reference_label": "Прямое сеточное решение",
+  "python": "3.13.14",
+  "platform": "macOS-26.7.1-arm64-arm-64bit-Mach-O",
+  "cpu_count": 14,
+  "timing": "Solver wall time after JIT warmup; reference, plots excluded; all layers preparation included."
+}

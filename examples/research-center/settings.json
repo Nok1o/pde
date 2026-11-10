@@ -1,0 +1,38 @@
+{
+  "settings": {
+    "config": {
+      "problem": "hot_top",
+      "n": 24,
+      "mode": "point",
+      "point": [
+        12,
+        12
+      ],
+      "walks": 2048,
+      "batches": 8,
+      "seed": 42,
+      "tol": 1e-07,
+      "max_iter": 20000,
+      "top": 100.0,
+      "bottom": 0.0,
+      "left": 0.0,
+      "right": 0.0,
+      "source": 0.0
+    },
+    "repeats": 5,
+    "max_walks": 131072,
+    "seconds_per_method": 60.0
+  },
+  "targets_pct": [
+    1.0,
+    5.0,
+    10.0
+  ],
+  "reference_kind": "analytic_point",
+  "reference_label": "Точный ответ в центре (по симметрии)",
+  "reference_value": 25.0,
+  "search_seconds": 3.1570390830165707,
+  "accuracy": "100 * RMS(u_run - reference) / abs(reference), checked on calibration and independent validation series",
+  "timing": "Mean solver time of validation runs; search, reference and JIT excluded; all layer preparation included",
+  "selection": "First tested budget passing both series; empirical estimate, not a probability guarantee"
+}

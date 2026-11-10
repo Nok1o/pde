@@ -1,0 +1,171 @@
+{
+  "config": {
+    "problem": "hot_top",
+    "n": 24,
+    "mode": "patch",
+    "point": null,
+    "walks": 1024,
+    "batches": 8,
+    "seed": 42,
+    "tol": 1e-07,
+    "max_iter": 20000,
+    "top": 100.0,
+    "bottom": 0.0,
+    "left": 0.0,
+    "right": 0.0,
+    "source": 0.0
+  },
+  "metadata": {
+    "python": "3.13.14",
+    "platform": "macOS-26.7.1-arm64-arm-64bit-Mach-O",
+    "cpu_count": 14,
+    "jit_warmup_seconds": 2.1659652702510357e-06,
+    "reference_seconds": 0.0010857080342248082,
+    "lod_stopping_rule": "relative_rhs_inf_v1",
+    "timing": "Solver wall time after JIT warm-up; reference and plots excluded. Layers include all preparation and independent batches.",
+    "units": "Условная температура; x,y — единичный квадрат",
+    "default_query": "one center point",
+    "reference_policy": "exact-first-v1",
+    "reference_kind": "grid",
+    "reference_label": "Прямое сеточное решение",
+    "reference_description": "Точное решение для всего выбранного набора узлов в программе не задано. Эталон — прямое решение разностной системы; погрешность самой сетки в эту ошибку не входит.",
+    "field_reference_label": "Прямое сеточное решение",
+    "metrics_policy": "four-methods-relative-v2"
+  },
+  "metrics": [
+    {
+      "method": "lod_serial",
+      "name": "ЛОМ",
+      "seconds": 0.0015510829980485141,
+      "query_mean": 24.999720042767574,
+      "reference_mean": 24.999999999999872,
+      "reference_kind": "grid",
+      "reference_label": "Прямое сеточное решение",
+      "rmse": 0.0002799618380638784,
+      "relative_error_pct": 0.001112729153428294,
+      "rmse_grid": 0.0002799618380638784,
+      "rmse_exact": null,
+      "walks": 0,
+      "steps": 0,
+      "mean_path_steps": null,
+      "iterations": 97,
+      "residual": 0.005581736533713411,
+      "converged": true,
+      "relative_residual": 9.690514815474671e-08,
+      "residual_scale": 57600.0,
+      "stopping_rule": "relative_rhs_inf_v1",
+      "min_observations": 0,
+      "max_observations": 0
+    },
+    {
+      "method": "mc",
+      "name": "Монте-Карло",
+      "seconds": 0.01101683295564726,
+      "query_mean": 25.325520833333332,
+      "reference_mean": 24.999999999999872,
+      "reference_kind": "grid",
+      "reference_label": "Прямое сеточное решение",
+      "rmse": 0.8898731007246952,
+      "relative_error_pct": 3.536866841837463,
+      "rmse_grid": 0.8898731007246952,
+      "rmse_exact": null,
+      "walks": 9216,
+      "steps": 1545988,
+      "mean_path_steps": 167.75043402777777,
+      "iterations": 0,
+      "residual": null,
+      "converged": true,
+      "relative_residual": null,
+      "residual_scale": null,
+      "stopping_rule": "fixed_walk_budget",
+      "min_observations": 1024,
+      "max_observations": 1024
+    },
+    {
+      "method": "reuse",
+      "name": "MК хвосты путей",
+      "seconds": 0.011626708030235022,
+      "query_mean": 25.95681640202714,
+      "reference_mean": 24.999999999999872,
+      "reference_kind": "grid",
+      "reference_label": "Прямое сеточное решение",
+      "rmse": 1.0136524783342573,
+      "relative_error_pct": 4.028837186838352,
+      "rmse_grid": 1.0136524783342573,
+      "rmse_exact": null,
+      "walks": 9216,
+      "steps": 1545988,
+      "mean_path_steps": 167.75043402777777,
+      "iterations": 0,
+      "residual": null,
+      "converged": true,
+      "relative_residual": null,
+      "residual_scale": null,
+      "stopping_rule": "fixed_walk_budget",
+      "min_observations": 4985,
+      "max_observations": 5750
+    },
+    {
+      "method": "layers",
+      "name": "MК слои от границы",
+      "seconds": 0.059907416987698525,
+      "query_mean": 24.883814826558602,
+      "reference_mean": 24.999999999999872,
+      "reference_kind": "grid",
+      "reference_label": "Прямое сеточное решение",
+      "rmse": 0.20095917995182008,
+      "relative_error_pct": 0.7987272112794584,
+      "rmse_grid": 0.20095917995182008,
+      "rmse_exact": null,
+      "walks": 541696,
+      "steps": 9138438,
+      "mean_path_steps": 16.870048883506616,
+      "iterations": 0,
+      "residual": null,
+      "converged": true,
+      "relative_residual": null,
+      "residual_scale": null,
+      "stopping_rule": "fixed_walk_budget",
+      "min_observations": 8,
+      "max_observations": 8
+    }
+  ],
+  "points_yx": [
+    [
+      11,
+      11
+    ],
+    [
+      11,
+      12
+    ],
+    [
+      11,
+      13
+    ],
+    [
+      12,
+      11
+    ],
+    [
+      12,
+      12
+    ],
+    [
+      12,
+      13
+    ],
+    [
+      13,
+      11
+    ],
+    [
+      13,
+      12
+    ],
+    [
+      13,
+      13
+    ]
+  ]
+}
