@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pde-lab"
+version = "0.1.0"
+description = "Poisson equation: directional splitting, Monte Carlo and experimental accelerations"
+requires-python = ">=3.11"
+dependencies = ["numpy>=1.26", "scipy>=1.12", "numba>=0.60", "matplotlib>=3.8", "pillow>=10", "plotly>=5.24", "streamlit>=1.65"]
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
+dev = ["pytest>=8", "black==26.10.1", "ruff==0.17.0"]
+
+[project.scripts]
+pde-lab = "pdelab.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["pdelab*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.black]
+line-length = 88
+target-version = ["py311"]
+extend-exclude = '/(runs|\.cache)/'
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+extend-exclude = ["runs", ".cache"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]
