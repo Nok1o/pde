@@ -90,10 +90,28 @@ def _research_tab(config):
             value=5,
             key="study3d_repeats",
         )
-    with st.expander("Точка и лимиты", key="cube_research_limits"):
+    mode = st.selectbox(
+        "Область исследования",
+        ["point", "patch", "slice", "field"],
+        format_func={
+            "point": "Одна точка",
+            "patch": "Участок 3 × 3 × 3",
+            "slice": "Срез",
+            "field": "Всё поле",
+        }.get,
+        key="study3d_mode",
+    )
+    point, plane, index = None, "xy", None
+    if mode == "point":
         point = _point_controls(n, "study3d_point")
+    elif mode == "slice":
+        plane = st.selectbox(
+            "Плоскость расчёта", ["xy", "xz", "yz"], key="study3d_plane"
+        )
+        index = st.slider("Узел среза", 0, n, n // 2, key=f"study3d_index_{n}")
+    with st.expander("Лимиты", key="cube_research_limits"):
         maximum = st.select_slider(
-            "Максимум путей",
+            "Максимум путей на точку",
             options=[64, 256, 1024, 4096, 16384, 65536, 262144],
             value=16384,
             key="study3d_walks",
@@ -110,7 +128,10 @@ def _research_tab(config):
         Config3D(
             problem=config.problem,
             n=n,
+            mode=mode,
             point=point,
+            plane=plane,
+            index=index,
             seed=config.seed,
             max_iter=config.max_iter,
         ),

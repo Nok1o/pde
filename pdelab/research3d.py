@@ -1,4 +1,4 @@
-"""Подбор бюджета и независимая итоговая проверка точности в одной 3D-точке."""
+"""Подбор бюджета и независимая проверка точности на выбранной области 3D."""
 
 import json
 from dataclasses import asdict, dataclass, field
@@ -28,7 +28,7 @@ class StudySettings3D:
 class Study3D:
     settings: StudySettings3D
     reference_kind: str
-    reference_value: float
+    reference_value: float | list[float]
     rows: list[dict] = field(default_factory=list)
     trials: list[dict] = field(default_factory=list)
 
@@ -75,8 +75,10 @@ def _series3d(study, problem, points, method, budget, budget_index, phase, deadl
         )
         if not result.converged:
             raise RuntimeError("ЛОМ не достиг допуска невязки")
-        value = float(result.values[tuple(points[0])])
-        if not np.isfinite(value):
+        value = result.values[tuple(points.T)]
+        if len(points) == 1:
+            value = float(value[0])
+        if not np.isfinite(value).all():
             raise RuntimeError("Неконечная оценка решения")
         values.append(value)
         times.append(result.elapsed)
@@ -87,7 +89,7 @@ def _series3d(study, problem, points, method, budget, budget_index, phase, deadl
                 "repeat": repeat + 1,
                 "seed": seed,
                 "budget": budget,
-                "value": value,
+                "value": np.asarray(value).tolist(),
                 "reference_value": study.reference_value,
                 "seconds": result.elapsed,
                 "steps": result.steps,
@@ -110,8 +112,6 @@ def accuracy_study3d(settings, progress=None):
         raise ValueError(
             "Для исследования выберите различные методы lod_serial и/или mc"
         )
-    if config.mode != "point":
-        raise ValueError("Исследование проводится в одной точке")
     for name, value, lower in (
         ("repeats", settings.repeats, 2),
         ("max_walks", settings.max_walks, 2),
@@ -127,10 +127,15 @@ def accuracy_study3d(settings, progress=None):
     ):
         raise ValueError("Seed должен быть целым в [0, 2³²)")
     problem = make_problem3d(config.problem, config.n)
-    points = select_points3d(config.n, point=config.point)
+    points = select_points3d(
+        config.n, config.mode, config.point, config.plane, config.index
+    )
     reference, kind, _ = comparison3d(problem)
-    target_value = float(reference[tuple(points[0])])
-    if target_value == 0:
+    reference_values = reference[tuple(points.T)]
+    target_value = (
+        float(reference_values[0]) if len(points) == 1 else reference_values.tolist()
+    )
+    if not np.any(reference_values):
         raise ValueError("Эталон равен нулю: относительная точность не определена")
     study = Study3D(settings, kind, target_value)
     warmup3d()
@@ -182,6 +187,13 @@ def study_payload3d(study):
         "settings": asdict(study.settings),
         "dimension": 3,
         "coordinate_order": ["x", "y", "z"],
+        "points_zyx": select_points3d(
+            study.settings.config.n,
+            study.settings.config.mode,
+            study.settings.config.point,
+            study.settings.config.plane,
+            study.settings.config.index,
+        ).tolist(),
         "reference_kind": study.reference_kind,
         "reference_value": study.reference_value,
         **accuracy_metadata(study.rows),

@@ -1,3 +1,4 @@
+import json
 from dataclasses import replace
 
 import numpy as np
@@ -5,7 +6,7 @@ import pytest
 
 from pdelab import research3d
 from pdelab.experiment3d import Config3D
-from pdelab.problem3d import blank_field3d
+from pdelab.problem3d import blank_field3d, select_points3d
 from pdelab.research3d import StudySettings3D, accuracy_study3d, export_study3d
 from pdelab.solvers import Result
 
@@ -135,3 +136,67 @@ def test_calibration_timeout_leaves_a_separate_confirmation_allowance(monkeypatc
     assert loose["budget"] == 0.1 and loose["seconds"] == 0.02
     assert loose["relative_error_pct"] == 7.0
     assert loose["status"] == "Достигнута"
+
+
+@pytest.mark.parametrize(
+    "mode,plane,index",
+    [("patch", "xy", None), ("field", "xy", None)]
+    + [("slice", plane, 2) for plane in ("xy", "xz", "yz")],
+)
+def test_region_study_uses_every_point_and_exports_coordinates(
+    monkeypatch, tmp_path, mode, plane, index
+):
+    config = Config3D(problem="affine", n=4, mode=mode, plane=plane, index=index)
+    expected_points = select_points3d(4, mode, plane=plane, index=index)
+    offsets = np.linspace(-0.04, 0.04, len(expected_points))
+    offsets[0] = 0  # An exact first point must not hide errors in the region.
+
+    def fake_solve(problem, points, method, **kwargs):
+        np.testing.assert_array_equal(points, expected_points)
+        values = blank_field3d(problem)
+        values[tuple(points.T)] = problem.exact[tuple(points.T)] + offsets
+        return Result(
+            method,
+            values,
+            np.zeros_like(values),
+            np.zeros_like(values, dtype=int),
+            elapsed=0.125,
+        )
+
+    monkeypatch.setattr(research3d, "solve3d", fake_solve)
+    monkeypatch.setattr(research3d, "warmup3d", lambda: None)
+    study = accuracy_study3d(
+        StudySettings3D(config, repeats=2, max_walks=64, methods=("mc",))
+    )
+    expected_error = 100 * np.sum(np.abs(offsets)) / np.sum(study.reference_value)
+    assert expected_error > 0
+    assert [row["target_pct"] for row in study.rows] == [1, 5, 10]
+    for row in study.rows:
+        assert row["relative_error_pct"] == pytest.approx(expected_error)
+        assert row["seconds"] == pytest.approx(0.125)
+    assert all(len(trial["value"]) == len(expected_points) for trial in study.trials)
+    export_study3d(study, tmp_path)
+    payload = json.loads((tmp_path / "settings.json").read_text())
+    assert payload["points_zyx"] == expected_points.tolist()
+    assert payload["reference_value"] == study.reference_value
+
+
+@pytest.mark.parametrize("mode", ["patch", "slice", "field"])
+def test_real_region_study_all_methods(mode):
+    study = accuracy_study3d(
+        StudySettings3D(
+            Config3D(problem="constant", n=4, mode=mode),
+            repeats=2,
+            max_walks=64,
+        )
+    )
+    assert len(study.rows) == 3 * len(research3d.METHODS_3D)
+    assert all(row["status"] == "Достигнута" for row in study.rows)
+    assert all(row["seconds"] is not None for row in study.rows)
+
+
+def test_zero_reference_region_is_rejected():
+    with pytest.raises(ValueError, match="равен нулю"):
+        accuracy_study3d(
+            StudySettings3D(Config3D(n=8, mode="slice", plane="yz", index=0))
+        )
