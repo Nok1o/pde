@@ -21,6 +21,94 @@ from .study_policy import render_accuracy_results
 from .ui_state import select_section
 
 
+def _problem_info(alpha):
+    with st.expander("Формулы и описание", expanded=False, key="nonlinear_formulas"):
+        st.markdown("**1. Исходное уравнение**")
+        st.latex(
+            r"C(u)\frac{\partial u}{\partial t}"
+            r"=\frac{\partial}{\partial x}\left(k(u)\frac{\partial u}{\partial x}\right)"
+            r"+\frac{\partial}{\partial y}\left(k(u)\frac{\partial u}{\partial y}\right)"
+            r"+f(x,y,t)"
+        )
+        st.write(
+            "u — температура; C(u) — коэффициент теплоёмкости; "
+            "k(u) — теплопроводность; f — заданный источник тепла."
+        )
+
+        st.markdown("**2. Какие коэффициенты принимаем**")
+        st.latex(r"C(u)=1,\qquad k(u)=1+\alpha u^2")
+        st.write(f"Сейчас α = {alpha:g}.")
+        st.write(
+            "При α = 0 получаем k(u) = 1: задача становится линейной."
+            if alpha == 0
+            else "Теплопроводность зависит от температуры, поэтому задача нелинейная."
+        )
+
+        st.markdown("**3. Как задаём источник f**")
+        st.write("Для проверки методов выбираем известное точное решение:")
+        st.latex(r"u_*(x,y,t)=1+e^{-t}\sin(\pi x)\sin(\pi y)")
+        st.write(
+            "Подбираем источник так, чтобы это решение удовлетворяло уравнению. "
+            "В формуле источника u_* — известная функция, а не искомое численное поле."
+        )
+        st.latex(
+            r"f=\frac{\partial u_*}{\partial t}"
+            r"-\nabla\!\cdot\!\left(k(u_*)\nabla u_*\right)"
+        )
+        st.write("После вычисления производных:")
+        st.latex(
+            r"\begin{aligned}f(x,y,t)={}&-(u_*-1)"
+            r"+2\pi^2 k(u_*)(u_*-1)\\"
+            r"&-2\alpha u_*\left["
+            r"\left(\frac{\partial u_*}{\partial x}\right)^2"
+            r"+\left(\frac{\partial u_*}{\partial y}\right)^2\right].\end{aligned}"
+        )
+
+        st.markdown("**4. Итоговое уравнение**")
+        st.write("Подставляем C(u) и k(u) в исходное уравнение:")
+        st.latex(
+            r"\begin{aligned}\frac{\partial u}{\partial t}"
+            r"={}&\frac{\partial}{\partial x}"
+            r"\left((1+\alpha u^2)\frac{\partial u}{\partial x}\right)\\"
+            r"&+\frac{\partial}{\partial y}"
+            r"\left((1+\alpha u^2)\frac{\partial u}{\partial y}\right)+f(x,y,t)."
+            r"\end{aligned}"
+        )
+
+        st.markdown("**5. Область, начальное и граничное условия**")
+        st.latex(r"\Omega=(0,1)^2,\qquad t\in[0,T]")
+        st.write("В начальный момент:")
+        st.latex(r"u(x,y,0)=1+\sin(\pi x)\sin(\pi y)")
+        st.write("На всех четырёх сторонах квадрата поддерживаем температуру 1:")
+        st.latex(r"u(0,y,t)=u(1,y,t)=u(x,0,t)=u(x,1,t)=1")
+
+    with st.expander(
+        "Как решаем: время → Пикар → ЛОМ или MC", key="nonlinear_method_formulas"
+    ):
+        st.write(
+            "Сначала переходим к следующему моменту времени. "
+            "На каждом временном слое уточняем поле итерациями Пикара; "
+            "линейную задачу внутри каждой итерации решаем прогонками или MC."
+        )
+        st.write(
+            "uᵐ — поле на предыдущем временном слое; vʲ — текущее приближение "
+            "на новом слое. Фиксируем проводимость по vʲ:"
+        )
+        st.latex(r"k^{(j)}=1+\alpha(v^j)^2")
+        st.write("Решаем линейную сеточную задачу для нового приближения:")
+        st.latex(
+            r"\left(\frac{I}{\Delta t}-\nabla_h\!\cdot k^{(j)}\nabla_h\right)"
+            r"\widetilde v^{j+1}=\frac{u^m}{\Delta t}+f^{m+1}"
+        )
+        st.caption("I — единичный оператор; ∇ₕ обозначает производные на сетке.")
+        st.write("Обновляем поле с релаксацией ω и повторяем до сходимости:")
+        st.latex(r"v^{j+1}=(1-\omega)v^j+\omega\widetilde v^{j+1}")
+        st.write(
+            "Ньютон + прямой решатель служит отдельным сеточным эталоном. "
+            "Основные сравниваемые варианты — Пикар + ЛОМ и Пикар + MC."
+        )
+
+
 def render_nonlinear_app():
     st.title("Нелинейная теплопроводность")
     with st.sidebar:
@@ -146,18 +234,7 @@ def render_nonlinear_app():
         lod=asdict(lod_settings),
         mc=asdict(mc_settings),
     )
-    with st.expander("Формулы и описание", expanded=False, key="nonlinear_formulas"):
-        st.latex(
-            r"u_t=\nabla\cdot((1+\alpha u^2)\nabla u)+F,\quad C=1,\quad u|_{\partial\Omega}=1"
-        )
-        st.latex(r"u_*=1+e^{-t}\sin(\pi x)\sin(\pi y),\qquad u_0=u_*(x,y,0)")
-        st.latex(r"F=-(u_*-1)+2\pi^2(1+\alpha u_*^2)(u_*-1)-2\alpha u_*|\nabla u_*|^2")
-        st.latex(
-            r"\left(\frac{I}{\Delta t}-\nabla_h\cdot k(v^j)\nabla_h\right)\widetilde v^{j+1}=\frac{u^m}{\Delta t}+F^{m+1},\quad v^{j+1}=(1-\omega)v^j+\omega\widetilde v^{j+1}"
-        )
-        st.caption(
-            "Каждый повтор MC считает всю историю и все внутренние узлы. Newton — независимая проверка сеточной системы."
-        )
+    _problem_info(alpha)
     try:
         lod_settings.validate()
         mc_settings.validate()
