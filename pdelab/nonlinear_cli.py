@@ -23,17 +23,38 @@ def main(argv=None):
     )
     parser.add_argument("command", choices=["run", "study", "targets"])
     parser.add_argument("--n", type=int, default=8)
-    parser.add_argument("--alpha", type=float, default=0.5)
-    parser.add_argument("--dt", type=float, default=0.01)
+    parser.add_argument(
+        "--gamma",
+        "--alpha",
+        dest="alpha",
+        help="γ в k(u)=1+γu²",
+        type=float,
+        default=0.5,
+    )
+    parser.add_argument(
+        "--tau",
+        "--dt",
+        dest="dt",
+        help="Шаг физического времени τ",
+        type=float,
+        default=0.01,
+    )
     parser.add_argument("--T", type=float, default=0.1)
-    parser.add_argument("--point", nargs=2, type=int, metavar=("X", "Y"))
+    parser.add_argument("--point", nargs=2, type=int, metavar=("X", "Z"))
     parser.add_argument("--repeats", type=int, default=4)
     parser.add_argument("--walks", type=int, default=128)
     parser.add_argument("--max-walks", type=int, default=2048)
     parser.add_argument(
         "--schedule", choices=["constant", "linear", "geometric"], default="geometric"
     )
-    parser.add_argument("--relaxation", type=float, default=0.7)
+    parser.add_argument(
+        "--xi",
+        "--relaxation",
+        dest="relaxation",
+        help="Релаксация ξ",
+        type=float,
+        default=0.7,
+    )
     parser.add_argument("--tol", type=float, default=1e-7)
     parser.add_argument("--linear-tol", type=float, default=1e-10)
     parser.add_argument("--mc-tol", type=float, default=0.001)

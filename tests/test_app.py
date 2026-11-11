@@ -125,7 +125,7 @@ def test_mixed_cube_main_action_selects_its_actual_result_section():
         str(Path(__file__).parents[1] / "app.py"), default_timeout=60
     ).run()
     app.radio(key="dimension").set_value("3D").run()
-    app.radio(key="cube_boundary_mode").set_value("Смешанные I / II / III").run()
+    app.radio(key="cube_boundary_mode").set_value("Смешанные: 1, 2, 3 рода").run()
     app.multiselect(key="bc3d_methods").set_value(["lod_serial"]).run()
     app.session_state["boundary3d_sections"] = "Исследование"
     app.run()

@@ -27,9 +27,9 @@ from .ui_state import select_section
 
 SIDE_LABELS = {"left": "Левая", "right": "Правая", "bottom": "Нижняя", "top": "Верхняя"}
 KIND_LABELS = {
-    "dirichlet": "I · Дирихле",
-    "neumann": "II · Нейман",
-    "robin": "III · Робин",
+    "dirichlet": "1-го рода · значение",
+    "neumann": "2-го рода · производная",
+    "robin": "3-го рода · теплообмен",
 }
 
 
@@ -62,19 +62,27 @@ def workload_message(config, methods, walks=None, repeats=1):
 
 def _formulas(config):
     with st.expander("Формулы и описание", expanded=False, key="boundary_formulas"):
-        st.latex(r"\Delta u=f,\quad (x,y)\in(0,1)^2,\qquad k=1")
+        st.latex(r"\Delta u=f_{\Delta},\quad (x,z)\in(0,1)^2,\qquad k=1")
+        st.latex(r"\Delta u+f=0,\qquad f_{\Delta}=-f")
+        st.latex(
+            r"\mathrm{I}:u=\mu,\quad \mathrm{II}:\partial_nu=\varphi,\quad \mathrm{III}:\partial_nu+\beta "
+            r"u=\varphi"
+        )
+        st.caption(
+            "Лекция 9: α∂ₙu + βu = φ; здесь α = 1, β ≥ 0. n — внешняя нормаль. f — источник тепла; fΔ — правая часть Пуассона."
+        )
         if config.problem == "polynomial":
-            st.latex(r"u_*=1+x+2y+x^2+y^2,\qquad f=4")
+            st.latex(r"u_*=1+x+2z+x^2+z^2,\qquad f_{\Delta}=4")
             st.write("Полином: проверка знаков внешней нормали и граничных строк.")
         elif config.problem == "smooth":
-            st.latex(r"u_*=2+x+2y+\cos(2\pi x)+\tfrac12\cos(2\pi y)")
-            st.latex(r"f=-4\pi^2\cos(2\pi x)-2\pi^2\cos(2\pi y)")
+            st.latex(r"u_*=2+x+2z+\cos(2\pi x)+\tfrac12\cos(2\pi z)")
+            st.latex(r"f_{\Delta}=-4\pi^2\cos(2\pi x)-2\pi^2\cos(2\pi z)")
             st.write("Гладкий пример: проверка уменьшения ошибки при уточнении сетки.")
         else:
-            st.latex(rf"f={config.source:g}")
+            st.latex(rf"f_{{\Delta}}={config.source:g}")
         normals = (-1, 3, -2, 4) if config.problem == "polynomial" else (-1, 1, -2, 2)
-        locations = ("x=0", "x=1", "y=0", "y=1")
-        derivatives = (r"-u_x", r"u_x", r"-u_y", r"u_y")
+        locations = ("x=0", "x=1", "z=0", "z=1")
+        derivatives = (r"-u_x", r"u_x", r"-u_z", r"u_z")
         for i, (side, kind, kappa) in enumerate(
             zip(SIDES, config.kinds, config.kappas)
         ):
@@ -91,12 +99,12 @@ def _formulas(config):
                 )
             st.latex(rf"{locations[i]}:\quad {left}={right}")
         st.caption(
-            "Нейман задаёт внешнюю производную. Физический поток при k=1: q = −∂u/∂n."
+            "Условие 2-го рода задаёт внешнюю производную. Физический поток при k=1: Fₙ = −∂u/∂n."
         )
 
 
 def render_boundary_app():
-    st.title("Условия Неймана и Робина")
+    st.title("Граничные условия 1, 2 и 3 рода")
     with st.sidebar:
         names = {**PRESETS_BOUNDARY, "custom": "Свои данные"}
         problem = st.selectbox(
@@ -124,18 +132,22 @@ def render_boundary_app():
                 kinds.append(kind)
                 kappas.append(
                     st.number_input(
-                        "κ", min_value=0.0, value=1.0, key=f"bc_{side}_kappa"
+                        "β", min_value=0.0, value=1.0, key=f"bc_{side}_kappa"
                     )
                     if kind == "robin"
                     else 0.0
                 )
                 data.append(
-                    st.number_input("g или r", value=0.0, key=f"bc_{side}_value")
+                    st.number_input(
+                        "μ (I род) / φ (II и III род)",
+                        value=0.0,
+                        key=f"bc_{side}_value",
+                    )
                     if problem == "custom"
                     else 0.0
                 )
         source = (
-            st.number_input("Источник f", value=0.0, key="bc_source")
+            st.number_input("Правая часть fΔ = −f", value=0.0, key="bc_source")
             if problem == "custom"
             else 0.0
         )
@@ -153,7 +165,7 @@ def render_boundary_app():
             "Узел x", min_value=0, max_value=n, value=n // 2, key="bc_x"
         )
         y = st.number_input(
-            "Узел y", min_value=0, max_value=n, value=n // 2, key="bc_y"
+            "Узел z", min_value=0, max_value=n, value=n // 2, key="bc_y"
         )
         st.caption(f"Точка ({x / n:g}, {y / n:g})")
         with st.expander("Точность и бюджет", key="boundary_ui_expander_155"):
@@ -216,7 +228,7 @@ def render_boundary_app():
         available = [m for m in available if m != "wos"]
     if operator.pure_neumann:
         st.caption(
-            "Чистый Нейман: среднее с весами объёмов равно нулю. MC без поглощения пока не поддерживается."
+            "Условия только 2-го рода: среднее с весами объёмов равно нулю. MC без поглощения пока не поддерживается."
         )
     with st.sidebar:
         methods = st.multiselect(

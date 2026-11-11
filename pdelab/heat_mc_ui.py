@@ -28,13 +28,13 @@ def _limit(settings, walks, diagnostic=False):
 def render_heat_mc(settings):
     st.subheader("Монте-Карло в пространстве и времени")
     st.caption(
-        "Самостоятельные траектории идут назад до u₀ или границы. Источник и граница всех нужных времён входят в подготовку и полное время."
+        "Самостоятельные траектории идут назад до μ или границы. Источник и граница всех нужных времён входят в подготовку и полное время."
     )
     diagnostic = st.checkbox(
-        "Диагностика только первого шага с заданным u₀", key="heat_mc_diagnostic"
+        "Диагностика только первого шага с заданным μ", key="heat_mc_diagnostic"
     )
     x = st.slider("Точка MC по x", 1, settings.n - 1, settings.n // 2, key="heat_mc_x")
-    y = st.slider("Точка MC по y", 1, settings.n - 1, settings.n // 2, key="heat_mc_y")
+    y = st.slider("Точка MC по z", 1, settings.n - 1, settings.n // 2, key="heat_mc_y")
     walks = st.select_slider(
         "Полных траекторий на точку",
         [64, 256, 1024, 4096, 16384, 65536],
@@ -94,11 +94,11 @@ def render_heat_mc(settings):
         f"Полное время MC: {result.seconds:.4g} с; подготовка: {result.preparation_seconds:.4g} с; траектории: {result.path_seconds:.4g} с. Прямой расчёт до того же t: {direct.seconds:.4g} с."
     )
     st.write(
-        f"Переходы: {result.spatial_transitions} пространственных и {result.temporal_transitions} временных. Численные буферы: {result.memory_bytes/2**20:.3g} МиБ (без памяти процесса и JIT)."
+        f"Переходы: {result.spatial_transitions} пространственных и {result.temporal_transitions} временных. Численные буферы: {result.memory_bytes / 2**20:.3g} МиБ (без памяти процесса и JIT)."
     )
     if result.diagnostic_step:
         st.info(
-            "Диагностика первого шага: u₀ задано. Этот замер не является расчётом всей истории до выбранного T."
+            "Диагностика первого шага: μ задано. Этот замер не является расчётом всей истории до выбранного T."
         )
     st.download_button(
         "Скачать MC по времени ZIP",
@@ -123,7 +123,7 @@ def render_heat_mc_study(settings):
         key="heat_study_x",
     )
     y = st.slider(
-        "Точка исследования по y",
+        "Точка исследования по z",
         1,
         settings.n - 1,
         settings.n // 2,

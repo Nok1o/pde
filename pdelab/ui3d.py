@@ -56,24 +56,29 @@ def _point_controls(n, prefix):
 def _problem_info(kind):
     with st.expander("Формулы и описание", expanded=False, key="cube_formulas"):
         st.latex(
-            r"u_{xx}+u_{yy}+u_{zz}=f,\quad (x,y,z)\in(0,1)^3,\qquad u|_{\partial\Omega}=g"
+            r"u_{xx}+u_{yy}+u_{zz}=f_{\Delta},\quad (x,y,z)\in(0,1)^3,\qquad u|_{\partial\Omega}=\mu"
         )
+        st.latex(r"\Delta u+f=0,\qquad f_{\Delta}=-f")
         if kind == "sine":
             st.latex(
-                r"u_*=\sin(\pi x)\sin(\pi y)\sin(\pi z),\qquad f=-3\pi^2u_*,\qquad g=0"
+                r"u_*=\sin(\pi x)\sin(\pi y)\sin(\pi z),\qquad f_{\Delta}=-3\pi^2u_*,\qquad \mu=0"
             )
             st.write(
                 "Синус: проверка источника и уменьшения погрешности при уточнении сетки."
             )
         elif kind == "affine":
-            st.latex(r"u_*=1+2x+3y+5z,\qquad f=0,\qquad g=u_*|_{\partial\Omega}")
+            st.latex(
+                r"u_*=1+2x+3y+5z,\qquad f_{\Delta}=0,\qquad \mu=u_*|_{\partial\Omega}"
+            )
             st.write(
                 "Линейное поле: разные коэффициенты по осям помогают обнаружить перестановку координат."
             )
         else:
-            st.latex(r"u_*=7,\qquad f=0,\qquad g=7")
+            st.latex(r"u_*=7,\qquad f_{\Delta}=0,\qquad \mu=7")
             st.write("Константа: контрольный пример без случайного разброса MC.")
-        st.latex(r"u_{ijk}=\frac{1}{6}\sum_{\text{6 соседей}}u-\frac{h^2f_{ijk}}{6}")
+        st.latex(
+            r"y_{ijk}=\frac{1}{6}\sum_{\text{6 соседей}}y-\frac{h^2f_{\Delta,ijk}}{6}"
+        )
 
 
 def _research_tab(config):

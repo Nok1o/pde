@@ -19,7 +19,7 @@ from .experiment3d import rows_csv
 
 def main(argv=None):
     parser = argparse.ArgumentParser(
-        description="3D: Дирихле, Нейман и Робин на шести гранях"
+        description="3D: условия 1, 2 и 3 рода на шести гранях"
     )
     parser.add_argument("command", choices=["run", "benchmark", "study"])
     parser.add_argument(
@@ -31,7 +31,14 @@ def main(argv=None):
             f"--{face}", choices=KINDS, default="robin" if face == "x0" else "dirichlet"
         )
     parser.add_argument(
-        "--kappas", nargs=6, type=float, default=[1.0] * 6, metavar=tuple(FACES)
+        "--betas",
+        "--kappas",
+        dest="kappas",
+        help="Коэффициенты β нормализованного условия ∂ₙu+βu=φ",
+        nargs=6,
+        type=float,
+        default=[1.0] * 6,
+        metavar=tuple(FACES),
     )
     parser.add_argument(
         "--data", nargs=6, type=float, default=[0.0] * 6, metavar=tuple(FACES)

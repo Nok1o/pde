@@ -1,4 +1,8 @@
-"""C=1, k(u)=1+alpha*u²: physical time, Picard, inner solves and Newton.
+"""Lecture notation: alpha is gamma in k(u)=1+gamma*u**2;
+relaxation is xi, dt is tau, source is f, and capacity c=1.
+These API names are retained for saved configurations.
+
+C=1, k(u)=1+alpha*u²: physical time, Picard, inner solves and Newton.
 
 All fields use [y,x]. Backward Euler freezes conductivity on a whole field.
 An incomplete nonlinear layer terminates the history with an explicit status.
@@ -283,10 +287,13 @@ def picard_layer(
             )
         if passes:
             row["accepted"] = True
-            result.converged, result.reason = True, (
-                "residual_and_change"
-                if method == "picard"
-                else "independent_validation"
+            result.converged, result.reason = (
+                True,
+                (
+                    "residual_and_change"
+                    if method == "picard"
+                    else "independent_validation"
+                ),
             )
             return result
         u = candidate
@@ -318,24 +325,36 @@ def newton_system(values, alpha, b, sigma):
         diagonal += n * n * (face_k + alpha * center * difference)
         derivative = n * n * (-face_k + alpha * neighbor * difference)
         if direction == 0:
-            origin, target = (slice(None, -1), slice(None)), (
-                slice(1, None),
-                slice(None),
+            origin, target = (
+                (slice(None, -1), slice(None)),
+                (
+                    slice(1, None),
+                    slice(None),
+                ),
             )
         elif direction == 1:
-            origin, target = (slice(1, None), slice(None)), (
-                slice(None, -1),
-                slice(None),
+            origin, target = (
+                (slice(1, None), slice(None)),
+                (
+                    slice(None, -1),
+                    slice(None),
+                ),
             )
         elif direction == 2:
-            origin, target = (slice(None), slice(None, -1)), (
-                slice(None),
-                slice(1, None),
+            origin, target = (
+                (slice(None), slice(None, -1)),
+                (
+                    slice(None),
+                    slice(1, None),
+                ),
             )
         else:
-            origin, target = (slice(None), slice(1, None)), (
-                slice(None),
-                slice(None, -1),
+            origin, target = (
+                (slice(None), slice(1, None)),
+                (
+                    slice(None),
+                    slice(None, -1),
+                ),
             )
         rows.append(indices[origin].ravel())
         columns.append(indices[target].ravel())

@@ -122,7 +122,10 @@ BASE = f"https://github.com/Nok1o/pde/blob/{REV}/"
 
 
 def code_link(file, function):
-    tree = ast.parse((ROOT / "pdelab" / file).read_text())
+    source = subprocess.check_output(
+        ["git", "show", f"{REV}:pdelab/{file}"], cwd=ROOT, text=True
+    )
+    tree = ast.parse(source)
     node = next(
         n
         for n in ast.walk(tree)
@@ -172,7 +175,7 @@ for chunk_index in range(2):
     subset = CODE[chunk_index * 15 : (chunk_index + 1) * 15]
     EXTRA.append(
         (
-            f"Карта кода - {chunk_index+1}/2",
+            f"Карта кода - {chunk_index + 1}/2",
             (
                 p(
                     "Ссылки ведут на зафиксированную версию GitHub. Так формулы можно сопоставить с алгоритмом, даже если основная ветка позже изменится."
@@ -183,7 +186,7 @@ for chunk_index in range(2):
                     [220, WIDTH - 220],
                 ),
                 src(
-                    f"Ревизия {REV}. В документе разобраны численные ядра и протокол исследования этой версии. Локальные незакоммиченные изменения интерфейса не являются источником формул."
+                    f"Ревизия {REV}. В документе разобраны численные ядра и протокол исследования этой версии. Обозначения документа согласованы с лекциями; исходные API-имена перечислены в главе 2. Ссылки и номера строк относятся к этой зафиксированной ревизии ядер."
                 ),
             ),
         )
@@ -196,15 +199,19 @@ EXTRA.append(
             p(
                 f'<link href="https://github.com/Nok1o/pde/tree/{REV}" color="#008080">Nok1o/pde, ревизия {REV[:7]}</link>. Основные выводы получены непосредственно из дискретных уравнений и сверены с функциями из карты кода. Дата подготовки: 11 ноября 2026.'
             ),
+            h("Обозначения преподавателя"),
+            p(
+                "«Мир Градова.pdf»: лекции 7–8 (с. 38–49), 9–10 (с. 55–61), 14–15 (с. 92–101). Согласование обозначений и сохранённых имён API приведено в первых двух главах. Текст лекций не включён в репозиторий."
+            ),
             h("Дополнительные источники"),
             p(
-                '[1] <link href="https://mfem.org/fem_bc/" color="#008080">MFEM: Boundary Conditions</link>. Обозначения Дирихле, Неймана и Робина. Проект использует собственную разностную схему, не FEM-дискретизацию MFEM.'
+                '[1] <link href="https://mfem.org/fem_bc/" color="#008080">MFEM: Boundary Conditions</link>. Обозначения граничных условий 1, 2 и 3 рода. Проект использует собственную разностную схему, не FEM-дискретизацию MFEM.'
             ),
             p(
                 '[2] J. S. Dokken. <link href="https://jsdokken.com/dolfinx-tutorial/v0.10/chapter2/nonlinpoisson_code.html" color="#008080">FEniCSx tutorial: Nonlinear Poisson, Implementation</link>. Изготовленные задачи с проводимостью 1+u². Наши разностные ядра и эталоны описаны отдельно.'
             ),
             p(
-                '[3] M. E. Muller. <link href="https://doi.org/10.1214/aoms/1177728169" color="#008080">Some Continuous Monte Carlo Methods for the Dirichlet Problem</link>. Annals of Mathematical Statistics, 27(3), 569-589, 1956. Историческая ссылка на WoS; формулы объёмных весов в этом конспекте выведены явно.'
+                '[3] M. E. Muller. <link href="https://doi.org/10.1214/aoms/1177728169" color="#008080">Исходная работа о непрерывных методах Монте-Карло</link>. Annals of Mathematical Statistics, 27(3), 569-589, 1956. Историческая ссылка на WoS; формулы объёмных весов в этом конспекте выведены явно.'
             ),
             p(
                 '[4] K. K. Sabelfeld. <link href="https://ideas.repec.org/a/bpj/mcmeap/v25y2019i1p85-96n5.html" color="#008080">A global random walk on spheres algorithm for transient heat equation and some extensions</link>. Monte Carlo Methods and Applications, 25(1), 85-96, 2019. DOI: 10.1515/mcma-2019-2032. Сопоставление сделано по доступной аннотации, не по полному тексту.'
@@ -335,7 +342,7 @@ def story(locations):
         para("Полный теоретический конспект проекта PDE", "h"),
         Spacer(1, 12),
         para(
-            "ЛОМ и прогонка · Монте-Карло и улучшения<br/>2D и 3D · Граничные условия I, II и III рода<br/>Физическое время · Квазилинейность · Честное сравнение"
+            "ЛОМ и прогонка · Монте-Карло и улучшения<br/>2D и 3D · Граничные условия 1, 2 и 3 рода<br/>Физическое время · Квазилинейность · Честное сравнение"
         ),
         Spacer(1, 23),
         image(ASSET / "sweeps.png", 150),
@@ -346,12 +353,12 @@ def story(locations):
         ),
         Spacer(1, 12),
         para(
-            f"39 тематических разделов • 93 формулы • 9 схем<br/>Состояние численных ядер: {REV[:7]}<br/>11 ноября 2026",
+            f"{len(PAGES)} тематических раздела • {len(EQUATIONS)} формул • 10 схем<br/>Состояние численных ядер: {REV[:7]}<br/>11 ноября 2026",
             "src",
         ),
         PageBreak(),
     ]
-    for part in range(2):
+    for part in range((len(ALL) + 20) // 21):
         flow.append(
             para("Оглавление" if part == 0 else "Оглавление / продолжение", "title")
         )
@@ -365,9 +372,11 @@ def story(locations):
         subset = list(enumerate(ALL))[part * 21 : (part + 1) * 21]
         data = []
         for idx, (title, _) in subset:
-            key = f"chapter-{idx+1}"
+            key = f"chapter-{idx + 1}"
             number = (
-                f"{idx+1:02d}" if idx < len(PAGES) else "П" + str(idx - len(PAGES) + 1)
+                f"{idx + 1:02d}"
+                if idx < len(PAGES)
+                else "П" + str(idx - len(PAGES) + 1)
             )
             data.append(
                 [
@@ -375,7 +384,8 @@ def story(locations):
                         f'<link href="#{key}">{number}. {escape(title)}</link>', "toc"
                     ),
                     para(
-                        f'<link href="#{key}">{locations.get(key,idx+4)}</link>', "toc"
+                        f'<link href="#{key}">{locations.get(key, idx + 4)}</link>',
+                        "toc",
                     ),
                 ]
             )
@@ -396,13 +406,13 @@ def story(locations):
         flow.append(PageBreak())
     for idx, (title, items) in enumerate(ALL):
         number = (
-            f"{idx+1:02d}"
+            f"{idx + 1:02d}"
             if idx < len(PAGES)
             else "Приложение " + str(idx - len(PAGES) + 1)
         )
         flow.append(para(number, "h"))
         heading = para(title, "title")
-        heading.chapter_key = f"chapter-{idx+1}"
+        heading.chapter_key = f"chapter-{idx + 1}"
         flow.append(heading)
         flow.extend(blocks(items))
         if idx < len(ALL) - 1:
@@ -429,7 +439,7 @@ for build in range(2):
 reader = PdfReader(OUT)
 print(f"PDF: {OUT}\nPages: {len(reader.pages)}; bytes: {OUT.stat().st_size}")
 for i, (title, _) in enumerate(ALL):
-    start = locations[f"chapter-{i+1}"]
-    end = locations.get(f"chapter-{i+2}", len(reader.pages) + 1)
+    start = locations[f"chapter-{i + 1}"]
+    end = locations.get(f"chapter-{i + 2}", len(reader.pages) + 1)
     if end - start != 1:
-        print(f"Overflow: chapter {i+1}, pages {start}-{end-1}: {title}")
+        print(f"Overflow: chapter {i + 1}, pages {start}-{end - 1}: {title}")

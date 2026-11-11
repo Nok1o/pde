@@ -61,7 +61,7 @@ def render_research_tab(config):
         with x_column:
             x = st.slider("Узел x", 0, n, n // 2, key="research_x")
         with y_column:
-            y = st.slider("Узел y", 0, n, n // 2, key="research_y")
+            y = st.slider("Узел z", 0, n, n // 2, key="research_y")
         st.caption(f"Точка: ({x / n:.4g}, {y / n:.4g})")
         max_walks = st.select_slider(
             "Максимум путей на точку",

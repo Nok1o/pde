@@ -24,63 +24,59 @@ from .ui_state import select_section
 def _problem_info(alpha):
     with st.expander("Формулы и описание", expanded=False, key="nonlinear_formulas"):
         st.markdown("**1. Исходное уравнение**")
+        st.caption(
+            "Лекция 14: c — теплоёмкость, k — теплопроводность, f — источник. Координаты x,z — как в лекции 15."
+        )
         st.latex(
-            r"C(u)\frac{\partial u}{\partial t}"
-            r"=\frac{\partial}{\partial x}\left(k(u)\frac{\partial u}{\partial x}\right)"
-            r"+\frac{\partial}{\partial y}\left(k(u)\frac{\partial u}{\partial y}\right)"
-            r"+f(x,y,t)"
+            r"c(u)\frac{\partial u}{\partial t}=\frac{\partial}{\partial x}\left(k(u)\frac{\partial u}"
+            r"{\partial x}\right)+\frac{\partial}{\partial z}\left(k(u)\frac{\partial u}{\partial z}"
+            r"\right)-p(x,z)u+f(x,z,t)"
         )
         st.write(
-            "u — температура; C(u) — коэффициент теплоёмкости; "
-            "k(u) — теплопроводность; f — заданный источник тепла."
+            "u — температура; c(u) — коэффициент теплоёмкости; k(u) — теплопроводность; f — заданный источник тепла."
         )
 
         st.markdown("**2. Какие коэффициенты принимаем**")
-        st.latex(r"C(u)=1,\qquad k(u)=1+\alpha u^2")
-        st.write(f"Сейчас α = {alpha:g}.")
+        st.latex(r"c(u)=1,\qquad p=0,\qquad k(u)=1+\gamma u^2")
+        st.write(f"Сейчас γ = {alpha:g}.")
         st.write(
-            "При α = 0 получаем k(u) = 1: задача становится линейной."
+            "При γ = 0 получаем k(u) = 1: задача становится линейной."
             if alpha == 0
             else "Теплопроводность зависит от температуры, поэтому задача нелинейная."
         )
 
+        st.caption("γ ≥ 0 — параметр нашего теста, добавленный к обозначениям лекций.")
         st.markdown("**3. Как задаём источник f**")
         st.write("Для проверки методов выбираем известное точное решение:")
-        st.latex(r"u_*(x,y,t)=1+e^{-t}\sin(\pi x)\sin(\pi y)")
+        st.latex(r"u_*(x,z,t)=1+e^{-t}\sin(\pi x)\sin(\pi z)")
         st.write(
             "Подбираем источник так, чтобы это решение удовлетворяло уравнению. "
             "В формуле источника u_* — известная функция, а не искомое численное поле."
         )
         st.latex(
-            r"f=\frac{\partial u_*}{\partial t}"
-            r"-\nabla\!\cdot\!\left(k(u_*)\nabla u_*\right)"
+            r"f=\frac{\partial u_*}{\partial t}-\nabla\!\cdot\!\left(k(u_*)\nabla u_*\right)"
         )
         st.write("После вычисления производных:")
         st.latex(
-            r"\begin{aligned}f(x,y,t)={}&-(u_*-1)"
-            r"+2\pi^2 k(u_*)(u_*-1)\\"
-            r"&-2\alpha u_*\left["
-            r"\left(\frac{\partial u_*}{\partial x}\right)^2"
-            r"+\left(\frac{\partial u_*}{\partial y}\right)^2\right].\end{aligned}"
+            r"\begin{aligned}f(x,z,t)={}&-(u_*-1)+2\pi^2 k(u_*)(u_*-1)\\&-2\gamma "
+            r"u_*\left[\left(\frac{\partial u_*}{\partial x}\right)^2+\left(\frac{\partial u_*}{\partial z}"
+            r"\right)^2\right].\end{aligned}"
         )
 
         st.markdown("**4. Итоговое уравнение**")
-        st.write("Подставляем C(u) и k(u) в исходное уравнение:")
+        st.write("Подставляем c(u) и k(u) в исходное уравнение:")
         st.latex(
-            r"\begin{aligned}\frac{\partial u}{\partial t}"
-            r"={}&\frac{\partial}{\partial x}"
-            r"\left((1+\alpha u^2)\frac{\partial u}{\partial x}\right)\\"
-            r"&+\frac{\partial}{\partial y}"
-            r"\left((1+\alpha u^2)\frac{\partial u}{\partial y}\right)+f(x,y,t)."
-            r"\end{aligned}"
+            r"\begin{aligned}\frac{\partial u}{\partial t}={}&\frac{\partial}{\partial x}\left((1+\gamma "
+            r"u^2)\frac{\partial u}{\partial x}\right)\\&+\frac{\partial}{\partial z}\left((1+\gamma "
+            r"u^2)\frac{\partial u}{\partial z}\right)+f(x,z,t).\end{aligned}"
         )
 
         st.markdown("**5. Область, начальное и граничное условия**")
         st.latex(r"\Omega=(0,1)^2,\qquad t\in[0,T]")
         st.write("В начальный момент:")
-        st.latex(r"u(x,y,0)=1+\sin(\pi x)\sin(\pi y)")
+        st.latex(r"u(x,z,0)=1+\sin(\pi x)\sin(\pi z)")
         st.write("На всех четырёх сторонах квадрата поддерживаем температуру 1:")
-        st.latex(r"u(0,y,t)=u(1,y,t)=u(x,0,t)=u(x,1,t)=1")
+        st.latex(r"u(0,z,t)=u(1,z,t)=u(x,0,t)=u(x,1,t)=1")
 
     with st.expander(
         "Как решаем: время → Пикар → ЛОМ или MC", key="nonlinear_method_formulas"
@@ -91,18 +87,17 @@ def _problem_info(alpha):
             "линейную задачу внутри каждой итерации решаем прогонками или MC."
         )
         st.write(
-            "uᵐ — поле на предыдущем временном слое; vʲ — текущее приближение "
-            "на новом слое. Фиксируем проводимость по vʲ:"
+            "yᵐ — поле на предыдущем временном слое; ŷˢ — текущее приближение на новом слое. Фиксируем проводимость по ŷˢ:"
         )
-        st.latex(r"k^{(j)}=1+\alpha(v^j)^2")
+        st.latex(r"k^{(s)}=1+\gamma(\hat y^{s})^2")
         st.write("Решаем линейную сеточную задачу для нового приближения:")
         st.latex(
-            r"\left(\frac{I}{\Delta t}-\nabla_h\!\cdot k^{(j)}\nabla_h\right)"
-            r"\widetilde v^{j+1}=\frac{u^m}{\Delta t}+f^{m+1}"
+            r"\left(\frac{I}{\tau}-\nabla_h\!\cdot k^{(s)}\nabla_h\right)\widetilde y^{s+1}=\frac{y^m}{\tau}"
+            r"+f^{m+1}"
         )
         st.caption("I — единичный оператор; ∇ₕ обозначает производные на сетке.")
-        st.write("Обновляем поле с релаксацией ω и повторяем до сходимости:")
-        st.latex(r"v^{j+1}=(1-\omega)v^j+\omega\widetilde v^{j+1}")
+        st.write("Обновляем поле с релаксацией ξ и повторяем до сходимости:")
+        st.latex(r"\hat y^{s+1}=(1-\xi)\hat y^{s}+\xi\widetilde y^{s+1}")
         st.write(
             "Ньютон + прямой решатель служит отдельным сеточным эталоном. "
             "Основные сравниваемые варианты — Пикар + ЛОМ и Пикар + MC."
@@ -116,10 +111,10 @@ def render_nonlinear_app():
             "Интервалов по оси", [4, 6, 8, 12, 16, 24, 32], value=8, key="nl_n"
         )
         alpha = st.number_input(
-            "α", min_value=0.0, max_value=100.0, value=0.5, key="nl_alpha"
+            "γ", min_value=0.0, max_value=100.0, value=0.5, key="nl_alpha"
         )
         dt = st.number_input(
-            "Физический шаг Δt",
+            "Физический шаг τ",
             min_value=0.0001,
             max_value=1.0,
             value=0.01,
@@ -136,7 +131,11 @@ def render_nonlinear_app():
                 st.session_state[key] = min(n, st.session_state[key])
             coordinates.append(
                 st.number_input(
-                    f"Узел {axis}", min_value=0, max_value=n, value=n // 2, key=key
+                    f"Узел {'z' if axis == 'y' else axis}",
+                    min_value=0,
+                    max_value=n,
+                    value=n // 2,
+                    key=key,
                 )
             )
         point = tuple(coordinates)
@@ -145,7 +144,7 @@ def render_nonlinear_app():
         )
         with st.expander("Нелинейные итерации", key="nonlinear_ui_expander_57"):
             relaxation = st.slider(
-                "Релаксация", 0.1, 1.0, 0.7, 0.1, key="nl_relaxation"
+                "Релаксация ξ", 0.1, 1.0, 0.7, 0.1, key="nl_relaxation"
             )
             tol = st.select_slider(
                 "Допуск Picard + ЛОМ",

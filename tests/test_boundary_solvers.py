@@ -82,7 +82,7 @@ def test_known_boundary_point_and_unknown_nodes():
 
 def test_neumann_mc_and_truncation_are_explicit_errors():
     p = make_boundary_problem(n=8, kinds=dict.fromkeys(SIDES, "neumann"))
-    with pytest.raises(ValueError, match="чистого Неймана"):
+    with pytest.raises(ValueError, match="условий только 2-го рода"):
         solve_boundary(p, select_boundary_points(8), "mc")
     with pytest.raises(ValueError, match="поглощающей"):
         trace_boundary_walk(p)

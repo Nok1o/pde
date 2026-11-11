@@ -18,7 +18,7 @@ from .experiment3d import rows_csv
 
 def main(argv=None):
     parser = argparse.ArgumentParser(
-        description="2D: Дирихле, Нейман и Робин по сторонам"
+        description="2D: условия 1, 2 и 3 рода по сторонам"
     )
     parser.add_argument("command", choices=["run", "benchmark", "study"])
     parser.add_argument(
@@ -32,7 +32,10 @@ def main(argv=None):
             default="robin" if side == "left" else "dirichlet",
         )
     parser.add_argument(
+        "--betas",
         "--kappas",
+        dest="kappas",
+        help="Коэффициенты β нормализованного условия ∂ₙu+βu=φ",
         nargs=4,
         type=float,
         default=[1.0] * 4,
@@ -47,7 +50,7 @@ def main(argv=None):
     )
     parser.add_argument("--source", type=float, default=0.0)
     parser.add_argument("--mode", choices=["point", "patch", "field"], default="point")
-    parser.add_argument("--point", nargs=2, type=int, metavar=("X", "Y"))
+    parser.add_argument("--point", nargs=2, type=int, metavar=("X", "Z"))
     parser.add_argument("--walks", type=int, default=2048)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--tol", type=float, default=1e-8)

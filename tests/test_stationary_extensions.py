@@ -142,7 +142,7 @@ def test_mixed_research_ui_runs_exports_and_invalidates(dimension, prefix, resea
     app.radio(key="dimension").set_value(dimension).run()
     app.radio(
         key="boundary_mode" if dimension == "2D" else "cube_boundary_mode"
-    ).set_value("Смешанные I / II / III").run()
+    ).set_value("Смешанные: 1, 2, 3 рода").run()
     assert "Исследование" in [tab.label for tab in app.tabs]
     app.multiselect(key=prefix + "_methods").set_value(["lod_serial", "graded"])
     app.select_slider(key=research + "_n").set_value(4)

@@ -112,7 +112,7 @@ def square(ax, n=8):
         ax.plot([0, 1], [v, v], color="#d6e2ec", lw=0.6)
     ax.plot([0, 1, 1, 0, 0], [0, 0, 1, 1, 0], color=BLUE, lw=1.4)
     ax.set_xlabel("x")
-    ax.set_ylabel("y", rotation=0)
+    ax.set_ylabel("z", rotation=0)
 
 
 fig, ax = plt.subplots(figsize=(5.6, 3.5))
@@ -122,14 +122,26 @@ ax.scatter([0.5], [0.5], c=RED, s=80, zorder=6)
 for xx, yy in [(0.375, 0.5), (0.625, 0.5), (0.5, 0.375), (0.5, 0.625)]:
     ax.plot([0.5, xx], [0.5, yy], c=BLUE, lw=2)
 ax.annotate(
-    "запрос uᵢ",
+    "запрос yᵢ",
     (0.5, 0.5),
     (0.69, 0.72),
     arrowprops={"arrowstyle": "->", "color": RED},
     color=RED,
 )
-ax.text(0.08, 0.9, "граница: известное g", color=BLUE)
+ax.text(0.08, 0.9, "граница: известное μ", color=BLUE)
 save(fig, "grid")
+
+fig, axs = plt.subplots(1, 2, figsize=(8, 2.7))
+for ax, intervals, title in zip(
+    axs, (16, 6), ("Основная: решаем задачу", "Контрольная: строим приближение")
+):
+    square(ax, intervals)
+    ax.scatter([0.5], [0.5], color=RED, s=45, zorder=5)
+    ax.set_title(title, fontsize=10)
+    ax.set_xticks([0, 0.5, 1])
+    ax.set_yticks([0, 0.5, 1])
+fig.tight_layout()
+save(fig, "two_grids")
 
 fig, axs = plt.subplots(1, 2, figsize=(8, 2.5))
 for j, ax in enumerate(axs):
@@ -139,7 +151,7 @@ for j, ax in enumerate(axs):
         ax.annotate(
             "", end, start, arrowprops={"arrowstyle": "->", "color": TEAL, "lw": 1.5}
         )
-    ax.set_title("1. Прогонки по x" if j == 0 else "2. Прогонки по y")
+    ax.set_title("1. Прогонки по x" if j == 0 else "2. Прогонки по z")
     ax.set_xticks([])
     ax.set_yticks([])
 fig.tight_layout()
@@ -213,9 +225,9 @@ def arr(ax, start, end):
 
 fig, ax = plt.subplots(figsize=(8, 2.2))
 ax.axis("off")
-box(ax, 0.01, 0.49, 0.27, 0.39, "Грубая система\nиз f и g")
+box(ax, 0.01, 0.49, 0.27, 0.39, "Грубая система\nиз fΔ и μ")
 box(ax, 0.36, 0.49, 0.27, 0.39, "Перенос v\nна исходную сетку")
-box(ax, 0.71, 0.49, 0.27, 0.39, "MC для остатка\nf − Lₕv")
+box(ax, 0.71, 0.49, 0.27, 0.39, "MC для остатка\nfΔ − Lₕv")
 arr(ax, (0.28, 0.69), (0.36, 0.69))
 arr(ax, (0.63, 0.69), (0.71, 0.69))
 ax.text(
@@ -274,7 +286,7 @@ ax.set_xlabel("пространственный узел (показана од�
 ax.text(
     5.3,
     2.2,
-    "→ по пространству\n↓ назад по времени\n\nНа t₀ выплачивается u₀.",
+    "→ по пространству\n↓ назад по времени\n\nНа t₀ выплачивается μ.",
     color=BLUE,
     va="top",
 )
@@ -283,8 +295,8 @@ save(fig, "spacetime")
 
 fig, ax = plt.subplots(figsize=(8, 2.1))
 ax.axis("off")
-box(ax, 0.01, 0.33, 0.27, 0.5, "Новый слой tₘ\nпредыдущее поле uᵐ⁻¹")
-box(ax, 0.36, 0.33, 0.27, 0.5, "Picard: k(vʲ)\nрешить → обновить")
+box(ax, 0.01, 0.33, 0.27, 0.5, "Новый слой tₘ\nпредыдущее поле yᵐ⁻¹")
+box(ax, 0.36, 0.33, 0.27, 0.5, "Picard: k(ŷˢ)\nрешить → обновить")
 box(ax, 0.71, 0.33, 0.27, 0.5, "Линейная система\nпрогонки или MC")
 arr(ax, (0.28, 0.59), (0.36, 0.59))
 arr(ax, (0.63, 0.59), (0.71, 0.59))
@@ -308,6 +320,8 @@ assert np.allclose(np.linalg.solve(a, [1, 0, 1]), 1)
 assert abs(np.exp(-2 * np.pi**2 * 0.01) - 0.82087) < 1e-5
 assert abs(1 / (1 + 2 * np.pi**2 * 0.01) - 0.83515) < 1e-5
 assert abs(100 * ((np.pi / 96) / np.sin(np.pi / 96)) ** 2 - 100 - 0.0357) < 1e-4
+assert (100 - 4 * 24) / 0.5**2 == 16
+assert 24 - 0.5**2 * (-16) / 4 == 25
 print(
-    f"{len(PAGES)} chapters; {len(manifest)} equations; 9 diagrams; arithmetic checks passed"
+    f"{len(PAGES)} chapters; {len(manifest)} equations; 10 diagrams; arithmetic checks passed"
 )

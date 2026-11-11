@@ -53,7 +53,7 @@ def test_ui_disables_series_with_mc_and_no_budgets(dimension, prefix):
     ).run()
     app.radio(key="dimension").set_value(dimension).run()
     mode_key = "boundary_mode" if dimension == "2D" else "cube_boundary_mode"
-    app.radio(key=mode_key).set_value("Смешанные I / II / III").run()
+    app.radio(key=mode_key).set_value("Смешанные: 1, 2, 3 рода").run()
     app.select_slider(key=f"{prefix}_n").set_value(8).run()
     app.multiselect(key=f"{prefix}_methods").set_value(["mc"])
     app.multiselect(key=f"{prefix}_budgets").set_value([]).run()
@@ -150,7 +150,7 @@ def test_boundary_ui_calculation_and_boundary_start():
     app = AppTest.from_file(
         Path(__file__).parents[1] / "app.py", default_timeout=60
     ).run()
-    app.radio(key="boundary_mode").set_value("Смешанные I / II / III").run()
+    app.radio(key="boundary_mode").set_value("Смешанные: 1, 2, 3 рода").run()
     assert not app.exception
     app.select_slider(key="bc_n").set_value(8).run()
     app.select_slider(key="bc_walks").set_value(64)
