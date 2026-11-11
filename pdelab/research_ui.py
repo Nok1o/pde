@@ -7,7 +7,7 @@ import streamlit as st
 
 from .experiment import Config
 from .research import StudySettings, accuracy_study, timing_rows
-from .study_policy import render_accuracy_results
+from .study_policy import ACCURACY_METRIC, render_accuracy_results
 
 
 def render_research_tab(config):
@@ -26,7 +26,7 @@ def render_research_tab(config):
             max_value=100,
             value=5,
             step=1,
-            help="Число независимых запусков в каждой серии. Усредняется время одного запуска; точность проверяется по RMS ошибок отдельных запусков.",
+            help="Число независимых запусков в каждой серии. Усредняется время одного запуска; точность проверяется по среднему модулю относительных ошибок отдельных запусков.",
             key="research_repeats",
         )
 
@@ -154,9 +154,14 @@ def render_research_tab(config):
         st.write(f"Эталон: {study.reference_label}. Запрос: {saved.mode}.")
         if saved.mode == "point":
             st.write(f"u = {study.reference_value:.6g}")
-        st.latex(
-            r"\varepsilon_{\mathrm{rel}} = 100\%\,\frac{\operatorname{RMS}_{r,j}(u_{r,j}-u_{*,j})}{\operatorname{RMS}_j(u_{*,j})}"
-        )
+        if study.rows and study.rows[0].get("accuracy_metric") == ACCURACY_METRIC:
+            st.latex(
+                r"\varepsilon_{\mathrm{rel}} = \frac{100\%}{R}\sum_{r=1}^{R}\frac{\sum_j |u_{r,j}-u_{*,j}|}{\sum_j |u_{*,j}|}"
+            )
+        else:
+            st.latex(
+                r"\varepsilon_{\mathrm{rel}} = 100\%\,\frac{\operatorname{RMS}_{r,j}(u_{r,j}-u_{*,j})}{\operatorname{RMS}_j(u_{*,j})}"
+            )
         st.write(
             "Бюджет проходит две серии: подбор и независимую проверку. В таблице — среднее время одного проверочного запуска. Это экспериментальная оценка точности."
         )

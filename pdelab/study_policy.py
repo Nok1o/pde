@@ -4,9 +4,44 @@ from time import perf_counter
 
 import numpy as np
 
-SELECTION_POLICY = "pilot_half_target_independent_confirmation_v2"
+SELECTION_POLICY = "pilot_half_target_mean_relative_error_v3"
+ACCURACY_METRIC = "mean_run_relative_l1_v1"
+ACCURACY_DESCRIPTION = "100 * mean_runs(sum_points(abs(u_run-reference)) / sum_points(abs(reference))); independent validation"
 CALIBRATION_FRACTION = 0.5
 DETERMINISTIC_METHODS = {"lod", "lod_serial", "picard"}
+
+
+def mean_relative_error(values, reference):
+    """Mean of absolute relative errors, not RMS or error of the mean.
+
+    For multiple query points use the relative L1 error of each whole query.
+    Individual zero reference nodes are included; an all-zero reference is undefined.
+    """
+    reference = np.asarray(reference, dtype=float)
+    values = np.asarray(values, dtype=float)
+    if not reference.size or not values.size:
+        raise ValueError("Для ошибки нужны непустые значения и эталон")
+    if not np.isfinite(reference).all() or not np.isfinite(values).all():
+        raise ValueError("Значения и эталон должны быть конечными")
+    scale = np.mean(np.abs(reference))
+    if scale == 0:
+        raise ValueError("Нулевой эталон: относительная ошибка не определена")
+    return float(100 * np.mean(np.abs(values - reference)) / scale)
+
+
+def accuracy_metadata(rows):
+    """Never relabel a saved RMS study with the new metric when exporting it."""
+    row = rows[0] if rows else {}
+    metric = row.get("accuracy_metric", "relative_rmse_v1")
+    return dict(
+        accuracy_metric=metric,
+        accuracy=(
+            ACCURACY_DESCRIPTION
+            if metric == ACCURACY_METRIC
+            else "100 * RMS(u_run-reference) / RMS(reference); individual runs"
+        ),
+        selection=row.get("selection_policy", "legacy"),
+    )
 
 
 def calibration_target(target, method):
@@ -47,6 +82,7 @@ def search_budgets(
             ),
             calibration_target_pct=calibration_target(target, method),
             selection_policy=SELECTION_POLICY,
+            accuracy_metric=ACCURACY_METRIC,
             status="Недостаточный запас точности в пределах бюджетов",
             status_code="not_reached",
         )
@@ -219,9 +255,10 @@ def render_accuracy_results(rows, names=None, *, key):
         st.info(
             "Показано исследование по прежнему протоколу. Запустите заново для подбора с запасом."
         )
-    st.caption(
-        "Новый протокол: подбор MC до половины целевой ошибки. Затем независимая проверка по полному порогу. Время — одного проверочного запуска."
-    )
+    else:
+        st.caption(
+            "Ошибка — среднее относительных ошибок отдельных запусков. MC подбирается до половины порога, затем независимо проверяется. Время — одного проверочного запуска."
+        )
     timing = display_timing_rows(rows, names)
     for line in timing:
         for column, value in line.items():

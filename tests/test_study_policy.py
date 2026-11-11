@@ -3,9 +3,12 @@
 import pytest
 
 from pdelab.study_policy import (
+    ACCURACY_METRIC,
     SELECTION_POLICY,
+    accuracy_metadata,
     calibration_target,
     display_timing_rows,
+    mean_relative_error,
     search_budgets,
 )
 
@@ -117,3 +120,26 @@ def test_nonfinite_validation_does_not_leak_nan_to_exports():
     row = search_budgets("mc", [64], measure, 60, targets=(1.0,))[0]
     assert row["seconds"] is None and row["relative_error_pct"] is None
     assert row["status_code"] == "validation_incomplete"
+
+
+def test_relative_error_is_mean_absolute_not_rms_or_error_of_mean():
+    assert mean_relative_error([9, 9, 13], 10) == pytest.approx(100 / 6)
+    assert mean_relative_error([8, 12], 10) == pytest.approx(20)
+    assert mean_relative_error([-9, -9, -13], -10) == pytest.approx(100 / 6)
+
+
+def test_field_error_uses_l1_and_keeps_zero_reference_nodes():
+    assert mean_relative_error([[2, 9], [-2, 11]], [0, 10]) == pytest.approx(30)
+    with pytest.raises(ValueError, match="Нулевой эталон"):
+        mean_relative_error([[1, 2]], [0, 0])
+
+
+def test_old_saved_study_keeps_old_metric_in_export():
+    old = accuracy_metadata([{"selection_policy": "old"}])
+    assert old["accuracy_metric"] == "relative_rmse_v1"
+    assert "RMS" in old["accuracy"]
+    new = accuracy_metadata(
+        [{"selection_policy": SELECTION_POLICY, "accuracy_metric": ACCURACY_METRIC}]
+    )
+    assert new["accuracy_metric"] == ACCURACY_METRIC
+    assert "abs" in new["accuracy"] and "RMS" not in new["accuracy"]

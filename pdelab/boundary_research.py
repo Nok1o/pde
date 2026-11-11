@@ -13,7 +13,14 @@ from .boundary_solvers import select_boundary_points, solve_boundary, warmup_bou
 from .boundary_solvers3d import solve_boundary3d, warmup_boundary3d
 from .problem3d import DIRECT_MAX_N
 from .research import LOD_SEARCH_TOLERANCES, TARGETS_PCT
-from .study_policy import SELECTION_POLICY, render_accuracy_results, search_budgets
+from .study_policy import (
+    ACCURACY_DESCRIPTION,
+    ACCURACY_METRIC,
+    SELECTION_POLICY,
+    mean_relative_error,
+    render_accuracy_results,
+    search_budgets,
+)
 
 
 def boundary_accuracy_study(
@@ -24,7 +31,7 @@ def boundary_accuracy_study(
     tolerances=LOD_SEARCH_TOLERANCES,
     seconds_per_method=60.0,
 ):
-    """Select on pilot RMSE; confirm once on independent whole runs, never retune."""
+    """Select on mean absolute relative error; confirm once on independent whole runs, never retune."""
     if isinstance(repeats, bool) or int(repeats) != repeats or repeats < 2:
         raise ValueError("Нужно минимум два независимых повтора")
     if not np.isfinite(seconds_per_method) or seconds_per_method <= 0:
@@ -106,9 +113,7 @@ def boundary_accuracy_study(
                 return None, reason
             values.append(value)
             times.append(elapsed)
-        error = float(
-            100 * np.sqrt(np.mean((np.array(values) - target) ** 2)) / abs(target)
-        )
+        error = mean_relative_error(values, target)
         return dict(error=error, seconds=float(np.mean(times))), "ok"
 
     for method in methods:
@@ -119,6 +124,7 @@ def boundary_accuracy_study(
                     target_pct=t,
                     status="zero_reference",
                     selection_policy=SELECTION_POLICY,
+                    accuracy_metric=ACCURACY_METRIC,
                     seconds=None,
                     relative_error_pct=None,
                     budget=None,
@@ -153,6 +159,8 @@ def boundary_accuracy_study(
         rows.extend(method_rows)
     return dict(
         selection_policy=SELECTION_POLICY,
+        accuracy_metric=ACCURACY_METRIC,
+        accuracy=ACCURACY_DESCRIPTION,
         config=asdict(config),
         repeats=repeats,
         budgets=list(budgets),
@@ -243,7 +251,7 @@ def render_boundary_research(config, methods, key):
     with st.expander("Статусы и параметры", key="boundary_research_expander_227"):
         st.dataframe(rows, hide_index=True)
         st.caption(
-            "Ошибка — RMS отдельных независимых запусков; время выводится только при подтверждённой точности. Нулевой эталон не допускает процентной ошибки."
+            "Ошибка — среднее относительных ошибок отдельных независимых запусков; время выводится только при подтверждённой точности. Нулевой эталон не допускает процентной ошибки."
         )
     st.download_button(
         "Скачать исследование CSV",

@@ -10,7 +10,7 @@ import numpy as np
 from .experiment3d import Config3D, comparison3d, rows_csv
 from .problem3d import make_problem3d, select_points3d
 from .solvers3d import METHODS_3D, solve3d, warmup3d
-from .study_policy import SELECTION_POLICY, search_budgets
+from .study_policy import accuracy_metadata, mean_relative_error, search_budgets
 
 TARGETS_3D = (1.0, 5.0, 10.0)
 
@@ -95,11 +95,7 @@ def _series3d(study, problem, points, method, budget, budget_index, phase, deadl
                 "iterations": result.iterations,
             }
         )
-    error = (
-        100
-        * float(np.sqrt(np.mean((np.array(values) - study.reference_value) ** 2)))
-        / abs(study.reference_value)
-    )
+    error = mean_relative_error(values, study.reference_value)
     return error, float(np.mean(times))
 
 
@@ -188,9 +184,8 @@ def study_payload3d(study):
         "coordinate_order": ["x", "y", "z"],
         "reference_kind": study.reference_kind,
         "reference_value": study.reference_value,
-        "selection": SELECTION_POLICY,
+        **accuracy_metadata(study.rows),
         "seconds_per_phase": study.settings.seconds_per_method,
-        "accuracy": "Relative RMSE of individual runs, not error of their mean; empirical estimate",
         "timing": "Mean wall time of validation runs after warmup; search and reference excluded",
     }
 

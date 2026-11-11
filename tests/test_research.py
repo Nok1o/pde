@@ -15,8 +15,8 @@ from pdelab.solvers import METHODS, Result
 
 
 def test_accuracy_uses_individual_errors_not_error_of_the_average():
-    assert research._relative_rmse([0.0, 50.0], 25.0) == pytest.approx(100.0)
-    assert research._relative_rmse([-24.0, -26.0], -25.0) == pytest.approx(4.0)
+    assert research.mean_relative_error([0.0, 50.0], 25.0) == pytest.approx(100.0)
+    assert research.mean_relative_error([-24.0, -26.0], -25.0) == pytest.approx(4.0)
 
 
 def _mock_solver(monkeypatch):

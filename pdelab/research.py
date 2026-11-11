@@ -15,7 +15,7 @@ from .experiment import Config
 from .problem import make_problem, reference_solution, select_points
 from .reference import choose_reference
 from .solvers import METHODS, solve, warmup
-from .study_policy import SELECTION_POLICY, search_budgets
+from .study_policy import accuracy_metadata, mean_relative_error, search_budgets
 
 TARGETS_PCT = (1.0, 5.0, 10.0)
 LOD_SEARCH_TOLERANCES = (
@@ -68,13 +68,6 @@ def _trial_seed(seed, budget_index, phase, repeat_index):
     phase_index = 0 if phase == "calibration" else 1
     sequence = np.random.SeedSequence([seed, budget_index, phase_index, repeat_index])
     return int(sequence.generate_state(1)[0])
-
-
-def _relative_rmse(values, reference):
-    """Ошибка отдельных запусков, без взаимного сокращения ошибок их среднего."""
-    reference = np.asarray(reference)
-    relative_errors = (np.asarray(values) - reference) / np.sqrt(np.mean(reference**2))
-    return float(100 * np.sqrt(np.mean(relative_errors**2)))
 
 
 def _measure_budget(
@@ -141,7 +134,9 @@ def _measure_budget(
                 ),
                 "value": np.asarray(value).tolist(),
                 "reference_value": study.reference_value,
-                "relative_error_pct": _relative_rmse([value], study.reference_value),
+                "relative_error_pct": mean_relative_error(
+                    [value], study.reference_value
+                ),
                 "preparation_seconds": result.extras.get("preparation_seconds", 0.0),
                 "path_seconds": result.extras.get("path_seconds", result.elapsed),
                 "seconds": result.elapsed,
@@ -167,7 +162,7 @@ def _measure_budget(
         )
 
     return {
-        "relative_error_pct": _relative_rmse(values, study.reference_value),
+        "relative_error_pct": mean_relative_error(values, study.reference_value),
         "seconds": float(np.mean(times)),
     }
 
@@ -177,7 +172,7 @@ def accuracy_study(settings: StudySettings, progress=None):
 
     В таблицу попадает среднее время одного подтверждающего запуска. Подготовка
     слоёв включена в solve.elapsed. Поиск бюджета, эталон и прогрев не включены.
-    Порог проверяется по относительной RMSE отдельных запусков, а не их среднего.
+    Порог проверяется по среднему модулю относительной ошибки отдельных запусков.
     Это эмпирическая точность на сериях, не вероятностная гарантия.
     """
     config = settings.config
@@ -303,9 +298,8 @@ def export_study(study, folder):
         "reference_label": study.reference_label,
         "reference_value": study.reference_value,
         "search_seconds": study.search_seconds,
-        "accuracy": "100 * RMS(u_run - reference) / RMS(reference), across runs and queried points; independent validation",
+        **accuracy_metadata(study.rows),
         "timing": "Mean solver time of validation runs; search, reference and JIT excluded; all layer preparation included",
-        "selection": SELECTION_POLICY,
         "seconds_per_phase": study.settings.seconds_per_method,
     }
     (folder / "settings.json").write_text(

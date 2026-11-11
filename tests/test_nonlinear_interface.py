@@ -151,3 +151,30 @@ def test_fixed_study_records_actual_method_settings(monkeypatch, tmp_path):
     assert lod["max_outer"] == 100 and lod["initial_walks"] is None
     assert mc["max_outer"] == 1 and mc["tolerance"] == 1e-10
     assert mc["max_total_walks"] == 20_000_000
+
+
+def test_target_metric_changes_without_relabelling_comparison_rmse():
+    from types import SimpleNamespace
+
+    from pdelab.nonlinear_study import NonlinearComparison, _target_comparison
+
+    runs = [SimpleNamespace(fields=np.array([[[value]]])) for value in (9.0, 9.0, 13.0)]
+    deterministic = SimpleNamespace(fields=np.array([[[10.0]]]))
+    comparison = NonlinearComparison(
+        point=(0, 0),
+        reference=deterministic,
+        deterministic=deterministic,
+        stochastic=runs,
+        metrics=[
+            {"method": "picard", "completed": True, "relative_error_pct": 0.0},
+            {"method": "mc", "completed": True, "relative_error_pct": 19.148542155},
+        ],
+        matched_picard=deterministic,
+    )
+    converted = _target_comparison(comparison, SimpleNamespace(exact=None), 0.0)
+    assert converted.metrics[1]["relative_error_pct"] == pytest.approx(100 / 6)
+    assert comparison.metrics[1]["relative_error_pct"] == pytest.approx(19.148542155)
+    assert (
+        converted.metrics[1]["relative_rmse_pct"]
+        == comparison.metrics[1]["relative_error_pct"]
+    )

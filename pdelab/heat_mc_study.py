@@ -13,7 +13,13 @@ from .heat import solve_heat
 from .heat_mc import _settings, _warmup, solve_heat_mc
 from .problem import validate_points
 from .research import _walk_budgets
-from .study_policy import SELECTION_POLICY, search_budgets
+from .study_policy import (
+    ACCURACY_DESCRIPTION,
+    ACCURACY_METRIC,
+    SELECTION_POLICY,
+    mean_relative_error,
+    search_budgets,
+)
 
 VALIDATION_POLICY = SELECTION_POLICY
 
@@ -80,6 +86,8 @@ def heat_mc_study(
         reference_kind="analytic" if problem.exact else "discrete",
         grid_reference=float(grid.fields[-1, y, x]),
         validation_policy=VALIDATION_POLICY,
+        accuracy_metric=ACCURACY_METRIC,
+        accuracy=ACCURACY_DESCRIPTION,
         timing="Full solve to T including all known-data preparation; JIT/reference excluded.",
     )
     trials, rows = [], []
@@ -145,11 +153,7 @@ def heat_mc_study(
                         memory_bytes=memory,
                     )
                 )
-            error = (
-                100
-                * float(np.sqrt(np.mean((np.array(values) - reference) ** 2)))
-                / abs(reference)
-            )
+            error = mean_relative_error(values, reference)
             return dict(relative_error_pct=error, seconds=float(np.mean(times)))
 
         method_rows = search_budgets(

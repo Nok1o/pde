@@ -13,7 +13,13 @@ from .nonlinear import (
     solve_nonlinear,
     solve_stationary_nonlinear,
 )
-from .study_policy import SELECTION_POLICY, calibration_target
+from .study_policy import (
+    ACCURACY_DESCRIPTION,
+    ACCURACY_METRIC,
+    SELECTION_POLICY,
+    calibration_target,
+    mean_relative_error,
+)
 
 
 def child_seed(seed, *indices):
@@ -402,6 +408,31 @@ def nonlinear_mc_study(repeats=4, seed=42):
     return rows, runs
 
 
+def _target_comparison(comparison, problem, final_time):
+    """Use the study metric without changing RMS diagnostics in normal comparisons."""
+    x, y = comparison.point
+    reference = (
+        problem.evaluate(problem.exact, final_time)[y, x]
+        if problem.exact is not None
+        else comparison.reference.fields[-1, y, x]
+    )
+    metrics = [dict(row) for row in comparison.metrics]
+    for row in metrics:
+        row["accuracy_metric"] = ACCURACY_METRIC
+        row["relative_rmse_pct"] = row["relative_error_pct"]
+        runs = (
+            comparison.stochastic
+            if row["method"] == "mc"
+            else [comparison.deterministic]
+        )
+        row["relative_error_pct"] = (
+            mean_relative_error([r.fields[-1, y, x] for r in runs], reference)
+            if row["completed"] and reference != 0
+            else None
+        )
+    return replace(comparison, metrics=metrics)
+
+
 def nonlinear_targets(
     problem,
     dt=0.01,
@@ -437,6 +468,7 @@ def nonlinear_targets(
         comparison = compare_nonlinear(
             problem, dt, T, point, repeats, deterministic, candidate
         )
+        comparison = _target_comparison(comparison, problem, T)
         pilots.append((candidate, comparison))
     rows = []
     validations = {}
@@ -465,6 +497,7 @@ def nonlinear_targets(
                 budget=deterministic_runs[0].settings.tolerance,
                 budget_kind="relative_residual_tolerance",
                 selection_policy=SELECTION_POLICY,
+                accuracy_metric=ACCURACY_METRIC,
             )
         )
         eligible = [
@@ -490,6 +523,7 @@ def nonlinear_targets(
                     budget_kind="initial_walks_per_node",
                     max_walks=last_settings.max_walks,
                     selection_policy=SELECTION_POLICY,
+                    accuracy_metric=ACCURACY_METRIC,
                     reason="; ".join(
                         sorted({r.reason for r in last.stochastic if not r.completed})
                     ),
@@ -499,8 +533,12 @@ def nonlinear_targets(
         chosen = min(eligible, key=lambda item: item[1]["seconds"])[0]
         if chosen not in validations:
             settings = replace(pilots[chosen][0], seed=child_seed(seed, 301, chosen))
-            validations[chosen] = compare_nonlinear(
-                problem, dt, T, point, repeats, deterministic, settings
+            validations[chosen] = _target_comparison(
+                compare_nonlinear(
+                    problem, dt, T, point, repeats, deterministic, settings
+                ),
+                problem,
+                T,
             )
         metric = validations[chosen].metrics[1]
         passed = (
@@ -527,6 +565,7 @@ def nonlinear_targets(
                 ],
                 calibration_target_pct=calibration_target(target, "mc"),
                 selection_policy=SELECTION_POLICY,
+                accuracy_metric=ACCURACY_METRIC,
                 validation_seconds=metric["seconds"],
                 reason="; ".join(
                     sorted(
@@ -541,6 +580,8 @@ def nonlinear_targets(
         )
     evidence = dict(
         selection_policy=SELECTION_POLICY,
+        accuracy_metric=ACCURACY_METRIC,
+        accuracy=ACCURACY_DESCRIPTION,
         deterministic_runs=[
             dict(seconds=run.seconds, completed=run.completed, reason=run.reason)
             for run in deterministic_runs
