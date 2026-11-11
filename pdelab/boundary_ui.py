@@ -23,6 +23,7 @@ from .boundary_solvers import (
 )
 from .boundary_views import boundary_field_figure, boundary_trace_figure
 from .experiment3d import rows_csv
+from .ui_state import select_section
 
 SIDE_LABELS = {"left": "Левая", "right": "Правая", "bottom": "Нижняя", "top": "Верхняя"}
 KIND_LABELS = {
@@ -60,7 +61,7 @@ def workload_message(config, methods, walks=None, repeats=1):
 
 
 def _formulas(config):
-    with st.expander("Формулы и описание", expanded=True):
+    with st.expander("Формулы и описание", expanded=False, key="boundary_formulas"):
         st.latex(r"\Delta u=f,\quad (x,y)\in(0,1)^2,\qquad k=1")
         if config.problem == "polynomial":
             st.latex(r"u_*=1+x+2y+x^2+y^2,\qquad f=4")
@@ -109,7 +110,10 @@ def render_boundary_app():
         )
         kinds, kappas, data = [], [], []
         for i, side in enumerate(SIDES):
-            with st.expander(SIDE_LABELS[side] + " сторона"):
+            with st.expander(
+                SIDE_LABELS[side] + " сторона",
+                key="boundary_ui_expander_112" + str(SIDE_LABELS[side] + " сторона"),
+            ):
                 kind = st.selectbox(
                     "Условие",
                     KINDS,
@@ -152,7 +156,7 @@ def render_boundary_app():
             "Узел y", min_value=0, max_value=n, value=n // 2, key="bc_y"
         )
         st.caption(f"Точка ({x / n:g}, {y / n:g})")
-        with st.expander("Точность и бюджет"):
+        with st.expander("Точность и бюджет", key="boundary_ui_expander_155"):
             walks = st.select_slider(
                 "Путей на точку",
                 [64, 256, 1024, 2048, 4096, 16384, 65536],
@@ -222,7 +226,13 @@ def render_boundary_app():
             format_func=METHODS_BOUNDARY.get,
             key="bc_methods",
         )
-        run = st.button("Рассчитать", type="primary", key="bc_run")
+        run = st.button(
+            "Рассчитать",
+            type="primary",
+            key="bc_run",
+            on_click=select_section,
+            args=("boundary_sections", "Сравнение"),
+        )
     if run:
         warning = workload_message(config, methods)
         if warning:
@@ -236,7 +246,9 @@ def render_boundary_app():
             except (ValueError, RuntimeError) as exc:
                 st.error(str(exc))
     comparison_tab, trace_tab, benchmark_tab, research_tab = st.tabs(
-        ["Сравнение", "Траектория", "Серия измерений", "Исследование"]
+        ["Сравнение", "Траектория", "Серия измерений", "Исследование"],
+        key="boundary_sections",
+        on_change="rerun",
     )
     with comparison_tab:
         experiment = st.session_state.get("bc_result")
@@ -276,12 +288,14 @@ def render_boundary_app():
                 rows_csv(experiment.metrics).encode("utf-8-sig"),
                 "boundary-metrics.csv",
                 "text/csv",
+                on_click="ignore",
             )
             st.download_button(
                 "Скачать настройки и результаты",
                 json.dumps(boundary_payload(experiment), ensure_ascii=False, indent=2),
                 "boundary-experiment.json",
                 "application/json",
+                on_click="ignore",
             )
     with trace_tab:
         if not operator.pure_neumann and st.button(
@@ -299,7 +313,7 @@ def render_boundary_app():
         trace = st.session_state.get("bc_trace_result")
         if trace is not None and trace[0] == asdict(config):
             st.plotly_chart(boundary_trace_figure(trace[1], n), width="stretch")
-            with st.expander("События на границе"):
+            with st.expander("События на границе", key="boundary_ui_expander_302"):
                 st.dataframe(
                     pd.DataFrame([e for e in trace[1] if e["sides"]]), hide_index=True
                 )
@@ -361,12 +375,14 @@ def render_boundary_app():
                 rows_csv(saved[1]).encode("utf-8-sig"),
                 "boundary-benchmark.csv",
                 "text/csv",
+                on_click="ignore",
             )
             st.download_button(
                 "Скачать настройки серии",
                 json.dumps(saved[0], ensure_ascii=False, indent=2),
                 "boundary-benchmark-settings.json",
                 "application/json",
+                on_click="ignore",
             )
 
     with research_tab:

@@ -7,6 +7,7 @@ import streamlit as st
 
 from .experiment import Config
 from .research import StudySettings, accuracy_study, timing_rows
+from .study_policy import render_accuracy_results
 
 
 def render_research_tab(config):
@@ -55,7 +56,7 @@ def render_research_tab(config):
             )
     st.session_state["research_point_grid"] = n
 
-    with st.expander("Точка и лимиты поиска"):
+    with st.expander("Точка и лимиты поиска", key="research_limits"):
         x_column, y_column = st.columns(2)
         with x_column:
             x = st.slider("Узел x", 0, n, n // 2, key="research_x")
@@ -84,12 +85,12 @@ def render_research_tab(config):
             key="research_max_walks",
         )
         seconds_per_method = st.number_input(
-            "Лимит поиска на метод, с",
+            "Лимит каждой фазы на метод, с",
             min_value=1.0,
             max_value=1800.0,
             value=60.0,
             step=10.0,
-            help="Проверяется между запусками решателя. Уже начатый запуск завершается полностью.",
+            help="Отдельный лимит для подбора и для проверки. Начатый запуск завершается полностью.",
             key="research_seconds",
         )
 
@@ -133,29 +134,17 @@ def render_research_tab(config):
         st.info("Настройки исследования изменены. Запустите его заново.")
 
     table = pd.DataFrame(timing_rows(study))
-    columns = {
-        name: st.column_config.NumberColumn(
-            format="%.6f",
-            help="Среднее время одного запуска проверочной серии. Подбор бюджета и эталон исключены; подготовка слоёв и контрольного приближения включена.",
-        )
-        for name in table.columns[1:]
-    }
-    columns["Относительная ошибка, %"] = st.column_config.NumberColumn(
-        format="%.0f%%",
-        help="Порог относительной RMSE по независимым запускам, подтверждённый на новой серии.",
-    )
-    st.dataframe(table, hide_index=True, width="stretch", column_config=columns)
-    if any(row["seconds"] is None for row in study.rows):
-        st.caption("—: точность не достигнута в пределах поиска. Причина — в деталях.")
+    render_accuracy_results(study.rows, key="research_results")
     st.download_button(
         "Скачать таблицу CSV",
         table.to_csv(index=False).encode("utf-8-sig"),
         "accuracy-timings.csv",
         "text/csv",
         key="research_table_csv",
+        on_click="ignore",
     )
 
-    with st.expander("Детали исследования"):
+    with st.expander("Детали исследования", key="research_raw_details"):
         saved = study.settings.config
         saved_x, saved_y = saved.point
         st.write(
@@ -209,4 +198,5 @@ def render_research_tab(config):
             "accuracy-trials.csv",
             "text/csv",
             key="research_trials_csv",
+            on_click="ignore",
         )

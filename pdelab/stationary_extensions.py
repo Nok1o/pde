@@ -323,7 +323,9 @@ def solve_extended(
 def render_method_scope(dimension, mixed=False):
     import streamlit as st
 
-    with st.expander("Методы: схемы и область применимости"):
+    with st.expander(
+        "Методы: схемы и область применимости", key="stationary_extensions_expander_326"
+    ):
         st.write(
             "ЛОМ и обычный MC решают одну равномерную разностную систему. Сгущённая сетка и WoS имеют собственные погрешности аппроксимации; сравниваются значения в одной физической точке."
         )

@@ -11,6 +11,7 @@ from .heat import make_heat_problem, solve_heat, time_grid
 from .heat_mc import heat_mc_step, solve_heat_mc
 from .heat_mc_study import VALIDATION_POLICY, heat_mc_study
 from .heat_mc_views import heat_mc_archive
+from .study_policy import render_accuracy_results
 
 
 def _limit(settings, walks, diagnostic=False):
@@ -105,6 +106,7 @@ def render_heat_mc(settings):
         "heat-mc-results.zip",
         "application/zip",
         key="heat_mc_download",
+        on_click="ignore",
     )
 
 
@@ -142,7 +144,7 @@ def render_heat_mc_study(settings):
         key="heat_study_walks",
     )
     seconds = st.number_input(
-        "Лимит поиска на метод, с",
+        "Лимит каждой фазы на метод, с",
         min_value=1.0,
         max_value=300.0,
         value=10.0,
@@ -183,16 +185,10 @@ def render_heat_mc_study(settings):
     if current != previous:
         st.info("Настройки исследования изменены. Выполните новую серию.")
     table = pd.DataFrame(study["rows"])
-    st.dataframe(
-        table.pivot(index="target_pct", columns="method", values="seconds").rename(
-            columns={
-                "lod": "ЛОМ, полное время до T, с",
-                "mc": "MC, полное время до T, с",
-            }
-        ),
-        column_config={"target_pct": "Порог ошибки, %"},
+    render_accuracy_results(
+        study["rows"], {"lod": "ЛОМ", "mc": "Монте-Карло"}, key="heat_study_results"
     )
-    with st.expander("Статусы и отдельные замеры"):
+    with st.expander("Статусы и отдельные замеры", key="heat_mc_ui_expander_189"):
         st.dataframe(table, hide_index=True)
         st.dataframe(pd.DataFrame(study["trials"]), hide_index=True)
     st.download_button(
@@ -201,4 +197,5 @@ def render_heat_mc_study(settings):
         "heat-mc-study.json",
         "application/json",
         key="heat_study_download",
+        on_click="ignore",
     )

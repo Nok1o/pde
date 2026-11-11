@@ -167,7 +167,8 @@ def test_research_uses_full_solves_and_independent_validation():
     assert study["settings"]["T"] == 0.03 and study["settings"]["point_yx"] == [3, 4]
     for row in study["rows"]:
         if row["status"] == "reached":
-            assert row["calibration_error_pct"] <= row["target_pct"]
+            fraction = 1 if row["method"] == "lod" else 0.5
+            assert row["calibration_error_pct"] <= fraction * row["target_pct"]
             assert row["validation_error_pct"] <= row["target_pct"]
             times = [
                 r["seconds"]

@@ -80,6 +80,10 @@ def test_boundary_targets_use_fresh_validation_seeds(config):
     validation = {r["seed"] for r in result["trials"] if r["phase"] == 1}
     assert pilot.isdisjoint(validation) and validation
     assert len(result["rows"]) == 6
+    for row in result["rows"]:
+        if row["status"] == "confirmed":
+            fraction = 1 if row["method"] == "lod_serial" else 0.5
+            assert row["calibration_error_pct"] <= fraction * row["target_pct"]
     assert all(
         r["seconds"] is None for r in result["rows"] if r["status"] != "confirmed"
     )
@@ -147,6 +151,10 @@ def test_mixed_research_ui_runs_exports_and_invalidates(dimension, prefix, resea
     assert not app.exception and not app.error
     result = app.session_state[research][1]
     assert len(result["rows"]) == 6
+    for row in result["rows"]:
+        if row["status"] == "confirmed":
+            fraction = 1 if row["method"] == "lod_serial" else 0.5
+            assert row["calibration_error_pct"] <= fraction * row["target_pct"]
     assert result["trials"]
     app.number_input(key=research + "x").set_value(0).run()
     assert any("изменены" in item.value for item in app.info)

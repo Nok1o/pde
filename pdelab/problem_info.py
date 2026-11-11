@@ -16,7 +16,12 @@ def _number(value):
 
 def render_problem_info(cfg):
     """Render the currently selected conditions, before any calculation is run."""
-    with st.expander(f"Формулы и описание: {PRESETS[cfg.problem]}", expanded=True):
+    with st.expander(
+        f"Формулы и описание: {PRESETS[cfg.problem]}",
+        expanded=False,
+        key="problem_info_expander_19"
+        + str(f"Формулы и описание: {PRESETS[cfg.problem]}"),
+    ):
         st.caption(
             "Все случаи — двумерные стационарные задачи в единичном квадрате: "
             "0 ≤ x ≤ 1, 0 ≤ y ≤ 1. Ищем поле u(x, y), например установившуюся температуру."

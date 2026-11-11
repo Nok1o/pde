@@ -18,6 +18,8 @@ from .research3d import (
     timing_rows3d,
 )
 from .solvers3d import METHODS_3D
+from .study_policy import render_accuracy_results
+from .ui_state import select_section
 from .views3d import residual_figure3d, slice_figure3d
 from .workload3d import interactive_mc_limit_message
 
@@ -52,7 +54,7 @@ def _point_controls(n, prefix):
 
 
 def _problem_info(kind):
-    with st.expander("Формулы и описание", expanded=True):
+    with st.expander("Формулы и описание", expanded=False, key="cube_formulas"):
         st.latex(
             r"u_{xx}+u_{yy}+u_{zz}=f,\quad (x,y,z)\in(0,1)^3,\qquad u|_{\partial\Omega}=g"
         )
@@ -88,7 +90,7 @@ def _research_tab(config):
             value=5,
             key="study3d_repeats",
         )
-    with st.expander("Точка и лимиты"):
+    with st.expander("Точка и лимиты", key="cube_research_limits"):
         point = _point_controls(n, "study3d_point")
         maximum = st.select_slider(
             "Максимум путей",
@@ -97,7 +99,7 @@ def _research_tab(config):
             key="study3d_walks",
         )
         seconds = st.number_input(
-            "Лимит поиска на метод, с",
+            "Лимит каждой фазы на метод, с",
             min_value=1.0,
             max_value=1800.0,
             value=60.0,
@@ -132,16 +134,17 @@ def _research_tab(config):
     if asdict(study.settings) != asdict(settings):
         st.info("Настройки изменены. Запустите исследование заново.")
     table = timing_rows3d(study)
-    st.dataframe(pd.DataFrame(table), hide_index=True, width="stretch")
+    render_accuracy_results(study.rows, key="study3d_results")
     st.download_button(
         "Скачать таблицу CSV",
         rows_csv(table).encode("utf-8-sig"),
         "3d-timings.csv",
         "text/csv",
+        on_click="ignore",
     )
-    with st.expander("Детали исследования"):
+    with st.expander("Детали исследования", key="cube_research_raw_details"):
         st.write(
-            "Бюджет фиксируется после подбора и проверяется новой серией. Прочерк означает недостигнутую точность; проверка не запускает повторный подбор."
+            "Бюджет фиксируется после подбора и проверяется новой серией. MC подбирается с двукратным запасом по ошибке; проверка не запускает повторный подбор."
         )
         st.dataframe(pd.DataFrame(study.rows), hide_index=True, width="stretch")
         payload = {
@@ -154,6 +157,7 @@ def _research_tab(config):
             json.dumps(payload, ensure_ascii=False, indent=2),
             "3d-study.json",
             "application/json",
+            on_click="ignore",
         )
 
 
@@ -234,7 +238,7 @@ def render_3d_app():
             value=2048,
             key="cube_walks",
         )
-        with st.expander("Точность и воспроизводимость"):
+        with st.expander("Точность и воспроизводимость", key="cube_solver_controls"):
             tol = st.select_slider(
                 "Относительный допуск ЛОМ",
                 options=[1e-2, 1e-4, 1e-6, 1e-7, 1e-8],
@@ -251,6 +255,8 @@ def render_3d_app():
         run = st.button(
             "Рассчитать",
             key="cube_run",
+            on_click=select_section,
+            args=("cube_sections", "Результат"),
             type="primary",
             disabled=not methods or limit_message is not None,
         )
@@ -263,7 +269,9 @@ def render_3d_app():
         except (ValueError, RuntimeError) as exc:
             st.error(str(exc))
     overview, slices, research, download = st.tabs(
-        ["Результат", "Срезы", "Исследование", "Сохранить"]
+        ["Результат", "Срезы", "Исследование", "Сохранить"],
+        key="cube_sections",
+        on_change="rerun",
     )
     with research:
         _research_tab(config)
@@ -347,4 +355,5 @@ def render_3d_app():
                 st.session_state["cube_archive"],
                 "pde-3d.zip",
                 "application/zip",
+                on_click="ignore",
             )

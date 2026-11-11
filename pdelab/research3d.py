@@ -10,6 +10,7 @@ import numpy as np
 from .experiment3d import Config3D, comparison3d, rows_csv
 from .problem3d import make_problem3d, select_points3d
 from .solvers3d import METHODS_3D, solve3d, warmup3d
+from .study_policy import SELECTION_POLICY, search_budgets
 
 TARGETS_3D = (1.0, 5.0, 10.0)
 
@@ -138,92 +139,29 @@ def accuracy_study3d(settings, progress=None):
     study = Study3D(settings, kind, target_value)
     warmup3d()
     for method_index, method in enumerate(methods):
-        rows = [
-            {
-                "target_pct": target,
-                "method": method,
-                "name": METHODS_3D[method],
-                "seconds": None,
-                "relative_error_pct": None,
-                "calibration_error_pct": None,
-                "budget": None,
-                "budget_kind": (
-                    "relative_residual_tolerance"
-                    if method == "lod_serial"
-                    else "walks_per_start"
-                ),
-                "status": "Не достигнута в пределах поиска",
-            }
-            for target in TARGETS_3D
-        ]
-        study.rows.extend(rows)
-        deadline = perf_counter() + settings.seconds_per_method
-        selected = {}
-        try:
-            # Сначала полностью фиксируем бюджеты. Проверочная серия не влияет на выбор.
-            for budget_index, budget in enumerate(
-                _budgets3d(method, settings.max_walks)
-            ):
-                if progress:
-                    progress(
-                        method_index / len(methods),
-                        f"{METHODS_3D[method]} · подбор · {budget:g}",
-                    )
-                error, _ = _series3d(
-                    study,
-                    problem,
-                    points,
-                    method,
-                    budget,
-                    budget_index,
-                    "calibration",
-                    deadline,
-                )
-                for row in rows:
-                    if row["target_pct"] not in selected:
-                        row["calibration_error_pct"] = error
-                        if error <= row["target_pct"]:
-                            selected[row["target_pct"]] = (budget, budget_index)
-                            row["budget"] = budget
-                if len(selected) == len(rows):
-                    break
-        except (TimeoutError, RuntimeError) as exc:
-            for row in rows:
-                if row["target_pct"] not in selected:
-                    row["status"] = str(exc)
 
-        # Даже после неудачи более строгого бюджета проверяем уже найденные.
-        # Общий deadline не продлевается, подбор после проверки не возобновляется.
-        confirmations = {}
-        for row in rows:
-            chosen = selected.get(row["target_pct"])
-            if chosen is None:
-                continue
-            if chosen not in confirmations:
-                if progress:
-                    progress(
-                        method_index / len(methods),
-                        f"{METHODS_3D[method]} · контроль · {chosen[0]:g}",
-                    )
-                try:
-                    confirmations[chosen] = _series3d(
-                        study, problem, points, method, *chosen, "validation", deadline
-                    )
-                except (TimeoutError, RuntimeError) as exc:
-                    confirmations[chosen] = exc
-            confirmation = confirmations[chosen]
-            if isinstance(confirmation, Exception):
-                row["status"] = f"Бюджет найден, проверка не завершена: {confirmation}"
-                continue
-            error, seconds = confirmation
-            row["relative_error_pct"] = error
-            row["status"] = (
-                "Достигнута"
-                if error <= row["target_pct"]
-                else "Не достигнута на контрольной серии"
+        def measure(budget, budget_index, phase, deadline):
+            if progress:
+                label = "подбор" if phase == "calibration" else "проверка"
+                progress(
+                    method_index / len(methods),
+                    f"{METHODS_3D[method]} · {label} · {budget:g}",
+                )
+            error, seconds = _series3d(
+                study, problem, points, method, budget, budget_index, phase, deadline
             )
-            if error <= row["target_pct"]:
-                row["seconds"] = seconds
+            return dict(relative_error_pct=error, seconds=seconds)
+
+        rows = search_budgets(
+            method,
+            _budgets3d(method, settings.max_walks),
+            measure,
+            settings.seconds_per_method,
+            clock=perf_counter,
+        )
+        for row in rows:
+            row["name"] = METHODS_3D[method]
+        study.rows.extend(rows)
         if progress:
             progress((method_index + 1) / len(methods), f"{METHODS_3D[method]}: готово")
     return study
@@ -250,7 +188,8 @@ def study_payload3d(study):
         "coordinate_order": ["x", "y", "z"],
         "reference_kind": study.reference_kind,
         "reference_value": study.reference_value,
-        "selection": "First calibration budget, fixed before final independent validation; no retry after validation failure",
+        "selection": SELECTION_POLICY,
+        "seconds_per_phase": study.settings.seconds_per_method,
         "accuracy": "Relative RMSE of individual runs, not error of their mean; empirical estimate",
         "timing": "Mean wall time of validation runs after warmup; search and reference excluded",
     }

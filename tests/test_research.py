@@ -75,7 +75,7 @@ def test_failed_confirmation_does_not_produce_a_time(monkeypatch):
             assert row["seconds"] is None
             assert row["relative_error_pct"] == pytest.approx(20)
             assert row["budget"] == 64
-            assert row["status"] == "Не достигнута в пределах поиска"
+            assert row["status"] == "Не достигнута на контрольной серии"
 
 
 def test_time_limit_preserves_unreached_cells(monkeypatch):
@@ -136,3 +136,21 @@ def test_zero_reference_is_not_silently_replaced_with_an_absolute_target():
 def test_invalid_study_settings_are_rejected(overrides):
     with pytest.raises(ValueError):
         accuracy_study(replace(StudySettings(Config(n=8)), **overrides))
+
+
+def test_real_center_48_reaches_one_percent_with_margin(monkeypatch):
+    monkeypatch.setattr(research, "METHODS", {"mc": "Монте-Карло", "reuse": "Хвосты"})
+    study = accuracy_study(
+        StudySettings(
+            Config(problem="sine", n=48, point=(24, 24)),
+            repeats=5,
+            max_walks=32768,
+            seconds_per_method=60,
+        )
+    )
+    for row in study.rows:
+        assert row["seconds"] is not None
+        assert row["calibration_error_pct"] <= row["target_pct"] / 2
+        assert row["relative_error_pct"] <= row["target_pct"]
+        if row["target_pct"] == 1:
+            assert row["budget"] > 2048

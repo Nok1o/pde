@@ -110,7 +110,7 @@ def test_stricter_lod_failure_preserves_reachable_target():
     assert all(row["seconds"] is None for row in study.rows if row["target_pct"] < 10)
 
 
-def test_expired_deadline_keeps_selected_budget_without_false_success(monkeypatch):
+def test_calibration_timeout_leaves_a_separate_confirmation_allowance(monkeypatch):
     clock = [0.0]
     monkeypatch.setattr(research3d, "perf_counter", lambda: clock[0])
     monkeypatch.setattr(research3d, "warmup3d", lambda: None)
@@ -119,6 +119,9 @@ def test_expired_deadline_keeps_selected_budget_without_false_success(monkeypatc
         if phase == "calibration" and budget_index == 0:
             clock[0] = 2.0
             return 7.0, 0.01
+        if phase == "validation":
+            assert clock[0] < deadline
+            return 7.0, 0.02
         assert clock[0] >= deadline
         raise TimeoutError("Лимит времени поиска")
 
@@ -129,6 +132,6 @@ def test_expired_deadline_keeps_selected_budget_without_false_success(monkeypatc
         )
     )
     loose = next(row for row in study.rows if row["target_pct"] == 10)
-    assert loose["budget"] == 0.1 and loose["seconds"] is None
-    assert loose["relative_error_pct"] is None
-    assert "проверка не завершена" in loose["status"]
+    assert loose["budget"] == 0.1 and loose["seconds"] == 0.02
+    assert loose["relative_error_pct"] == 7.0
+    assert loose["status"] == "Достигнута"

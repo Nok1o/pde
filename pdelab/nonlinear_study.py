@@ -13,6 +13,7 @@ from .nonlinear import (
     solve_nonlinear,
     solve_stationary_nonlinear,
 )
+from .study_policy import SELECTION_POLICY, calibration_target
 
 
 def child_seed(seed, *indices):
@@ -461,6 +462,9 @@ def nonlinear_targets(
                 seconds=(deterministic_seconds if lod_pass else None),
                 relative_error_pct=lod_error,
                 walks=None,
+                budget=deterministic_runs[0].settings.tolerance,
+                budget_kind="relative_residual_tolerance",
+                selection_policy=SELECTION_POLICY,
             )
         )
         eligible = [
@@ -468,17 +472,27 @@ def nonlinear_targets(
             for i, (_, c) in enumerate(pilots)
             if c.metrics[1]["completed"]
             and c.metrics[1]["relative_error_pct"] is not None
-            and c.metrics[1]["relative_error_pct"] <= target
+            and c.metrics[1]["relative_error_pct"] <= calibration_target(target, "mc")
         ]
         if not eligible:
+            last_settings, last = pilots[-1]
+            metric = last.metrics[1]
             rows.append(
                 dict(
                     target_pct=target,
                     method="mc",
-                    status="not_reached",
+                    status="not_reached" if metric["completed"] else "solver_failed",
                     seconds=None,
                     relative_error_pct=None,
-                    walks=None,
+                    calibration_error_pct=metric["relative_error_pct"],
+                    calibration_target_pct=calibration_target(target, "mc"),
+                    walks=last_settings.walks,
+                    budget_kind="initial_walks_per_node",
+                    max_walks=last_settings.max_walks,
+                    selection_policy=SELECTION_POLICY,
+                    reason="; ".join(
+                        sorted({r.reason for r in last.stochastic if not r.completed})
+                    ),
                 )
             )
             continue
@@ -498,13 +512,35 @@ def nonlinear_targets(
             dict(
                 target_pct=target,
                 method="mc",
-                status="confirmed" if passed else "validation_failed",
+                status=(
+                    "confirmed"
+                    if passed
+                    else "validation_failed" if metric["completed"] else "solver_failed"
+                ),
                 seconds=metric["seconds"] if passed else None,
                 relative_error_pct=metric["relative_error_pct"],
                 walks=pilots[chosen][0].walks,
+                budget_kind="initial_walks_per_node",
+                max_walks=pilots[chosen][0].max_walks,
+                calibration_error_pct=pilots[chosen][1].metrics[1][
+                    "relative_error_pct"
+                ],
+                calibration_target_pct=calibration_target(target, "mc"),
+                selection_policy=SELECTION_POLICY,
+                validation_seconds=metric["seconds"],
+                reason="; ".join(
+                    sorted(
+                        {
+                            r.reason
+                            for r in validations[chosen].stochastic
+                            if not r.completed
+                        }
+                    )
+                ),
             )
         )
     evidence = dict(
+        selection_policy=SELECTION_POLICY,
         deterministic_runs=[
             dict(seconds=run.seconds, completed=run.completed, reason=run.reason)
             for run in deterministic_runs

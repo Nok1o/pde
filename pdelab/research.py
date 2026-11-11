@@ -15,6 +15,7 @@ from .experiment import Config
 from .problem import make_problem, reference_solution, select_points
 from .reference import choose_reference
 from .solvers import METHODS, solve, warmup
+from .study_policy import SELECTION_POLICY, search_budgets
 
 TARGETS_PCT = (1.0, 5.0, 10.0)
 LOD_SEARCH_TOLERANCES = (
@@ -217,101 +218,41 @@ def accuracy_study(settings: StudySettings, progress=None):
             "Эталон в этой точке равен нулю: относительная точность не определена. Выберите другую точку или задачу."
         )
     study = StudyResult(settings, reference.kind, reference.label, reference_value)
-    study.rows = [
-        {
-            "target_pct": target,
-            "method": method,
-            "name": name,
-            "seconds": None,
-            "relative_error_pct": None,
-            "calibration_error_pct": None,
-            "budget": None,
-            "budget_kind": (
-                "relative_residual_tolerance"
-                if method == "lod_serial"
-                else "walks_per_start"
-            ),
-            "status": "Не достигнута в пределах поиска",
-        }
-        for target in TARGETS_PCT
-        for method, name in METHODS.items()
-    ]
-
     if progress:
         progress(0.0, "Подготовка решателей…")
     warmup()
     started_at = perf_counter()
     walk_budgets = _walk_budgets(settings.max_walks, config.batches)
-
     for method_index, method in enumerate(METHODS):
-        pending = [row for row in study.rows if row["method"] == method]
         budgets = LOD_SEARCH_TOLERANCES if method == "lod_serial" else walk_budgets
-        deadline = perf_counter() + settings.seconds_per_method
-        try:
-            for budget_index, budget in enumerate(budgets):
-                fraction = (method_index + budget_index / len(budgets)) / len(METHODS)
 
-                def report(label):
-                    if progress:
-                        progress(fraction, label)
+        def measure(budget, budget_index, phase, deadline):
+            def report(label):
+                if progress:
+                    progress(method_index / len(METHODS), label)
 
-                calibration = _measure_budget(
-                    study,
-                    problem,
-                    points,
-                    method,
-                    budget,
-                    budget_index,
-                    "calibration",
-                    deadline,
-                    report,
-                    grid_reference[tuple(points.T)],
-                )
-                for row in pending:
-                    row.update(
-                        budget=budget,
-                        calibration_error_pct=calibration["relative_error_pct"],
-                        relative_error_pct=None,
-                    )
-                candidates = [
-                    row
-                    for row in pending
-                    if calibration["relative_error_pct"] <= row["target_pct"]
-                ]
-                if not candidates:
-                    continue
+            return _measure_budget(
+                study,
+                problem,
+                points,
+                method,
+                budget,
+                budget_index,
+                phase,
+                deadline,
+                report,
+                grid_reference[tuple(points.T)],
+            )
 
-                validation = _measure_budget(
-                    study,
-                    problem,
-                    points,
-                    method,
-                    budget,
-                    budget_index,
-                    "validation",
-                    deadline,
-                    report,
-                    grid_reference[tuple(points.T)],
-                )
-                for row in candidates:
-                    row["relative_error_pct"] = validation["relative_error_pct"]
-                    pending.remove(row)
-                    if validation["relative_error_pct"] <= row["target_pct"]:
-                        row.update(
-                            seconds=validation["seconds"],
-                            relative_error_pct=validation["relative_error_pct"],
-                            calibration_error_pct=calibration["relative_error_pct"],
-                            budget=budget,
-                            status="Достигнута",
-                        )
-                if not pending:
-                    break
-        except (TimeoutError, RuntimeError) as exc:
-            for row in pending:
-                row["status"] = str(exc)
+        rows = search_budgets(
+            method, budgets, measure, settings.seconds_per_method, clock=perf_counter
+        )
+        for row in rows:
+            row["name"] = METHODS[method]
+        study.rows.extend(rows)
         if progress:
             progress((method_index + 1) / len(METHODS), f"{METHODS[method]}: готово")
-
+    study.rows.sort(key=lambda row: row["target_pct"])
     study.search_seconds = perf_counter() - started_at
     return study
 
@@ -364,7 +305,8 @@ def export_study(study, folder):
         "search_seconds": study.search_seconds,
         "accuracy": "100 * RMS(u_run - reference) / RMS(reference), across runs and queried points; independent validation",
         "timing": "Mean solver time of validation runs; search, reference and JIT excluded; all layer preparation included",
-        "selection": "First budget passing calibration; validation never changes the selected budget; empirical estimate",
+        "selection": SELECTION_POLICY,
+        "seconds_per_phase": study.settings.seconds_per_method,
     }
     (folder / "settings.json").write_text(
         json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8"

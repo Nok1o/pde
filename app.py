@@ -22,6 +22,7 @@ from pdelab.reference import REFERENCE_POLICY
 from pdelab.research import export_study
 from pdelab.research_ui import render_research_tab
 from pdelab.solvers import LOD_STOPPING_RULE, METHODS
+from pdelab.ui_state import select_section
 from pdelab.views import (
     benchmark_plot,
     convergence_plot,
@@ -109,7 +110,7 @@ with st.sidebar:
         st.caption(f"Координаты: ({ix/n:.3f}, {iy/n:.3f})")
     top, bottom, left, right, source = 100.0, 0.0, 0.0, 0.0, 0.0
     if problem == "hot_top":
-        with st.expander("Граница и источник"):
+        with st.expander("Граница и источник", key="dirichlet_boundary_controls"):
             top = st.number_input("Верх", value=100.0)
             bottom = st.number_input("Низ", value=0.0)
             left = st.number_input("Лево", value=0.0)
@@ -127,7 +128,7 @@ with st.sidebar:
         options=[64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384],
         value=2048,
     )
-    with st.expander("Точность и воспроизводимость"):
+    with st.expander("Точность и воспроизводимость", key="dirichlet_solver_controls"):
         tol = st.select_slider(
             "Относительный допуск ЛОМ",
             options=[1e-2, 1e-4, 1e-6, 1e-7, 1e-8],
@@ -173,6 +174,8 @@ with st.sidebar:
         disabled=not methods,
         width="stretch",
         key="main_run",
+        on_click=select_section,
+        args=("main_sections", "Обзор"),
     )
 
 if run:
@@ -230,7 +233,9 @@ tabs = st.tabs(
         "Серия экспериментов",
         "Исследование",
         "Сохранить",
-    ]
+    ],
+    key="main_sections",
+    on_change="rerun",
 )
 with tabs[6]:
     render_research_tab(cfg)
@@ -299,7 +304,11 @@ with tabs[2]:
     baseline = exp.results.get("lod_serial")
     if baseline:
         st.subheader("Сходимость ЛОМ")
-        linear_tab, log_tab = st.tabs(["Линейная шкала", "Логарифмическая шкала"])
+        linear_tab, log_tab = st.tabs(
+            ["Линейная шкала", "Логарифмическая шкала"],
+            key="residual_scales",
+            on_change="rerun",
+        )
         with linear_tab:
             st.plotly_chart(residual_plot(exp, "linear"), width="stretch")
         with log_tab:
@@ -368,6 +377,7 @@ with tabs[5]:
             df.to_csv(index=False).encode("utf-8-sig"),
             "benchmark.csv",
             "text/csv",
+            on_click="ignore",
         )
 with tabs[7]:
     if st.button("Подготовить все представления"):
@@ -393,5 +403,6 @@ with tabs[7]:
             st.session_state["archive"],
             "pde-results.zip",
             "application/zip",
+            on_click="ignore",
         )
         st.success("Сохранено: " + st.session_state["export_path"])

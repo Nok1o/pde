@@ -17,6 +17,8 @@ from .nonlinear_io import (
     time_figure,
 )
 from .nonlinear_study import compare_nonlinear, nonlinear_targets
+from .study_policy import render_accuracy_results
+from .ui_state import select_section
 
 
 def render_nonlinear_app():
@@ -53,7 +55,7 @@ def render_nonlinear_app():
         repeats = st.number_input(
             "Полных повторов MC", min_value=2, max_value=20, value=4, key="nl_repeats"
         )
-        with st.expander("Нелинейные итерации"):
+        with st.expander("Нелинейные итерации", key="nonlinear_ui_expander_57"):
             relaxation = st.slider(
                 "Релаксация", 0.1, 1.0, 0.7, 0.1, key="nl_relaxation"
             )
@@ -76,7 +78,7 @@ def render_nonlinear_app():
                 value=12,
                 key="nl_outer",
             )
-        with st.expander("Линейный расчёт и бюджет MC"):
+        with st.expander("Линейный расчёт и бюджет MC", key="nonlinear_ui_expander_80"):
             linear_tol = st.select_slider(
                 "Линейный допуск ЛОМ",
                 [1e-8, 1e-10, 1e-12],
@@ -109,7 +111,13 @@ def render_nonlinear_app():
             seed = st.number_input(
                 "Seed", min_value=0, max_value=2**32 - 1, value=42, key="nl_seed"
             )
-        run = st.button("Рассчитать", type="primary", key="nl_run")
+        run = st.button(
+            "Рассчитать",
+            type="primary",
+            key="nl_run",
+            on_click=select_section,
+            args=("nonlinear_sections", "Сравнение"),
+        )
     lod_settings = NonlinearSettings(
         tolerance=tol,
         change_tolerance=tol,
@@ -138,7 +146,7 @@ def render_nonlinear_app():
         lod=asdict(lod_settings),
         mc=asdict(mc_settings),
     )
-    with st.expander("Формулы и описание", expanded=True):
+    with st.expander("Формулы и описание", expanded=False, key="nonlinear_formulas"):
         st.latex(
             r"u_t=\nabla\cdot((1+\alpha u^2)\nabla u)+F,\quad C=1,\quad u|_{\partial\Omega}=1"
         )
@@ -174,7 +182,9 @@ def render_nonlinear_app():
         except (ValueError, RuntimeError) as exc:
             st.error(str(exc))
     comparison_tab, iterations_tab, research_tab = st.tabs(
-        ["Сравнение", "Итерации", "Исследование 1/5/10%"]
+        ["Сравнение", "Итерации", "Исследование 1/5/10%"],
+        key="nonlinear_sections",
+        on_change="rerun",
     )
     result = st.session_state.get("nl_result")
     with comparison_tab:
@@ -204,7 +214,9 @@ def render_nonlinear_app():
                 field_figure(result, st.toggle("Показать ошибку", key="nl_error")),
                 width="stretch",
             )
-            with st.expander("Статистика полных цепочек MC"):
+            with st.expander(
+                "Статистика полных цепочек MC", key="nonlinear_ui_expander_208"
+            ):
                 st.dataframe(
                     pd.DataFrame([result.metrics[1]])[
                         [
@@ -227,6 +239,7 @@ def render_nonlinear_app():
                     st.session_state["nl_archive"],
                     "nonlinear.zip",
                     "application/zip",
+                    on_click="ignore",
                 )
     with iterations_tab:
         if result is not None:
@@ -263,7 +276,6 @@ def render_nonlinear_app():
         if saved is not None:
             if saved[0] != target_settings:
                 st.info("Показано исследование с прежними настройками.")
-            table = pd.DataFrame(saved[1])
             pilots = pd.DataFrame(
                 [
                     {**metric, "N": item["settings"]["walks"]}
@@ -286,27 +298,22 @@ def render_nonlinear_app():
                 ),
                 width="stretch",
             )
-            st.dataframe(
-                table.pivot(
-                    index="target_pct", columns="method", values="seconds"
-                ).rename_axis("Точность, %"),
-                width="stretch",
-            )
-            st.dataframe(
-                table[
-                    ["target_pct", "method", "status", "relative_error_pct", "walks"]
-                ],
-                hide_index=True,
+            render_accuracy_results(
+                saved[1],
+                {"picard": "Picard + ЛОМ", "mc": "Picard + MC"},
+                key="nl_study_results",
             )
             st.download_button(
                 "Скачать таблицу",
                 csv_bytes(saved[1]),
                 "nonlinear-targets.csv",
                 "text/csv",
+                on_click="ignore",
             )
             st.download_button(
                 "Скачать проверку бюджетов",
                 json_bytes(dict(settings=saved[0], evidence=saved[2])),
                 "nonlinear-targets.json",
                 "application/json",
+                on_click="ignore",
             )

@@ -89,7 +89,10 @@ def test_failed_pilot_has_no_confirmed_mc_time():
         settings=NonlinearSettings(max_total_walks=1),
     )
     mc = [row for row in rows if row["method"] == "mc"]
-    assert all(row["status"] == "not_reached" and row["seconds"] is None for row in mc)
+    assert all(
+        row["status"] == "solver_failed" and row["seconds"] is None for row in mc
+    )
+    assert all(row["walks"] == 8 and "walk_budget" in row["reason"] for row in mc)
     assert evidence["validations"] == []
 
 

@@ -7,6 +7,7 @@ import streamlit as st
 
 from .heat import HEAT_PRESETS, make_heat_problem, solve_heat
 from .heat_views import heat_archive, heat_profile, heat_slice
+from .ui_state import select_section
 
 
 @dataclass
@@ -58,7 +59,13 @@ def render_heat_app():
             value=1e-10,
             key="heat_tol",
         )
-        run = st.button("Рассчитать теплопроводность", type="primary", key="heat_run")
+        run = st.button(
+            "Рассчитать теплопроводность",
+            type="primary",
+            key="heat_run",
+            on_click=select_section,
+            args=("heat_sections", "Сеточный расчёт"),
+        )
     settings = HeatSettings(preset, n, a2, dt, T, tol)
     if preset == "decay":
         st.latex(r"u_*=e^{-2\pi^2 a^2t}\sin(\pi x)\sin(\pi y),\quad F=0,\quad g=0")
@@ -72,7 +79,11 @@ def render_heat_app():
     )
     from .heat_mc_ui import render_heat_mc, render_heat_mc_study
 
-    tabs = st.tabs(["Сеточный расчёт", "Монте-Карло", "Исследование по времени"])
+    tabs = st.tabs(
+        ["Сеточный расчёт", "Монте-Карло", "Исследование по времени"],
+        key="heat_sections",
+        on_change="rerun",
+    )
     with tabs[1]:
         render_heat_mc(settings)
     with tabs[2]:
@@ -149,4 +160,5 @@ def _render_grid(settings, run):
             st.session_state["heat_archive"],
             "heat-results.zip",
             "application/zip",
+            on_click="ignore",
         )
