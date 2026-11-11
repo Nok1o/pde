@@ -1,4 +1,4 @@
-"""Independent full-chain ensembles, held-out targets and separated errors."""
+"""Full-chain ensembles, adaptive accuracy targets and separated errors."""
 
 from dataclasses import asdict, dataclass, replace
 
@@ -17,8 +17,9 @@ from .study_policy import (
     ACCURACY_DESCRIPTION,
     ACCURACY_METRIC,
     SELECTION_POLICY,
-    calibration_target,
     mean_relative_error,
+    phase_seed_index,
+    search_budgets,
 )
 
 
@@ -445,10 +446,9 @@ def nonlinear_targets(
     settings=None,
     deterministic=None,
 ):
-    """Select on pilot chains, confirm each selected budget on fresh full chains."""
+    """Select with stable full-chain pilots and retry checks at larger budgets."""
     if not budgets or any(isinstance(n, bool) or int(n) != n or n < 2 for n in budgets):
         raise ValueError("Нужен хотя бы один целый бюджет MC ≥2")
-    pilots = []
     base = (
         NonlinearSettings(
             tolerance=0.001, change_tolerance=0.001, relaxation=0.7, max_outer=12
@@ -458,29 +458,62 @@ def nonlinear_targets(
     )
     if any(budget > base.max_walks for budget in budgets):
         raise ValueError("Начальный бюджет исследования не должен превышать max_walks")
-    for index, budget in enumerate(budgets):
+    pilots = []
+    validations = {}
+
+    def measure(budget, index, phase, deadline):
         candidate = replace(
             base,
             walks=int(budget),
+            seed=child_seed(seed, 300, index, phase_seed_index(phase)),
+        )
+        comparison = _target_comparison(
+            compare_nonlinear(problem, dt, T, point, repeats, deterministic, candidate),
+            problem,
+            T,
+        )
+        if phase == "validation":
+            validations[index] = comparison
+        else:
+            pilots.append((candidate, comparison, phase))
+        metric = comparison.metrics[1]
+        if not metric["completed"]:
+            reasons = sorted(
+                {r.reason for r in comparison.stochastic if not r.completed}
+            )
+            raise RuntimeError("; ".join(reasons))
+        if metric["relative_error_pct"] is None:
+            raise RuntimeError("Нулевой эталон: относительная ошибка не определена")
+        return dict(
+            relative_error_pct=metric["relative_error_pct"], seconds=metric["seconds"]
+        )
+
+    mc_rows = search_budgets("mc", budgets, measure, float("inf"), fastest=True)
+    if not pilots:
+        raise RuntimeError(mc_rows[0]["status"])
+    for row in mc_rows:
+        row.update(
+            status_detail=row["status"],
+            status=row["status_code"],
+            walks=(
+                row["budget"]
+                if row["budget"] is not None
+                else row["interrupted_budget"]
+            ),
+            budget_kind="initial_walks_per_node",
             max_walks=base.max_walks,
-            seed=child_seed(seed, 300, index),
+            reason=row["status"] if row["status_code"] == "solver_failed" else "",
         )
-        comparison = compare_nonlinear(
-            problem, dt, T, point, repeats, deterministic, candidate
-        )
-        comparison = _target_comparison(comparison, problem, T)
-        pilots.append((candidate, comparison))
-    rows = []
-    validations = {}
     deterministic_runs = [pilots[0][1].deterministic]
     deterministic_runs.extend(
         solve_nonlinear(problem, dt, T, "picard", deterministic)
         for _ in range(int(repeats) - 1)
     )
     deterministic_seconds = float(np.mean([run.seconds for run in deterministic_runs]))
-    for target in (1.0, 5.0, 10.0):
-        lod = pilots[0][1].metrics[0]
-        lod_error = lod["relative_error_pct"]
+    rows = []
+    for mc_row in mc_rows:
+        target = mc_row["target_pct"]
+        lod_error = pilots[0][1].metrics[0]["relative_error_pct"]
         lod_pass = (
             all(run.completed for run in deterministic_runs)
             and lod_error is not None
@@ -491,7 +524,7 @@ def nonlinear_targets(
                 target_pct=target,
                 method="picard",
                 status="confirmed" if lod_pass else "not_reached",
-                seconds=(deterministic_seconds if lod_pass else None),
+                seconds=deterministic_seconds if lod_pass else None,
                 relative_error_pct=lod_error,
                 walks=None,
                 budget=deterministic_runs[0].settings.tolerance,
@@ -500,84 +533,7 @@ def nonlinear_targets(
                 accuracy_metric=ACCURACY_METRIC,
             )
         )
-        eligible = [
-            (i, c.metrics[1])
-            for i, (_, c) in enumerate(pilots)
-            if c.metrics[1]["completed"]
-            and c.metrics[1]["relative_error_pct"] is not None
-            and c.metrics[1]["relative_error_pct"] <= calibration_target(target, "mc")
-        ]
-        if not eligible:
-            last_settings, last = pilots[-1]
-            metric = last.metrics[1]
-            rows.append(
-                dict(
-                    target_pct=target,
-                    method="mc",
-                    status="not_reached" if metric["completed"] else "solver_failed",
-                    seconds=None,
-                    relative_error_pct=None,
-                    calibration_error_pct=metric["relative_error_pct"],
-                    calibration_target_pct=calibration_target(target, "mc"),
-                    walks=last_settings.walks,
-                    budget_kind="initial_walks_per_node",
-                    max_walks=last_settings.max_walks,
-                    selection_policy=SELECTION_POLICY,
-                    accuracy_metric=ACCURACY_METRIC,
-                    reason="; ".join(
-                        sorted({r.reason for r in last.stochastic if not r.completed})
-                    ),
-                )
-            )
-            continue
-        chosen = min(eligible, key=lambda item: item[1]["seconds"])[0]
-        if chosen not in validations:
-            settings = replace(pilots[chosen][0], seed=child_seed(seed, 301, chosen))
-            validations[chosen] = _target_comparison(
-                compare_nonlinear(
-                    problem, dt, T, point, repeats, deterministic, settings
-                ),
-                problem,
-                T,
-            )
-        metric = validations[chosen].metrics[1]
-        passed = (
-            metric["completed"]
-            and metric["relative_error_pct"] is not None
-            and metric["relative_error_pct"] <= target
-        )
-        rows.append(
-            dict(
-                target_pct=target,
-                method="mc",
-                status=(
-                    "confirmed"
-                    if passed
-                    else "validation_failed" if metric["completed"] else "solver_failed"
-                ),
-                seconds=metric["seconds"] if passed else None,
-                relative_error_pct=metric["relative_error_pct"],
-                walks=pilots[chosen][0].walks,
-                budget_kind="initial_walks_per_node",
-                max_walks=pilots[chosen][0].max_walks,
-                calibration_error_pct=pilots[chosen][1].metrics[1][
-                    "relative_error_pct"
-                ],
-                calibration_target_pct=calibration_target(target, "mc"),
-                selection_policy=SELECTION_POLICY,
-                accuracy_metric=ACCURACY_METRIC,
-                validation_seconds=metric["seconds"],
-                reason="; ".join(
-                    sorted(
-                        {
-                            r.reason
-                            for r in validations[chosen].stochastic
-                            if not r.completed
-                        }
-                    )
-                ),
-            )
-        )
+        rows.append(mc_row)
     evidence = dict(
         selection_policy=SELECTION_POLICY,
         accuracy_metric=ACCURACY_METRIC,
@@ -589,10 +545,11 @@ def nonlinear_targets(
         pilots=[
             dict(
                 settings=asdict(s),
+                phase=phase,
                 metrics=c.metrics,
                 seeds=[r.settings.seed for r in c.stochastic],
             )
-            for s, c in pilots
+            for s, c, phase in pilots
         ],
         validations=[
             dict(

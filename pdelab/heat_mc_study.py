@@ -18,6 +18,7 @@ from .study_policy import (
     ACCURACY_METRIC,
     SELECTION_POLICY,
     mean_relative_error,
+    phase_seed_index,
     search_budgets,
 )
 
@@ -112,7 +113,7 @@ def heat_mc_study(
                             seed,
                             method_index,
                             budget_index,
-                            0 if phase == "calibration" else 1,
+                            phase_seed_index(phase),
                             repeat,
                         ]
                     ).generate_state(1)[0]

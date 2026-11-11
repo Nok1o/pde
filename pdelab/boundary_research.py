@@ -18,6 +18,7 @@ from .study_policy import (
     ACCURACY_METRIC,
     SELECTION_POLICY,
     mean_relative_error,
+    phase_seed_index,
     render_accuracy_results,
     search_budgets,
 )
@@ -31,7 +32,7 @@ def boundary_accuracy_study(
     tolerances=LOD_SEARCH_TOLERANCES,
     seconds_per_method=60.0,
 ):
-    """Select on mean absolute relative error; confirm once on independent whole runs, never retune."""
+    """Select on stable pilot batches; retry unconfirmed targets at larger budgets."""
     if isinstance(repeats, bool) or int(repeats) != repeats or repeats < 2:
         raise ValueError("Нужно минимум два независимых повтора")
     if not np.isfinite(seconds_per_method) or seconds_per_method <= 0:
@@ -135,7 +136,7 @@ def boundary_accuracy_study(
 
         def series(budget, index, phase, deadline):
             measurement, reason = measure(
-                method, budget, index, int(phase == "validation"), deadline
+                method, budget, index, phase_seed_index(phase), deadline
             )
             if measurement is None:
                 if reason == "timeout":

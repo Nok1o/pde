@@ -10,7 +10,12 @@ import numpy as np
 from .experiment3d import Config3D, comparison3d, rows_csv
 from .problem3d import make_problem3d, select_points3d
 from .solvers3d import METHODS_3D, solve3d, warmup3d
-from .study_policy import accuracy_metadata, mean_relative_error, search_budgets
+from .study_policy import (
+    accuracy_metadata,
+    mean_relative_error,
+    phase_seed_index,
+    search_budgets,
+)
 
 TARGETS_3D = (1.0, 5.0, 10.0)
 
@@ -59,7 +64,7 @@ def _series3d(study, problem, points, method, budget, budget_index, phase, deadl
                     int(config.seed),
                     int(method != "lod_serial"),
                     budget_index,
-                    int(phase == "validation"),
+                    phase_seed_index(phase),
                     repeat,
                 ]
             ).generate_state(1)[0]
@@ -143,7 +148,7 @@ def accuracy_study3d(settings, progress=None):
 
         def measure(budget, budget_index, phase, deadline):
             if progress:
-                label = "подбор" if phase == "calibration" else "проверка"
+                label = "проверка" if phase == "validation" else "подбор"
                 progress(
                     method_index / len(methods),
                     f"{METHODS_3D[method]} · {label} · {budget:g}",

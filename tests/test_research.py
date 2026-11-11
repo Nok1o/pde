@@ -29,7 +29,7 @@ def _mock_solver(monkeypatch):
             value = 25.0
         elif walks == 64:
             # Удачный подбор ещё не означает успех: новая серия не проходит.
-            value = 25.0 if calls[(method, walks)] <= 2 else 30.0
+            value = 25.0 if calls[(method, walks)] <= 6 else 30.0
         values = blank_field(problem)
         values[tuple(points[0])] = value
         return Result(
@@ -58,11 +58,12 @@ def test_independent_confirmation_is_required_and_mean_runtime_is_reported(monke
             assert row["status"] == "Достигнута"
             assert row["seconds"] == pytest.approx(0.002)
         else:
-            assert row["budget"] == 64
-            assert row["seconds"] is None
-            assert row["relative_error_pct"] == pytest.approx(20)
-    assert not any(t["budget"] == 128 for t in study.trials)
-    calibration = {t["seed"] for t in study.trials if t["phase"] == "calibration"}
+            assert row["budget"] == 128
+            assert row["seconds"] == pytest.approx(0.0128)
+            assert row["relative_error_pct"] == pytest.approx(0.5)
+            assert row["validation_attempts"] == 2
+    assert any(t["budget"] == 128 for t in study.trials)
+    calibration = {t["seed"] for t in study.trials if t["phase"] != "validation"}
     validation = {t["seed"] for t in study.trials if t["phase"] == "validation"}
     assert calibration.isdisjoint(validation)
 
@@ -75,7 +76,7 @@ def test_failed_confirmation_does_not_produce_a_time(monkeypatch):
             assert row["seconds"] is None
             assert row["relative_error_pct"] == pytest.approx(20)
             assert row["budget"] == 64
-            assert row["status"] == "Не достигнута на контрольной серии"
+            assert row["status"] == "Точность не подтверждена в пределах бюджетов"
 
 
 def test_time_limit_preserves_unreached_cells(monkeypatch):

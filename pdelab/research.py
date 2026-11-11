@@ -15,7 +15,12 @@ from .experiment import Config
 from .problem import make_problem, reference_solution, select_points
 from .reference import choose_reference
 from .solvers import METHODS, solve, warmup
-from .study_policy import accuracy_metadata, mean_relative_error, search_budgets
+from .study_policy import (
+    accuracy_metadata,
+    mean_relative_error,
+    phase_seed_index,
+    search_budgets,
+)
 
 TARGETS_PCT = (1.0, 5.0, 10.0)
 LOD_SEARCH_TOLERANCES = (
@@ -65,7 +70,7 @@ def _walk_budgets(max_walks, batches):
 
 def _trial_seed(seed, budget_index, phase, repeat_index):
     """Подбор и проверка используют разные воспроизводимые серии путей."""
-    phase_index = 0 if phase == "calibration" else 1
+    phase_index = phase_seed_index(phase)
     sequence = np.random.SeedSequence([seed, budget_index, phase_index, repeat_index])
     return int(sequence.generate_state(1)[0])
 
@@ -88,7 +93,7 @@ def _measure_budget(
     repeats = 1 if is_lod and phase == "calibration" else study.settings.repeats
     values = []
     times = []
-    phase_label = "подбор" if phase == "calibration" else "проверка"
+    phase_label = "проверка" if phase == "validation" else "подбор"
     budget_label = f"tol={budget:g}" if is_lod else f"N={budget}"
 
     for repeat_index in range(repeats):

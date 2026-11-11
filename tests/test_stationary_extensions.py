@@ -76,14 +76,15 @@ def test_boundary_targets_use_fresh_validation_seeds(config):
     result = boundary_accuracy_study(
         config, ["lod_serial", "mc"], repeats=2, budgets=[64, 256], tolerances=[1e-8]
     )
-    pilot = {r["seed"] for r in result["trials"] if r["phase"] == 0}
+    pilot = {r["seed"] for r in result["trials"] if r["phase"] != 1}
     validation = {r["seed"] for r in result["trials"] if r["phase"] == 1}
     assert pilot.isdisjoint(validation) and validation
+    mc_trials = [r for r in result["trials"] if r["method"] == "mc"]
+    assert len({r["seed"] for r in mc_trials}) == len(mc_trials)
     assert len(result["rows"]) == 6
     for row in result["rows"]:
         if row["status"] == "confirmed":
-            fraction = 1 if row["method"] == "lod_serial" else 0.5
-            assert row["calibration_error_pct"] <= fraction * row["target_pct"]
+            assert row["calibration_error_pct"] <= row["calibration_target_pct"]
     assert all(
         r["seconds"] is None for r in result["rows"] if r["status"] != "confirmed"
     )
@@ -153,8 +154,7 @@ def test_mixed_research_ui_runs_exports_and_invalidates(dimension, prefix, resea
     assert len(result["rows"]) == 6
     for row in result["rows"]:
         if row["status"] == "confirmed":
-            fraction = 1 if row["method"] == "lod_serial" else 0.5
-            assert row["calibration_error_pct"] <= fraction * row["target_pct"]
+            assert row["calibration_error_pct"] <= row["calibration_target_pct"]
     assert result["trials"]
     app.number_input(key=research + "x").set_value(0).run()
     assert any("изменены" in item.value for item in app.info)

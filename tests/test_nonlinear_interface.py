@@ -96,6 +96,69 @@ def test_failed_pilot_has_no_confirmed_mc_time():
     assert evidence["validations"] == []
 
 
+def test_nonlinear_targets_retry_failed_check_on_fresh_larger_budget(monkeypatch):
+    from types import SimpleNamespace
+
+    import pdelab.nonlinear_study as module
+
+    baseline = SimpleNamespace(
+        completed=True, seconds=0.001, reason="ok", settings=NonlinearSettings()
+    )
+
+    def comparison(problem, dt, final_time, point, repeats, deterministic, candidate):
+        fails = candidate.walks == 8 and candidate.seed == module.child_seed(
+            42, 300, 0, 1
+        )
+        runs = [
+            SimpleNamespace(
+                settings=SimpleNamespace(seed=module.child_seed(candidate.seed, r)),
+                completed=True,
+                reason="ok",
+            )
+            for r in range(repeats)
+        ]
+        return SimpleNamespace(
+            deterministic=baseline,
+            stochastic=runs,
+            metrics=[
+                dict(method="picard", relative_error_pct=0.0, completed=True),
+                dict(
+                    method="mc",
+                    relative_error_pct=20.0 if fails else 0.1,
+                    seconds=0.01 * candidate.walks,
+                    completed=True,
+                ),
+            ],
+        )
+
+    monkeypatch.setattr(module, "compare_nonlinear", comparison)
+    monkeypatch.setattr(
+        module, "_target_comparison", lambda comparison, *args: comparison
+    )
+    monkeypatch.setattr(module, "solve_nonlinear", lambda *args: baseline)
+    rows, evidence = module.nonlinear_targets(
+        make_nonlinear_problem(4), repeats=2, budgets=(8, 32)
+    )
+    mc_rows = [row for row in rows if row["method"] == "mc"]
+    assert all(row["status"] == "confirmed" and row["budget"] == 32 for row in mc_rows)
+    assert all(row["validation_attempts"] == 2 for row in mc_rows)
+    pilot_seeds = [s for item in evidence["pilots"] for s in item["seeds"]]
+    validation_seeds = [s for item in evidence["validations"] for s in item["seeds"]]
+    assert len(set(pilot_seeds + validation_seeds)) == 16
+    assert len(evidence["validations"]) == 2
+
+
+def test_nonlinear_initial_failure_preserves_solver_reason(monkeypatch):
+    import pdelab.nonlinear_study as module
+
+    def fail(*args):
+        raise RuntimeError("reference did not converge")
+
+    monkeypatch.setattr(module, "compare_nonlinear", fail)
+    with pytest.raises(RuntimeError, match="reference did not converge"):
+        module.nonlinear_targets(make_nonlinear_problem(4), budgets=(8,))
+
+
 def test_ui_comparison_history_targets_export_and_old_modes():
     app = AppTest.from_file(
         Path(__file__).parents[1] / "app.py", default_timeout=60

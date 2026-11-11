@@ -11,15 +11,16 @@ from pdelab.research3d import StudySettings3D, accuracy_study3d, export_study3d
 from pdelab.solvers import Result
 
 
-def test_validation_failure_never_restarts_selection(monkeypatch):
-    calls = {"mc": 0, "lod_serial": 0, "graded": 0, "wos": 0}
+def test_failed_validation_retries_with_larger_budget_and_fresh_streams(monkeypatch):
+    from collections import defaultdict
 
-    def fake_solve(problem, points, method, **kwargs):
-        calls[method] += 1
+    calls = defaultdict(int)
+
+    def fake_solve(problem, points, method, *, walks, **kwargs):
+        calls[(method, walks)] += 1
         values = blank_field3d(problem)
-        values[tuple(points.T)] = (
-            1.0 if calls[method] <= (2 if method != "lod_serial" else 1) else 1.2
-        )
+        fails = method != "lod_serial" and walks == 64 and calls[(method, walks)] > 6
+        values[tuple(points.T)] = 1.2 if fails else 1.0
         return Result(
             method,
             values,
@@ -31,23 +32,15 @@ def test_validation_failure_never_restarts_selection(monkeypatch):
     monkeypatch.setattr(research3d, "solve3d", fake_solve)
     monkeypatch.setattr(research3d, "warmup3d", lambda: None)
     study = accuracy_study3d(StudySettings3D(Config3D(n=8), repeats=2, max_walks=128))
-    assert all(row["seconds"] is None for row in study.rows)
-    assert all(
-        row["status"] == "Не достигнута на контрольной серии" for row in study.rows
-    )
-    assert calls == {"mc": 4, "lod_serial": 3, "graded": 4, "wos": 4}
-    for method in calls:
-        calibration = {
-            trial["seed"]
-            for trial in study.trials
-            if trial["method"] == method and trial["phase"] == "calibration"
-        }
-        validation = {
-            trial["seed"]
-            for trial in study.trials
-            if trial["method"] == method and trial["phase"] == "validation"
-        }
-        assert calibration.isdisjoint(validation)
+    assert all(row["seconds"] is not None for row in study.rows)
+    for row in study.rows:
+        if row["method"] != "lod_serial":
+            assert row["budget"] == 128
+            assert row["validation_attempts"] == 2
+    for method in ("mc", "graded", "wos"):
+        assert calls[(method, 64)] == calls[(method, 128)] == 8
+        trials = [trial for trial in study.trials if trial["method"] == method]
+        assert len({trial["seed"] for trial in trials}) == len(trials)
 
 
 def test_real_study_and_export(tmp_path):

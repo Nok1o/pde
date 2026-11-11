@@ -1,12 +1,12 @@
-"""Shared pilot margin, held-out confirmation and readable accuracy results."""
+"""Stable pilot selection, fresh-data retries and readable accuracy results."""
 
 from time import perf_counter
 
 import numpy as np
 
-SELECTION_POLICY = "pilot_half_target_mean_relative_error_v3"
+SELECTION_POLICY = "stable_pilot_adaptive_retry_v4"
 ACCURACY_METRIC = "mean_run_relative_l1_v1"
-ACCURACY_DESCRIPTION = "100 * mean_runs(sum_points(abs(u_run-reference)) / sum_points(abs(reference))); independent validation"
+ACCURACY_DESCRIPTION = "100 * mean_runs(sum_points(abs(u_run-reference)) / sum_points(abs(reference))); error of individual runs in the validation series"
 CALIBRATION_FRACTION = 0.5
 DETERMINISTIC_METHODS = {"lod", "lod_serial", "picard"}
 
@@ -49,6 +49,16 @@ def calibration_target(target, method):
     return target if method in DETERMINISTIC_METHODS else target * CALIBRATION_FRACTION
 
 
+def phase_seed_index(phase):
+    """Separate every pilot batch from validation without changing legacy streams."""
+    return {
+        "calibration": 0,
+        "validation": 1,
+        "calibration_2": 2,
+        "calibration_3": 3,
+    }[phase]
+
+
 def search_budgets(
     method,
     budgets,
@@ -59,12 +69,18 @@ def search_budgets(
     fastest=False,
     clock=perf_counter,
 ):
-    """Choose only on pilot data, then confirm once, with a separate time allowance.
+    """Require three stable MC pilots, then retry failures at larger budgets.
 
-    measure(budget, index, phase, deadline) returns relative_error_pct and seconds.
-    Partial/failed series must raise instead of reporting a success from fewer runs.
-    A failed final check never returns its target to calibration.
+    Each (budget index, phase) is measured at most once on separate random data.
+    The last check is an adaptive empirical result, not a confidence guarantee.
+    Calibration and validation each have one cumulative time allowance, which
+    retries do not reset. In fastest mode rank successful candidates by pilot
+    time, not by the luckiest validation timing.
     """
+    stochastic = method not in DETERMINISTIC_METHODS
+    budgets = list(budgets)
+    if stochastic:
+        budgets = sorted(set(budgets))
     rows = [
         dict(
             method=method,
@@ -76,92 +92,158 @@ def search_budgets(
             budget=None,
             interrupted_budget=None,
             budget_kind=(
-                "relative_residual_tolerance"
-                if method in DETERMINISTIC_METHODS
-                else "walks_per_start"
+                "walks_per_start" if stochastic else "relative_residual_tolerance"
             ),
             calibration_target_pct=calibration_target(target, method),
             selection_policy=SELECTION_POLICY,
             accuracy_metric=ACCURACY_METRIC,
             status="Недостаточный запас точности в пределах бюджетов",
             status_code="not_reached",
+            validation_attempts=0,
+            calibration_margin_relaxed=False,
         )
         for target in targets
     ]
-    selected = {}
-    deadline = clock() + seconds_per_phase
+    attempts = []
+    spent = {"calibration": 0.0, "validation": 0.0}
+    best_pilot_times = {}
+
+    def run_series(budget, index, phase):
+        group = "validation" if phase == "validation" else "calibration"
+        started = clock()
+        remaining = seconds_per_phase - spent[group]
+        attempt = dict(budget=budget, budget_index=index, phase=phase)
+        try:
+            if remaining <= 0:
+                raise TimeoutError("Лимит времени")
+            result = measure(budget, index, phase, started + remaining)
+            if not np.isfinite(result["relative_error_pct"]):
+                raise RuntimeError("Неконечная ошибка")
+            if not np.isfinite(result["seconds"]) or result["seconds"] < 0:
+                raise RuntimeError("Некорректное время расчёта")
+            attempt.update(result, status="completed")
+            return result
+        except (TimeoutError, RuntimeError) as exc:
+            attempt.update(
+                status="timeout" if isinstance(exc, TimeoutError) else "solver_failed",
+                reason=str(exc),
+            )
+            raise
+        finally:
+            elapsed = max(0.0, clock() - started)
+            spent[group] += elapsed
+            attempt["elapsed_seconds"] = elapsed
+            attempts.append(attempt)
+
     for index, budget in enumerate(budgets):
-        pending = [r for r in rows if fastest or r["target_pct"] not in selected]
+        pending = [r for r in rows if fastest or r["seconds"] is None]
         if not pending:
             break
+        at_maximum = stochastic and index == len(budgets) - 1
+
+        def pilot_limit(row):
+            return (
+                row["target_pct"]
+                if at_maximum
+                else calibration_target(row["target_pct"], method)
+            )
+
+        pilots = []
         try:
-            pilot = measure(budget, index, "calibration", deadline)
-            if not np.isfinite(pilot["relative_error_pct"]):
-                raise RuntimeError("Неконечная ошибка подбора")
+            pilots.append(run_series(budget, index, "calibration"))
+            # Do not spend extra pilot runs on an already insufficient budget.
+            if stochastic and any(
+                pilots[0]["relative_error_pct"] <= pilot_limit(r) for r in pending
+            ):
+                for phase in ("calibration_2", "calibration_3"):
+                    pilots.append(run_series(budget, index, phase))
         except (TimeoutError, RuntimeError) as exc:
             for row in pending:
-                if row["target_pct"] not in selected:
-                    row["interrupted_budget"] = budget
-                    row["status"] = (
-                        "Лимит времени поиска"
-                        if isinstance(exc, TimeoutError)
-                        else f"Ошибка решателя: {exc}"
-                    )
-                    row["status_code"] = (
-                        "timeout" if isinstance(exc, TimeoutError) else "solver_failed"
+                if row["seconds"] is None:
+                    row.update(
+                        interrupted_budget=budget,
+                        status=(
+                            "Лимит времени поиска"
+                            if isinstance(exc, TimeoutError)
+                            else f"Ошибка решателя: {exc}"
+                        ),
+                        status_code=(
+                            "timeout"
+                            if isinstance(exc, TimeoutError)
+                            else "solver_failed"
+                        ),
                     )
             break
+        pilot_error = max(p["relative_error_pct"] for p in pilots)
+        pilot_seconds = float(np.mean([p["seconds"] for p in pilots]))
+        eligible = []
         for row in pending:
-            target = row["target_pct"]
-            # Record the last completed series even when the margin is not met.
-            if target not in selected:
+            nominal_limit = calibration_target(row["target_pct"], method)
+            relaxed = at_maximum and pilot_error > nominal_limit
+            if row["seconds"] is None:
                 row.update(
-                    budget=budget, calibration_error_pct=pilot["relative_error_pct"]
+                    budget=budget,
+                    calibration_error_pct=pilot_error,
+                    relative_error_pct=None,
+                    validation_seconds=None,
+                    status="Недостаточный запас точности в пределах бюджетов",
+                    status_code="not_reached",
+                    calibration_target_pct=(
+                        pilot_limit(row) if relaxed else nominal_limit
+                    ),
+                    calibration_margin_relaxed=relaxed,
                 )
-            if pilot["relative_error_pct"] <= row["calibration_target_pct"]:
-                previous = selected.get(target)
-                if previous is None or (
-                    fastest and pilot["seconds"] < previous[2]["seconds"]
-                ):
-                    selected[target] = (budget, index, pilot)
+            if pilot_error <= pilot_limit(row) and (
+                row["seconds"] is None
+                or pilot_seconds < best_pilot_times[row["target_pct"]]
+            ):
+                eligible.append(row)
+        if not eligible:
+            continue
+        try:
+            confirmation = run_series(budget, index, "validation")
+        except (TimeoutError, RuntimeError) as exc:
+            for row in eligible:
+                row["validation_attempts"] += 1
+                if row["seconds"] is None:
                     row.update(
-                        budget=budget, calibration_error_pct=pilot["relative_error_pct"]
+                        status=f"Бюджет найден, проверка не завершена: {exc}",
+                        status_code="validation_incomplete",
                     )
-    confirmations = {}
-    deadline = clock() + seconds_per_phase
-    for row in rows:
-        chosen = selected.get(row["target_pct"])
-        if chosen is None:
-            continue
-        budget, index, _ = chosen
-        if index not in confirmations:
-            try:
-                confirmation = measure(budget, index, "validation", deadline)
-                if not np.isfinite(confirmation["relative_error_pct"]):
-                    raise RuntimeError("Неконечная ошибка проверки")
-                confirmations[index] = confirmation
-            except (TimeoutError, RuntimeError) as exc:
-                confirmations[index] = exc
-        confirmation = confirmations[index]
-        if isinstance(confirmation, Exception):
-            reason = (
-                "лимит времени"
-                if isinstance(confirmation, TimeoutError)
-                else str(confirmation)
-            )
-            row.update(
-                status=f"Бюджет найден, проверка не завершена: {reason}",
-                status_code="validation_incomplete",
-            )
-            continue
+            break
         error = confirmation["relative_error_pct"]
-        passed = np.isfinite(error) and error <= row["target_pct"]
+        for row in eligible:
+            row["validation_attempts"] += 1
+            passed = error <= row["target_pct"]
+            if passed or row["seconds"] is None:
+                nominal_limit = calibration_target(row["target_pct"], method)
+                relaxed = at_maximum and pilot_error > nominal_limit
+                row.update(
+                    budget=budget,
+                    calibration_error_pct=pilot_error,
+                    relative_error_pct=error,
+                    validation_seconds=confirmation["seconds"],
+                    seconds=confirmation["seconds"] if passed else None,
+                    status=(
+                        "Достигнута"
+                        if passed
+                        else "Точность не подтверждена в пределах бюджетов"
+                    ),
+                    status_code="confirmed" if passed else "validation_failed",
+                    calibration_margin_relaxed=relaxed,
+                    calibration_target_pct=(
+                        row["target_pct"] if relaxed else nominal_limit
+                    ),
+                )
+                if passed:
+                    best_pilot_times[row["target_pct"]] = pilot_seconds
+        # Unconfirmed targets remain pending at the next (strictly larger) MC budget.
+    for row in rows:
         row.update(
-            relative_error_pct=error,
-            validation_seconds=confirmation["seconds"],
-            seconds=confirmation["seconds"] if passed else None,
-            status="Достигнута" if passed else "Не достигнута на контрольной серии",
-            status_code="confirmed" if passed else "validation_failed",
+            attempts=attempts,
+            calibration_seconds=spent["calibration"],
+            total_validation_seconds=spent["validation"],
+            search_seconds=sum(spent.values()),
         )
     return rows
 
@@ -171,7 +253,7 @@ def readable_status(row):
     labels = {
         "confirmed": "Достигнута",
         "reached": "Достигнута",
-        "validation_failed": "Проверка не прошла",
+        "validation_failed": "Не подтверждена в пределах лимитов",
         "not_confirmed": "Проверка не прошла",
         "not_reached": "Нет запаса точности",
         "budget_exhausted": "Нет запаса точности",
@@ -253,11 +335,11 @@ def render_accuracy_results(rows, names=None, *, key):
     names = {} if names is None else names
     if any(r.get("selection_policy") != SELECTION_POLICY for r in rows):
         st.info(
-            "Показано исследование по прежнему протоколу. Запустите заново для подбора с запасом."
+            "Показано исследование по прежнему протоколу. Запустите заново для устойчивого подбора с повторными попытками."
         )
     else:
         st.caption(
-            "Ошибка — среднее относительных ошибок отдельных запусков. MC подбирается до половины порога, затем независимо проверяется. Время — одного проверочного запуска."
+            "Ошибка — среднее относительных ошибок отдельных запусков. MC: три предварительные серии с запасом, затем новая проверка; при неудаче бюджет увеличивается. Это адаптивная проверка, не статистическая гарантия. Время — одного проверочного запуска."
         )
     timing = display_timing_rows(rows, names)
     for line in timing:
@@ -283,6 +365,8 @@ def render_accuracy_results(rows, names=None, *, key):
         pilot = row.get("calibration_error_pct")
         check = row.get("relative_error_pct", row.get("validation_error_pct"))
         status = readable_status(row)
+        if row.get("calibration_margin_relaxed"):
+            status += "; максимум путей, без дополнительного запаса"
         interrupted = row.get("interrupted_budget")
         if interrupted is not None and row.get("budget") is not None:
             if row["method"] in DETERMINISTIC_METHODS:
@@ -296,6 +380,8 @@ def render_accuracy_results(rows, names=None, *, key):
                 "Бюджет": budget_label(row),
                 "Подбор, %": f"{pilot:.3g}" if pilot is not None else "не завершён",
                 "Проверка, %": f"{check:.3g}" if check is not None else "не завершена",
+                "Попыток проверки": row.get("validation_attempts", 1),
+                "Подбор и проверки, с": round(row.get("search_seconds", 0), 3),
                 "Статус": status,
             }
         )
