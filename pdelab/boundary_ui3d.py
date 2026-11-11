@@ -22,6 +22,7 @@ from .boundary_ui import KIND_LABELS
 from .boundary_views3d import boundary_trace_figure3d
 from .boundary_workload3d import boundary_limit_message3d
 from .experiment3d import rows_csv
+from .ui_state import select_section
 from .views3d import PLANES, residual_figure3d, slice_figure3d
 
 
@@ -42,7 +43,10 @@ def _controls():
     n = st.select_slider("Интервалов по оси", grids, value=16, key="bc3d_n")
     kinds, kappas, data = [], [], []
     for i, face in enumerate(FACES):
-        with st.expander(f"Грань {face[0]} = {face[1]}"):
+        with st.expander(
+            f"Грань {face[0]} = {face[1]}",
+            key="boundary_ui3d_expander_45" + str(f"Грань {face[0]} = {face[1]}"),
+        ):
             kind = st.selectbox(
                 "Условие",
                 KINDS,
@@ -52,17 +56,19 @@ def _controls():
             )
             kinds.append(kind)
             kappas.append(
-                st.number_input("κ", min_value=0.0, value=1.0, key=f"bc3d_{face}_kappa")
+                st.number_input("β", min_value=0.0, value=1.0, key=f"bc3d_{face}_kappa")
                 if kind == "robin"
                 else 0.0
             )
             data.append(
-                st.number_input("g или r", value=0.0, key=f"bc3d_{face}_value")
+                st.number_input(
+                    "μ (I род) / φ (II и III род)", value=0.0, key=f"bc3d_{face}_value"
+                )
                 if problem == "custom"
                 else 0.0
             )
     source = (
-        st.number_input("Источник f", value=0.0, key="bc3d_source")
+        st.number_input("Правая часть fΔ = −f", value=0.0, key="bc3d_source")
         if problem == "custom"
         else 0.0
     )
@@ -82,7 +88,7 @@ def _controls():
     if mode == "slice":
         plane = st.selectbox("Плоскость расчёта", list(PLANES), key="bc3d_plane")
         index = _node("Индекс среза", n, n // 2, "bc3d_index")
-    with st.expander("Точность и бюджет"):
+    with st.expander("Точность и бюджет", key="boundary_ui3d_expander_85"):
         walks = st.select_slider(
             "Путей на точку",
             [64, 256, 1024, 2048, 4096, 16384],
@@ -131,10 +137,18 @@ def _controls():
 
 
 def _formulas(config):
-    with st.expander("Формулы и описание", expanded=True):
-        st.latex(r"u_{xx}+u_{yy}+u_{zz}=f,\quad (x,y,z)\in(0,1)^3,\qquad k=1")
+    with st.expander("Формулы и описание", expanded=False, key="boundary3d_formulas"):
+        st.latex(r"u_{xx}+u_{yy}+u_{zz}=f_{\Delta},\quad (x,y,z)\in(0,1)^3,\qquad k=1")
+        st.latex(r"\Delta u+f=0,\qquad f_{\Delta}=-f")
+        st.latex(
+            r"\mathrm{I}:u=\mu,\quad \mathrm{II}:\partial_nu=\varphi,\quad \mathrm{III}:\partial_nu+\beta "
+            r"u=\varphi"
+        )
+        st.caption(
+            "Лекция 9: α∂ₙu + βu = φ; здесь α = 1, β ≥ 0. n — внешняя нормаль. f — источник тепла; fΔ — правая часть Пуассона."
+        )
         if config.problem == "polynomial":
-            st.latex(r"u_*=1+x+2y+3z+x^2+y^2+z^2,\qquad f=6")
+            st.latex(r"u_*=1+x+2y+3z+x^2+y^2+z^2,\qquad f_{\Delta}=6")
             st.write(
                 "Полином: проверка знаков нормали и совместной обработки граней на рёбрах и в углах."
             )
@@ -143,11 +157,11 @@ def _formulas(config):
                 r"u_*=3+x+2y+3z+\cos(2\pi x)+\tfrac12\cos(2\pi y)+\tfrac14\cos(2\pi z)"
             )
             st.latex(
-                r"f=-4\pi^2\left(\cos(2\pi x)+\tfrac12\cos(2\pi y)+\tfrac14\cos(2\pi z)\right)"
+                r"f_{\Delta}=-4\pi^2\left(\cos(2\pi x)+\tfrac12\cos(2\pi y)+\tfrac14\cos(2\pi z)\right)"
             )
             st.write("Гладкий пример: проверка уменьшения ошибки при уточнении сетки.")
         else:
-            st.latex(rf"f={config.source:g}")
+            st.latex(rf"f_{{\Delta}}={config.source:g}")
         normals = (
             (-1, 3, -2, 4, -3, 5)
             if config.problem == "polynomial"
@@ -170,7 +184,7 @@ def _formulas(config):
                 )
             st.latex(rf"{face[0]}={face[1]}:\quad {left}={right}")
         st.caption(
-            "Нейман задаёт внешнюю производную. На рёбрах и в углах складываются вклады соседних граней; Дирихле имеет приоритет."
+            "Условие 2-го рода задаёт внешнюю производную. На рёбрах и в углах складываются вклады соседних граней; условие 1-го рода имеет приоритет."
         )
 
 
@@ -206,7 +220,7 @@ def _comparison(experiment, config, methods):
     error = st.toggle("Показать ошибку", key="bc3d_show_error")
     st.plotly_chart(slice_figure3d(experiment, plane, index, error), width="stretch")
     if "lod_serial" in experiment.results:
-        with st.expander("Сходимость ЛОМ"):
+        with st.expander("Сходимость ЛОМ", key="boundary_ui3d_expander_209"):
             st.plotly_chart(
                 residual_figure3d(experiment.results["lod_serial"]), width="stretch"
             )
@@ -224,6 +238,7 @@ def _comparison(experiment, config, methods):
             "boundary3d.zip",
             "application/zip",
             key="bc3d_download",
+            on_click="ignore",
         )
 
 
@@ -277,12 +292,14 @@ def _benchmark(config, methods):
             rows_csv(saved[1]).encode("utf-8-sig"),
             "boundary3d-series.csv",
             "text/csv",
+            on_click="ignore",
         )
         st.download_button(
             "Скачать настройки серии",
             json.dumps(saved[0], ensure_ascii=False, indent=2),
             "boundary3d-series.json",
             "application/json",
+            on_click="ignore",
         )
 
 
@@ -305,7 +322,7 @@ def render_boundary_app3d():
         available = [m for m in available if m != "wos"]
     if pure_neumann:
         st.caption(
-            "Чистый Нейман: среднее с весами объёмов равно нулю. MC без поглощения пока не поддерживается."
+            "Условия только 2-го рода: среднее с весами объёмов равно нулю. MC без поглощения пока не поддерживается."
         )
     with st.sidebar:
         methods = st.multiselect(
@@ -316,7 +333,12 @@ def render_boundary_app3d():
             key="bc3d_methods",
         )
         run = st.button(
-            "Рассчитать", type="primary", disabled=not methods, key="bc3d_run"
+            "Рассчитать",
+            type="primary",
+            disabled=not methods,
+            key="bc3d_run",
+            on_click=select_section,
+            args=("boundary3d_sections", "Сравнение и срезы"),
         )
     if run:
         warning = boundary_limit_message3d(config, methods)
@@ -336,7 +358,9 @@ def render_boundary_app3d():
 
     render_method_scope(3, mixed=True)
     comparison, trace_tab, series, research_tab = st.tabs(
-        ["Сравнение и срезы", "Траектория", "Серия измерений", "Исследование"]
+        ["Сравнение и срезы", "Траектория", "Серия измерений", "Исследование"],
+        key="boundary3d_sections",
+        on_change="rerun",
     )
     with comparison:
         experiment = st.session_state.get("bc3d_result")
@@ -356,7 +380,7 @@ def render_boundary_app3d():
             st.plotly_chart(
                 boundary_trace_figure3d(saved[1], config.n), width="stretch"
             )
-            with st.expander("События на границе"):
+            with st.expander("События на границе", key="boundary_ui3d_expander_359"):
                 st.dataframe(
                     pd.DataFrame([e for e in saved[1] if e["faces"]]), hide_index=True
                 )

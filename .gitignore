@@ -6,6 +6,10 @@ __pycache__/
 .cache/
 runs/
 
+# Generated documents and intermediate rendering files.
+/output/
+/tmp/
+
 # Local environments and packaging output.
 .venv/
 venv/

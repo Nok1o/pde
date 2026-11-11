@@ -20,7 +20,7 @@ from .views import benchmark_plot, export
 
 def main(argv=None):
     parser = argparse.ArgumentParser(
-        description="PDE Lab: Δu=f, сеточный метод и варианты Монте-Карло"
+        description="PDE Lab: Δu=fΔ (fΔ=−f), сеточный метод и варианты Монте-Карло"
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
     for cmd in ["run", "benchmark", "study"]:
@@ -29,7 +29,7 @@ def main(argv=None):
             "--problem", choices=list(PRESETS), default="hot_top"
         )
         command_parser.add_argument(
-            "--n", type=int, default=24, help="Число интервалов; узлов n+1"
+            "--n", type=int, default=24, help="Число интервалов; узлов N+1"
         )
         command_parser.add_argument(
             "--mode", choices=["point", "patch", "field"], default="point"
@@ -38,7 +38,7 @@ def main(argv=None):
             "--point",
             type=int,
             nargs=2,
-            metavar=("X", "Y"),
+            metavar=("X", "Z"),
             help="Индексы выбранного узла (по умолчанию центр)",
         )
         command_parser.add_argument(
@@ -59,7 +59,7 @@ def main(argv=None):
             "--tol",
             type=float,
             default=1e-7,
-            help="Относительная невязка ||b-Au||∞/||b||∞; 0 < tol < 1",
+            help="Относительная невязка ||b-Ay||∞/||b||∞; 0 < tol < 1",
         )
         command_parser.add_argument("--max-iter", type=int, default=20000)
         for side, default in [
@@ -94,8 +94,22 @@ def main(argv=None):
         "--problem", choices=["decay", "manufactured"], default="decay"
     )
     heat_parser.add_argument("--n", type=int, default=24)
-    heat_parser.add_argument("--a2", type=float, default=1.0)
-    heat_parser.add_argument("--dt", type=float, default=0.01)
+    heat_parser.add_argument(
+        "--a",
+        "--a2",
+        dest="a2",
+        help="Температуропроводность a (лекция 15); прежнее имя --a2",
+        type=float,
+        default=1.0,
+    )
+    heat_parser.add_argument(
+        "--tau",
+        "--dt",
+        dest="dt",
+        help="Шаг физического времени τ",
+        type=float,
+        default=0.01,
+    )
     heat_parser.add_argument("--T", type=float, default=0.2)
     heat_parser.add_argument("--tol", type=float, default=1e-10)
     heat_parser.add_argument("--max-iter", type=int, default=20000)
@@ -113,10 +127,24 @@ def main(argv=None):
             "--problem", choices=["decay", "manufactured"], default="decay"
         )
         command_parser.add_argument("--n", type=int, default=24)
-        command_parser.add_argument("--a2", type=float, default=1.0)
-        command_parser.add_argument("--dt", type=float, default=0.01)
+        command_parser.add_argument(
+            "--a",
+            "--a2",
+            dest="a2",
+            help="Температуропроводность a (лекция 15); прежнее имя --a2",
+            type=float,
+            default=1.0,
+        )
+        command_parser.add_argument(
+            "--tau",
+            "--dt",
+            dest="dt",
+            help="Шаг физического времени τ",
+            type=float,
+            default=0.01,
+        )
         command_parser.add_argument("--T", type=float, default=0.04)
-        command_parser.add_argument("--point", type=int, nargs=2, metavar=("X", "Y"))
+        command_parser.add_argument("--point", type=int, nargs=2, metavar=("X", "Z"))
         command_parser.add_argument("--seed", type=int, default=42)
         command_parser.add_argument("--max-transitions", type=int, default=1000000)
         command_parser.add_argument("--out", type=Path, default=Path("runs") / name)
@@ -150,7 +178,7 @@ def main(argv=None):
                 )
                 export_heat_mc(result, problem, args.dt, args.out)
                 print(
-                    f"MC до t={args.T:g}: {result.seconds:.4g} с, {result.spatial_transitions+result.temporal_transitions} переходов"
+                    f"MC до t={args.T:g}: {result.seconds:.4g} с, {result.spatial_transitions + result.temporal_transitions} переходов"
                 )
             else:
                 study = heat_mc_study(
@@ -223,13 +251,13 @@ def main(argv=None):
                 relative = (
                     "—"
                     if row["relative_error_pct"] is None
-                    else f'{row["relative_error_pct"]:.6g}'
+                    else f"{row['relative_error_pct']:.6g}"
                 )
                 print(
-                    f'{row["name"]:28s} {row["seconds"]*1000:10.3f} {row["rmse"]:16.6g} {relative:>17s}'
+                    f"{row['name']:28s} {row['seconds'] * 1000:10.3f} {row['rmse']:16.6g} {relative:>17s}"
                 )
             print(
-                f'\nИнтерактивный результат: {(args.out/"interactive.html").resolve()}'
+                f"\nИнтерактивный результат: {(args.out / 'interactive.html').resolve()}"
             )
         else:
             rows = benchmark(
@@ -258,7 +286,7 @@ def main(argv=None):
                 ),
                 encoding="utf-8",
             )
-            print(f'\nРезультат: {(args.out/"benchmark.html").resolve()}')
+            print(f"\nРезультат: {(args.out / 'benchmark.html').resolve()}")
     except (ValueError, RuntimeError) as exc:
         parser.exit(2, f"Ошибка: {exc}\n")
 

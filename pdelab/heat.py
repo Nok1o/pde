@@ -1,7 +1,9 @@
-"""Physical time integration of u_t = a² Δu + F with Dirichlet data.
+"""Physical time integration of u_t = a Δu + f with Dirichlet data.
 
 Backward Euler is solved to a relative RHS residual at each time layer.
 Directional sweeps are an inner iteration, never a physical time step.
+Lecture notation: a2 stores a itself (not its square), dt is tau.
+The existing x,y callable API represents the lecture coordinates x,z.
 """
 
 from dataclasses import dataclass

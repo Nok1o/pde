@@ -22,6 +22,7 @@ from pdelab.reference import REFERENCE_POLICY
 from pdelab.research import export_study
 from pdelab.research_ui import render_research_tab
 from pdelab.solvers import LOD_STOPPING_RULE, METHODS
+from pdelab.ui_state import select_section
 from pdelab.views import (
     benchmark_plot,
     convergence_plot,
@@ -58,10 +59,10 @@ dimension = st.sidebar.radio(
 if dimension == "3D":
     cube_boundary_mode = st.sidebar.radio(
         "Граничные условия",
-        ["Дирихле", "Смешанные I / II / III"],
+        ["1-го рода", "Смешанные: 1, 2, 3 рода"],
         key="cube_boundary_mode",
     )
-    if cube_boundary_mode == "Смешанные I / II / III":
+    if cube_boundary_mode == "Смешанные: 1, 2, 3 рода":
         from pdelab.boundary_ui3d import render_boundary_app3d
 
         render_boundary_app3d()
@@ -72,9 +73,9 @@ if dimension == "3D":
     st.stop()
 
 boundary_mode = st.sidebar.radio(
-    "Граничные условия", ["Дирихле", "Смешанные I / II / III"], key="boundary_mode"
+    "Граничные условия", ["1-го рода", "Смешанные: 1, 2, 3 рода"], key="boundary_mode"
 )
-if boundary_mode == "Смешанные I / II / III":
+if boundary_mode == "Смешанные: 1, 2, 3 рода":
     from pdelab.boundary_ui import render_boundary_app
 
     render_boundary_app()
@@ -91,7 +92,7 @@ with st.sidebar:
         options=[8, 12, 16, 24, 32, 48, 64, 96, 128],
         value=24,
     )
-    st.caption(f"Узлов: {n+1} × {n+1}; шаг h={1/n:.4g}.")
+    st.caption(f"Узлов: {n + 1} × {n + 1}; шаг h={1 / n:.4g}.")
     mode = st.selectbox(
         "Что нужно вычислить",
         ["point", "patch", "field"],
@@ -104,17 +105,17 @@ with st.sidebar:
     point = None
     if mode == "point":
         ix = st.slider("Узел по x", 0, n, n // 2)
-        iy = st.slider("Узел по y", 0, n, n // 2)
+        iy = st.slider("Узел по z", 0, n, n // 2)
         point = (ix, iy)
-        st.caption(f"Координаты: ({ix/n:.3f}, {iy/n:.3f})")
+        st.caption(f"Координаты: ({ix / n:.3f}, {iy / n:.3f})")
     top, bottom, left, right, source = 100.0, 0.0, 0.0, 0.0, 0.0
     if problem == "hot_top":
-        with st.expander("Граница и источник"):
+        with st.expander("Граница и источник", key="dirichlet_boundary_controls"):
             top = st.number_input("Верх", value=100.0)
             bottom = st.number_input("Низ", value=0.0)
             left = st.number_input("Лево", value=0.0)
             right = st.number_input("Право", value=0.0)
-            source = st.number_input("Постоянная правая часть f", value=0.0)
+            source = st.number_input("Постоянная правая часть fΔ = −f", value=0.0)
     st.header("Расчёт")
     from pdelab.stationary_extensions import render_method_scope
 
@@ -127,7 +128,7 @@ with st.sidebar:
         options=[64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384],
         value=2048,
     )
-    with st.expander("Точность и воспроизводимость"):
+    with st.expander("Точность и воспроизводимость", key="dirichlet_solver_controls"):
         tol = st.select_slider(
             "Относительный допуск ЛОМ",
             options=[1e-2, 1e-4, 1e-6, 1e-7, 1e-8],
@@ -135,7 +136,7 @@ with st.sidebar:
             format_func=lambda v: f"{v:g}",
         )
         st.latex(
-            r"\frac{\lVert b-Au\rVert_\infty}{\lVert b\rVert_\infty}\leq\mathrm{tol}"
+            r"\frac{\lVert b-Ay\rVert_\infty}{\lVert b\rVert_\infty}\leq\mathrm{tol}"
         )
         st.caption("b — правая часть сеточной системы с учётом границы.")
         batches = st.selectbox(
@@ -173,6 +174,8 @@ with st.sidebar:
         disabled=not methods,
         width="stretch",
         key="main_run",
+        on_click=select_section,
+        args=("main_sections", "Обзор"),
     )
 
 if run:
@@ -230,7 +233,9 @@ tabs = st.tabs(
         "Серия экспериментов",
         "Исследование",
         "Сохранить",
-    ]
+    ],
+    key="main_sections",
+    on_change="rerun",
 )
 with tabs[6]:
     render_research_tab(cfg)
@@ -295,11 +300,15 @@ with tabs[1]:
         st.plotly_chart(fig, width="stretch")
 with tabs[2]:
     st.plotly_chart(trajectory_plot(exp), width="stretch")
-    st.latex(r"Z = g(X_{\tau}) - \frac{h^2}{4}\sum_{k=0}^{\tau-1} f(X_k)")
+    st.latex(r"Z = \mu(X_{K}) - \frac{h^2}{4}\sum_{k=0}^{K-1} f_{\Delta}(X_k)")
     baseline = exp.results.get("lod_serial")
     if baseline:
         st.subheader("Сходимость ЛОМ")
-        linear_tab, log_tab = st.tabs(["Линейная шкала", "Логарифмическая шкала"])
+        linear_tab, log_tab = st.tabs(
+            ["Линейная шкала", "Логарифмическая шкала"],
+            key="residual_scales",
+            on_change="rerun",
+        )
         with linear_tab:
             st.plotly_chart(residual_plot(exp, "linear"), width="stretch")
         with log_tab:
@@ -368,6 +377,7 @@ with tabs[5]:
             df.to_csv(index=False).encode("utf-8-sig"),
             "benchmark.csv",
             "text/csv",
+            on_click="ignore",
         )
 with tabs[7]:
     if st.button("Подготовить все представления"):
@@ -393,5 +403,6 @@ with tabs[7]:
             st.session_state["archive"],
             "pde-results.zip",
             "application/zip",
+            on_click="ignore",
         )
         st.success("Сохранено: " + st.session_state["export_path"])

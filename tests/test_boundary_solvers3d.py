@@ -146,7 +146,7 @@ def test_known_dirichlet_point_has_zero_work_unknown_nodes_stay_nan():
 
 def test_pure_neumann_and_unfinished_walks_are_explicit_errors():
     problem = make_boundary_problem3d(n=6, kinds=dict.fromkeys(FACES, "neumann"))
-    with pytest.raises(ValueError, match="чистого Неймана"):
+    with pytest.raises(ValueError, match="условий только 2-го рода"):
         solve_boundary3d(problem, [[3, 3, 3]], "mc")
     with pytest.raises(ValueError, match="поглощающей"):
         trace_boundary_walk3d(problem)

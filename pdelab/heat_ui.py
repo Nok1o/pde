@@ -7,6 +7,7 @@ import streamlit as st
 
 from .heat import HEAT_PRESETS, make_heat_problem, solve_heat
 from .heat_views import heat_archive, heat_profile, heat_slice
+from .ui_state import select_section
 
 
 @dataclass
@@ -21,9 +22,10 @@ class HeatSettings:
 
 def render_heat_app():
     st.title("Теплопроводность · физическое время")
-    st.latex(
-        r"u_t=a^2\Delta u+F,\qquad (I-\Delta t\,a^2 L_h)u^{m+1}=u^m+\Delta t F^{m+1}"
+    st.caption(
+        "Лекция 15: u — непрерывное поле, y — сеточное; a — температуропроводность, τ — шаг времени, f — источник."
     )
+    st.latex(r"u_t=a\Delta u+f,\qquad (I-\tau\,a L_h)y^{m+1}=y^m+\tau f^{m+1}")
     with st.sidebar:
         preset = st.selectbox(
             "Начальное поле и условия",
@@ -35,10 +37,10 @@ def render_heat_app():
             "Интервалов по оси", [8, 12, 16, 24, 32, 48, 64], value=24, key="heat_n"
         )
         a2 = st.number_input(
-            "Коэффициент a²", min_value=0.001, max_value=100.0, value=1.0, key="heat_a2"
+            "Коэффициент a", min_value=0.001, max_value=100.0, value=1.0, key="heat_a2"
         )
         dt = st.number_input(
-            "Шаг физического времени Δt",
+            "Шаг физического времени τ",
             min_value=0.0001,
             max_value=10.0,
             value=0.01,
@@ -58,21 +60,31 @@ def render_heat_app():
             value=1e-10,
             key="heat_tol",
         )
-        run = st.button("Рассчитать теплопроводность", type="primary", key="heat_run")
+        run = st.button(
+            "Рассчитать теплопроводность",
+            type="primary",
+            key="heat_run",
+            on_click=select_section,
+            args=("heat_sections", "Сеточный расчёт"),
+        )
     settings = HeatSettings(preset, n, a2, dt, T, tol)
     if preset == "decay":
-        st.latex(r"u_*=e^{-2\pi^2 a^2t}\sin(\pi x)\sin(\pi y),\quad F=0,\quad g=0")
+        st.latex(r"u_*=e^{-2\pi^2 at}\sin(\pi x)\sin(\pi z),\quad f=0,\quad \mu=0")
     else:
-        st.latex(r"u_*=1+x+y+t(1+x)+e^t x(1-x)y(1-y)")
+        st.latex("u_*=1+x+z+t(1+x)+e^t x(1-x)z(1-z)")
         st.latex(
-            r"F=1+x+e^t[x(1-x)y(1-y)+2a^2(x(1-x)+y(1-y))],\quad g=u_*|_{\partial\Omega}"
+            r"f=1+x+e^t[x(1-x)z(1-z)+2a(x(1-x)+z(1-z))],\quad \mu=u_*|_{\partial\Omega}"
         )
     st.caption(
-        "Начальное поле u₀=u*(x,y,0). Итерации линейного решателя выполняются внутри каждого временного слоя."
+        "Начальное поле μ(x,z)=u*(x,z,0). Итерации линейного решателя выполняются внутри каждого временного слоя."
     )
     from .heat_mc_ui import render_heat_mc, render_heat_mc_study
 
-    tabs = st.tabs(["Сеточный расчёт", "Монте-Карло", "Исследование по времени"])
+    tabs = st.tabs(
+        ["Сеточный расчёт", "Монте-Карло", "Исследование по времени"],
+        key="heat_sections",
+        on_change="rerun",
+    )
     with tabs[1]:
         render_heat_mc(settings)
     with tabs[2]:
@@ -111,7 +123,7 @@ def _render_grid(settings, run):
         st.info("Параметры изменены. Выполните новый расчёт.")
     direct = st.session_state["heat_direct"]
     st.write(
-        f"Временных шагов: {len(result.times)-1}; физическое время: {result.times[-1]:g}; расчёт: {result.seconds:.3g} с."
+        f"Временных шагов: {len(result.times) - 1}; физическое время: {result.times[-1]:g}; расчёт: {result.seconds:.3g} с."
     )
     rows = result.rows()
     for row, field, ref in zip(rows, result.fields, direct.fields):
@@ -121,7 +133,7 @@ def _render_grid(settings, run):
             columns={
                 "time_index": "Номер временного слоя",
                 "t": "Физическое время t",
-                "dt": "Шаг Δt",
+                "dt": "Шаг τ",
                 "iterations": "Итераций внутри слоя",
                 "relative_residual": "Относительная невязка слоя",
                 "center": "u в центре",
@@ -149,4 +161,5 @@ def _render_grid(settings, run):
             st.session_state["heat_archive"],
             "heat-results.zip",
             "application/zip",
+            on_click="ignore",
         )

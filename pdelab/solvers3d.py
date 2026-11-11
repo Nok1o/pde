@@ -12,7 +12,7 @@ METHODS_3D = {
     "lod_serial": "ЛОМ",
     "mc": "Монте-Карло",
     "graded": "MC · сгущённая сетка",
-    "wos": "WoS · Дирихле",
+    "wos": "WoS · 1-й род",
 }
 STOPPING_RULE_3D = "relative_rhs_inf_3d_v1"
 

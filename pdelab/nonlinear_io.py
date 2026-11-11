@@ -151,7 +151,7 @@ def field_figure(comparison, error=False):
         )
         figure.update_xaxes(title_text="x", row=1, col=i)
         figure.update_yaxes(
-            title_text="y", scaleanchor="x" if i == 1 else f"x{i}", row=1, col=i
+            title_text="z", scaleanchor="x" if i == 1 else f"x{i}", row=1, col=i
         )
     figure.update_layout(
         height=380,
@@ -308,7 +308,7 @@ def study_figure(rows):
                 x=[row["initial_walks"] for row in group],
                 y=[row["rmse_grid"] for row in group],
                 mode="lines+markers",
-                name=f"α={key[0]}, n={key[1]}, Δt={key[2]}, {key[3]}, ω={key[4]}",
+                name=f"γ={key[0]}, N={key[1]}, τ={key[2]}, {key[3]}, ξ={key[4]}",
             ),
             row=1,
             col=1,
@@ -322,7 +322,7 @@ def study_figure(rows):
                 mode="markers",
                 name=method,
                 text=[
-                    f"α={row['alpha']}, n={row['n']}, N={row['initial_walks']}, Δt={row['dt']}"
+                    f"γ={row['alpha']}, N={row['n']}, N_MC={row['initial_walks']}, τ={row['dt']}"
                     for row in group
                 ],
             ),

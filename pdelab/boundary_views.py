@@ -8,10 +8,10 @@ from .boundary_solvers import METHODS_BOUNDARY
 
 EVENT_NAMES = {
     "interior": "Внутренний узел",
-    "neumann": "Нейман: вклад производной",
-    "robin": "Робин: продолжение",
-    "robin_absorption": "Робин: поглощение",
-    "dirichlet": "Дирихле: выплата g",
+    "neumann": "2-й род: вклад производной",
+    "robin": "3-й род: продолжение",
+    "robin_absorption": "3-й род: поглощение",
+    "dirichlet": "1-й род: выплата μ",
 }
 EVENT_COLORS = {
     "interior": "#3156a3",
@@ -51,7 +51,7 @@ def boundary_field_figure(experiment, error=False):
     figure.update_layout(
         title="Эталон",
         xaxis_title="x",
-        yaxis_title="y",
+        yaxis_title="z",
         height=500,
         updatemenus=[dict(buttons=buttons, x=0, y=1.17)],
     )
@@ -104,7 +104,7 @@ def boundary_trace_figure(history, n):
         col=2,
     )
     figure.update_xaxes(range=[0, 1], title="x", row=1, col=1)
-    figure.update_yaxes(range=[0, 1], title="y", row=1, col=1)
+    figure.update_yaxes(range=[0, 1], title="z", row=1, col=1)
     figure.update_xaxes(title="Шаг", row=1, col=2)
     figure.update_yaxes(title="Вклад пути", row=1, col=2)
     figure.update_layout(height=480, legend={"orientation": "h", "y": -0.2})

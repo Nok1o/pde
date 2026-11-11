@@ -99,7 +99,7 @@ def field_plot(exp, kind="value"):
             cmap=cmap,
             interpolation="nearest",
         )
-        ax.set(xlabel="x", ylabel="y", title=name, xlim=(0, 1), ylim=(0, 1))
+        ax.set(xlabel="x", ylabel="z", title=name, xlim=(0, 1), ylim=(0, 1))
         if len(exp.points) <= 9:
             y, x = exp.points.T
             ax.scatter(
@@ -170,7 +170,7 @@ def profile_plot(exp):
     ax.set(
         xlabel="x",
         ylabel="Температура, усл. ед.",
-        title=f"Горизонтальный срез y={y/exp.problem.n:.3f}",
+        title=f"Горизонтальный срез z={y / exp.problem.n:.3f}",
     )
     ax.legend(fontsize=8)
     ax.grid(alpha=0.2)
@@ -346,7 +346,7 @@ def interactive_field(exp, kind="value"):
                         "count": "Наблюдений",
                     }[kind]
                 ),
-                hovertemplate="x=%{x:.3f}<br>y=%{y:.3f}<br>значение=%{z:.5g}<extra>"
+                hovertemplate="x=%{x:.3f}<br>z=%{y:.3f}<br>значение=%{z:.5g}<extra>"
                 + name
                 + "</extra>",
             )
@@ -365,7 +365,7 @@ def interactive_field(exp, kind="value"):
         updatemenus=[dict(buttons=buttons, x=0, y=1.17, xanchor="left")],
         margin=dict(t=95),
         xaxis_title="x",
-        yaxis_title="y",
+        yaxis_title="z",
         yaxis_scaleanchor="x",
         plot_bgcolor="#e8edf0",
         height=530,
@@ -417,7 +417,7 @@ def surface_plot(exp):
     fig.update_layout(
         template="plotly_white",
         title="Поверхность: " + ref.field_label,
-        scene=dict(xaxis_title="x", yaxis_title="y", zaxis_title="u"),
+        scene=dict(xaxis_title="x", yaxis_title="z", zaxis_title="u"),
         height=570,
         legend=dict(orientation="h", y=-0.08),
     )
@@ -449,7 +449,7 @@ def residual_plot(exp, scale="linear"):
         y=baseline.extras["tolerance"],
         line_dash="dash",
         line_color="#d77923",
-        annotation_text=f'Допуск {baseline.extras["tolerance"]:g}',
+        annotation_text=f"Допуск {baseline.extras['tolerance']:g}",
     )
     label = "Линейная шкала" if scale == "linear" else "Логарифмическая шкала"
     fig.update_layout(
@@ -503,7 +503,7 @@ def trajectory_plot(exp):
         title = f"Шаг {i}: вклад источника {val:.4g}"
         if complete:
             title += (
-                f'; граница {exp.trace["boundary"]:.4g}; итог {exp.trace["reward"]:.4g}'
+                f"; граница {exp.trace['boundary']:.4g}; итог {exp.trace['reward']:.4g}"
             )
         frames.append(
             go.Frame(
@@ -518,7 +518,7 @@ def trajectory_plot(exp):
         template="plotly_white",
         title="Одна отдельная траектория: расчёт вклада",
         xaxis=dict(title="x", range=[0, 1]),
-        yaxis=dict(title="y", range=[0, 1], scaleanchor="x"),
+        yaxis=dict(title="z", range=[0, 1], scaleanchor="x"),
         height=560,
         updatemenus=[
             dict(
@@ -624,7 +624,7 @@ def reuse_plot(exp):
     for j, i in enumerate(starts):
         value = exp.trace["reward"] - exp.trace["source"][i]
         label = (
-            f"Узел ({path[i,1]}, {path[i,0]}) · первый визит {i} · вклад {value:.4g}"
+            f"Узел ({path[i, 1]}, {path[i, 0]}) · первый визит {i} · вклад {value:.4g}"
         )
         labels.append(label)
         fig.add_trace(
@@ -664,7 +664,7 @@ def reuse_plot(exp):
         title=labels[0],
         showlegend=False,
         xaxis=dict(title="x", range=[0, 1]),
-        yaxis=dict(title="y", range=[0, 1], scaleanchor="x"),
+        yaxis=dict(title="z", range=[0, 1], scaleanchor="x"),
         updatemenus=[dict(buttons=buttons, x=0, y=1.2, xanchor="left")],
         margin=dict(t=110),
     )
@@ -709,7 +709,7 @@ def layer_plot(exp):
         height=560,
         plot_bgcolor="#e8edf0",
         xaxis=dict(title="x", range=[0, 1]),
-        yaxis=dict(title="y", range=[0, 1], scaleanchor="x"),
+        yaxis=dict(title="z", range=[0, 1], scaleanchor="x"),
         updatemenus=[
             dict(
                 type="buttons",
@@ -790,10 +790,10 @@ def animations(exp, out):
             ms=2,
         )
         ax.scatter(path[0, 1] / n, path[0, 0] / n, c="black", s=55, zorder=3)
-        label = f'Шаг {i} · накопленный источник: {exp.trace["source"][i]:.3f}'
+        label = f"Шаг {i} · накопленный источник: {exp.trace['source'][i]:.3f}"
         if i == len(path) - 1:
-            label += f'\nИтог пути: {exp.trace["reward"]:.3f}'
-        ax.set(xlim=(0, 1), ylim=(0, 1), xlabel="x", ylabel="y", title=label)
+            label += f"\nИтог пути: {exp.trace['reward']:.3f}"
+        ax.set(xlim=(0, 1), ylim=(0, 1), xlabel="x", ylabel="z", title=label)
         fig.supxlabel(
             "Фон: "
             + exp.comparison.field_label
@@ -826,7 +826,7 @@ def animations(exp, out):
                 xlim=(0, 1),
                 ylim=(0, 1),
                 xlabel="x",
-                ylabel="y",
+                ylabel="z",
                 title=f"Факторизованный сеточный метод · итерация {it}",
             )
             fig.supxlabel(
@@ -981,21 +981,21 @@ def export(exp, out, with_gifs=True):
     )
     for r in exp.metrics:
         value_cell = (
-            f'<td>{exp.results[r["method"]].values[tuple(exp.points[0])]:.6g}</td>'
+            f"<td>{exp.results[r['method']].values[tuple(exp.points[0])]:.6g}</td>"
             if len(exp.points) == 1
             else ""
         )
         relative = (
-            "—" if r["relative_error_pct"] is None else f'{r["relative_error_pct"]:.5g}'
+            "—" if r["relative_error_pct"] is None else f"{r['relative_error_pct']:.5g}"
         )
         table += (
-            f'<tr><td>{html.escape(r["name"])}</td>'
+            f"<tr><td>{html.escape(r['name'])}</td>"
             + value_cell
-            + f'<td>{r["seconds"]*1000:.3f}</td><td>{r["rmse"]:.5g}</td><td>{relative}</td><td>{r["walks"]}</td><td>{r["steps"]}</td><td>{r["iterations"]}</td></tr>'
+            + f"<td>{r['seconds'] * 1000:.3f}</td><td>{r['rmse']:.5g}</td><td>{relative}</td><td>{r['walks']}</td><td>{r['steps']}</td><td>{r['iterations']}</td></tr>"
         )
     table += "</table>"
     document = """<!doctype html><html lang="ru"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PDE Lab — результаты</title><style>body{font:16px/1.5 system-ui,sans-serif;color:#193247;background:#f3f6f8;margin:0}main{max-width:1100px;margin:auto;padding:24px}section{background:white;padding:22px;margin:20px 0;border-radius:12px}h1{font-size:30px}h2{font-size:22px}p{color:#516579}table{border-collapse:collapse;width:100%;font-size:14px}td,th{border-bottom:1px solid #ddd;padding:10px;text-align:left}.scroll{overflow:auto}a{color:#2864b1}</style><main><h1>Сеточный метод и Монте-Карло</h1>"""
-    document += f"<p>{html.escape(exp.problem.name)} · сетка {exp.problem.n+1}×{exp.problem.n+1} · запрошено точек: {len(exp.points)} · seed {exp.config.seed}</p>"
+    document += f"<p>{html.escape(exp.problem.name)} · сетка {exp.problem.n + 1}×{exp.problem.n + 1} · запрошено точек: {len(exp.points)} · seed {exp.config.seed}</p>"
     document += (
         "<section><h2>Эталон: "
         + html.escape(ref.label)
@@ -1025,7 +1025,7 @@ def benchmark_figure(rows):
             group = [r for r in subset if r["budget"] == b]
             ts.append(np.median([r["seconds"] for r in group]))
             es.append(max(1e-14, np.sqrt(np.mean([r["rmse"] ** 2 for r in group]))))
-            labels.append(("отн. tol=" if m.startswith("lod_") else "N=") + str(b))
+            labels.append(("отн. tol=" if m.startswith("lod_") else "N_MC=") + str(b))
         if ts:
             fig.add_trace(
                 go.Scatter(
@@ -1067,7 +1067,7 @@ def benchmark_plot(rows, out):
             group = [r for r in subset if r["budget"] == b]
             ts.append(np.median([r["seconds"] for r in group]))
             es.append(max(1e-14, np.sqrt(np.mean([r["rmse"] ** 2 for r in group]))))
-            labels.append(("отн. tol=" if m.startswith("lod_") else "N=") + str(b))
+            labels.append(("отн. tol=" if m.startswith("lod_") else "N_MC=") + str(b))
         ax.loglog(ts, es, "o-", color=COLORS[m], label=METHODS[m])
         ax.scatter(
             [r["seconds"] for r in subset],

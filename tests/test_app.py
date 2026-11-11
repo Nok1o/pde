@@ -94,3 +94,41 @@ def test_research_patch_renders_vector_reference():
     app.button(key="research_run").click().run()
     assert not app.exception
     assert len(app.session_state["research_result"].reference_value) == 9
+
+
+def test_research_keeps_active_section_and_main_button_opens_results():
+    app = AppTest.from_file(
+        str(Path(__file__).parents[1] / "app.py"), default_timeout=60
+    ).run()
+    app.session_state["main_sections"] = "Исследование"
+    app.select_slider(key="research_n").set_value(8)
+    app.number_input(key="research_repeats").set_value(2)
+    app.select_slider(key="research_max_walks").set_value(64)
+    app.run()
+    app.button(key="research_run").click().run()
+    assert not app.exception
+    assert app.session_state["main_sections"] == "Исследование"
+    assert "research_result" in app.session_state
+    table = app.dataframe[0].value
+    assert not table.isna().any().any()
+    assert any(
+        "N=64" in str(cell) for cell in app.dataframe[1].value.to_numpy().ravel()
+    )
+    app.button(key="main_run").click().run()
+    assert not app.exception
+    assert app.session_state["main_sections"] == "Обзор"
+    assert "experiment" in app.session_state
+
+
+def test_mixed_cube_main_action_selects_its_actual_result_section():
+    app = AppTest.from_file(
+        str(Path(__file__).parents[1] / "app.py"), default_timeout=60
+    ).run()
+    app.radio(key="dimension").set_value("3D").run()
+    app.radio(key="cube_boundary_mode").set_value("Смешанные: 1, 2, 3 рода").run()
+    app.multiselect(key="bc3d_methods").set_value(["lod_serial"]).run()
+    app.session_state["boundary3d_sections"] = "Исследование"
+    app.run()
+    app.button(key="bc3d_run").click().run()
+    assert not app.exception and not app.error
+    assert app.session_state["boundary3d_sections"] == "Сравнение и срезы"

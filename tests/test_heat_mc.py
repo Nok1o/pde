@@ -167,7 +167,10 @@ def test_research_uses_full_solves_and_independent_validation():
     assert study["settings"]["T"] == 0.03 and study["settings"]["point_yx"] == [3, 4]
     for row in study["rows"]:
         if row["status"] == "reached":
-            assert row["calibration_error_pct"] <= row["target_pct"]
+            assert row["calibration_error_pct"] <= row["calibration_target_pct"]
+            if row["calibration_margin_relaxed"]:
+                assert row["budget"] == 256
+                assert row["calibration_target_pct"] == row["target_pct"]
             assert row["validation_error_pct"] <= row["target_pct"]
             times = [
                 r["seconds"]
@@ -239,7 +242,7 @@ def test_research_reports_transition_failure_without_publishing_times():
     )
 
 
-def test_failed_final_validation_never_restarts_budget_search(monkeypatch):
+def test_failed_validation_retries_larger_budget(monkeypatch):
     from types import SimpleNamespace
 
     import pdelab.heat_mc_study as module
@@ -255,9 +258,8 @@ def test_failed_final_validation_never_restarts_budget_search(monkeypatch):
 
     def estimate(*args, walks, **kwargs):
         budgets.append(walks)
-        # Calibration passes all targets; final validation fails all targets.
-        # Larger budgets would pass if incorrectly revisited after validation.
-        value = (1.005 if len(budgets) <= 2 else 1.12) if walks == 64 else 1.0
+        # Three pilot batches pass; validation fails at 64 and passes at 128.
+        value = (1.005 if len(budgets) <= 6 else 1.12) if walks == 64 else 1.0
         return SimpleNamespace(
             values=np.array([value]),
             seconds=0.01,
@@ -270,11 +272,10 @@ def test_failed_final_validation_never_restarts_budget_search(monkeypatch):
     monkeypatch.setattr(module, "solve_heat_mc", estimate)
     study = module.heat_mc_study(p, dt=0.01, T=0.02, repeats=2, max_walks=256)
     rows = [row for row in study["rows"] if row["method"] == "mc"]
-    assert budgets == [64] * 4
+    assert budgets == [64] * 8 + [128] * 8
     assert len(rows) == 3
-    assert all(
-        row["status"] == "not_confirmed" and row["seconds"] is None for row in rows
-    )
-    assert all(row["budget"] == 64 for row in rows)
-    assert all(row["calibration_error_pct"] == pytest.approx(0.5) for row in rows)
-    assert all(row["validation_error_pct"] == pytest.approx(12) for row in rows)
+    assert all(row["status"] == "reached" and row["seconds"] == 0.01 for row in rows)
+    assert all(row["budget"] == 128 for row in rows)
+    assert all(row["validation_attempts"] == 2 for row in rows)
+    assert all(row["calibration_error_pct"] == 0 for row in rows)
+    assert all(row["validation_error_pct"] == 0 for row in rows)

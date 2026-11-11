@@ -15,7 +15,7 @@ from .graded import graded_axis
 
 _warmed_dimensions = set()
 
-EXTENDED_METHODS = {"wos": "WoS · Дирихле", "graded": "MC · сгущённая сетка"}
+EXTENDED_METHODS = {"wos": "WoS · 1-й род", "graded": "MC · сгущённая сетка"}
 
 
 @njit(cache=True)
@@ -176,7 +176,7 @@ def graded_boundary_operator(problem):
     operator = op_type(sampled, axis=axis)
     operator.check_compatibility()
     if operator.pure_neumann:
-        raise ValueError("MC без поглощения для чистого Неймана не реализован")
+        raise ValueError("MC без поглощения для условий только 2-го рода не реализован")
     return operator, axis
 
 
@@ -220,7 +220,9 @@ def solve_extended(
         and hasattr(problem, "sides")
         and any(c.kind != "dirichlet" for c in problem.sides.values())
     ):
-        raise ValueError("Непрерывный WoS требует Дирихле на всех сторонах/гранях")
+        raise ValueError(
+            "Непрерывный WoS требует условий 1-го рода на всех сторонах/гранях"
+        )
     with NUMBA_LOCK:
         if dimension not in _warmed_dimensions:
             # Compile small signatures before timing. No solution/reference preparation here.
@@ -323,17 +325,19 @@ def solve_extended(
 def render_method_scope(dimension, mixed=False):
     import streamlit as st
 
-    with st.expander("Методы: схемы и область применимости"):
+    with st.expander(
+        "Методы: схемы и область применимости", key="stationary_extensions_expander_326"
+    ):
         st.write(
             "ЛОМ и обычный MC решают одну равномерную разностную систему. Сгущённая сетка и WoS имеют собственные погрешности аппроксимации; сравниваются значения в одной физической точке."
         )
         st.latex(r"x_i=\tfrac12(2i/n)^2\ (i\le n/2),\quad x_{n-i}=1-x_i")
         st.write(
-            "Сгущённая сетка: консервативные контрольные объёмы; отражение на Неймане и частичное поглощение на Робине. Между узлами используется случайная интерполяция начальной точки."
+            "Сгущённая сетка: консервативные контрольные объёмы; отражение при условиях 2-го рода и частичное поглощение при условиях 3-го рода. Между узлами используется случайная интерполяция начальной точки."
         )
         if mixed:
             st.write(
-                "Непрерывный WoS для Неймана/Робина не реализован. Чистый Нейман: только ЛОМ с проверкой баланса и фиксацией среднего; поглощающий MC неприменим."
+                "Непрерывный WoS для условий 2-го и 3-го рода не реализован. Условия только 2-го рода: только ЛОМ с проверкой баланса и фиксацией среднего; поглощающий MC неприменим."
             )
         else:
             st.latex(

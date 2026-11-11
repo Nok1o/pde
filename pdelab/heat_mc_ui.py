@@ -11,6 +11,7 @@ from .heat import make_heat_problem, solve_heat, time_grid
 from .heat_mc import heat_mc_step, solve_heat_mc
 from .heat_mc_study import VALIDATION_POLICY, heat_mc_study
 from .heat_mc_views import heat_mc_archive
+from .study_policy import render_accuracy_results
 
 
 def _limit(settings, walks, diagnostic=False):
@@ -27,13 +28,13 @@ def _limit(settings, walks, diagnostic=False):
 def render_heat_mc(settings):
     st.subheader("Монте-Карло в пространстве и времени")
     st.caption(
-        "Самостоятельные траектории идут назад до u₀ или границы. Источник и граница всех нужных времён входят в подготовку и полное время."
+        "Самостоятельные траектории идут назад до μ или границы. Источник и граница всех нужных времён входят в подготовку и полное время."
     )
     diagnostic = st.checkbox(
-        "Диагностика только первого шага с заданным u₀", key="heat_mc_diagnostic"
+        "Диагностика только первого шага с заданным μ", key="heat_mc_diagnostic"
     )
     x = st.slider("Точка MC по x", 1, settings.n - 1, settings.n // 2, key="heat_mc_x")
-    y = st.slider("Точка MC по y", 1, settings.n - 1, settings.n // 2, key="heat_mc_y")
+    y = st.slider("Точка MC по z", 1, settings.n - 1, settings.n // 2, key="heat_mc_y")
     walks = st.select_slider(
         "Полных траекторий на точку",
         [64, 256, 1024, 4096, 16384, 65536],
@@ -93,11 +94,11 @@ def render_heat_mc(settings):
         f"Полное время MC: {result.seconds:.4g} с; подготовка: {result.preparation_seconds:.4g} с; траектории: {result.path_seconds:.4g} с. Прямой расчёт до того же t: {direct.seconds:.4g} с."
     )
     st.write(
-        f"Переходы: {result.spatial_transitions} пространственных и {result.temporal_transitions} временных. Численные буферы: {result.memory_bytes/2**20:.3g} МиБ (без памяти процесса и JIT)."
+        f"Переходы: {result.spatial_transitions} пространственных и {result.temporal_transitions} временных. Численные буферы: {result.memory_bytes / 2**20:.3g} МиБ (без памяти процесса и JIT)."
     )
     if result.diagnostic_step:
         st.info(
-            "Диагностика первого шага: u₀ задано. Этот замер не является расчётом всей истории до выбранного T."
+            "Диагностика первого шага: μ задано. Этот замер не является расчётом всей истории до выбранного T."
         )
     st.download_button(
         "Скачать MC по времени ZIP",
@@ -105,13 +106,14 @@ def render_heat_mc(settings):
         "heat-mc-results.zip",
         "application/zip",
         key="heat_mc_download",
+        on_click="ignore",
     )
 
 
 def render_heat_mc_study(settings):
     st.subheader("Время достижения 1%, 5% и 10%")
     st.caption(
-        "Сравниваются полные расчёты до T. Порог проверяется по RMSE независимых запусков, затем новой серией; подбор и эталон исключены из табличного времени."
+        "Сравниваются полные расчёты до T. Порог проверяется по средней относительной ошибке независимых запусков, затем новой серией; подбор и эталон исключены из табличного времени."
     )
     x = st.slider(
         "Точка исследования по x",
@@ -121,7 +123,7 @@ def render_heat_mc_study(settings):
         key="heat_study_x",
     )
     y = st.slider(
-        "Точка исследования по y",
+        "Точка исследования по z",
         1,
         settings.n - 1,
         settings.n // 2,
@@ -142,7 +144,7 @@ def render_heat_mc_study(settings):
         key="heat_study_walks",
     )
     seconds = st.number_input(
-        "Лимит поиска на метод, с",
+        "Лимит каждой фазы на метод, с",
         min_value=1.0,
         max_value=300.0,
         value=10.0,
@@ -183,16 +185,10 @@ def render_heat_mc_study(settings):
     if current != previous:
         st.info("Настройки исследования изменены. Выполните новую серию.")
     table = pd.DataFrame(study["rows"])
-    st.dataframe(
-        table.pivot(index="target_pct", columns="method", values="seconds").rename(
-            columns={
-                "lod": "ЛОМ, полное время до T, с",
-                "mc": "MC, полное время до T, с",
-            }
-        ),
-        column_config={"target_pct": "Порог ошибки, %"},
+    render_accuracy_results(
+        study["rows"], {"lod": "ЛОМ", "mc": "Монте-Карло"}, key="heat_study_results"
     )
-    with st.expander("Статусы и отдельные замеры"):
+    with st.expander("Статусы и отдельные замеры", key="heat_mc_ui_expander_189"):
         st.dataframe(table, hide_index=True)
         st.dataframe(pd.DataFrame(study["trials"]), hide_index=True)
     st.download_button(
@@ -201,4 +197,5 @@ def render_heat_mc_study(settings):
         "heat-mc-study.json",
         "application/json",
         key="heat_study_download",
+        on_click="ignore",
     )

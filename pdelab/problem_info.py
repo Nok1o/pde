@@ -16,10 +16,14 @@ def _number(value):
 
 def render_problem_info(cfg):
     """Render the currently selected conditions, before any calculation is run."""
-    with st.expander(f"Формулы и описание: {PRESETS[cfg.problem]}", expanded=True):
+    with st.expander(
+        f"Формулы и описание: {PRESETS[cfg.problem]}",
+        expanded=False,
+        key="problem_info_expander_19"
+        + str(f"Формулы и описание: {PRESETS[cfg.problem]}"),
+    ):
         st.caption(
-            "Все случаи — двумерные стационарные задачи в единичном квадрате: "
-            "0 ≤ x ≤ 1, 0 ≤ y ≤ 1. Ищем поле u(x, y), например установившуюся температуру."
+            "Все случаи — двумерные стационарные задачи в единичном квадрате: 0 ≤ x ≤ 1, 0 ≤ z ≤ 1. Ищем поле u(x, z), например установившуюся температуру."
         )
         if cfg.problem == "hot_top":
             st.write(
@@ -44,18 +48,22 @@ def render_problem_info(cfg):
             )
 
         st.markdown("**Уравнение внутри квадрата**")
+        st.latex(r"\Delta u+f=0,\qquad f_{\Delta}=-f")
+        st.caption(
+            "f — источник тепла по лекциям; fΔ — правая часть Δu=fΔ в данных программы."
+        )
         st.latex(
-            r"\Delta u = \frac{\partial^2 u}{\partial x^2}"
-            r" + \frac{\partial^2 u}{\partial y^2} = f(x,y)"
+            r"\Delta u = \frac{\partial^2 u}{\partial x^2} + \frac{\partial^2 u}{\partial z^2} = f_{\Delta}"
+            r"(x,z)"
         )
         if cfg.problem == "hot_top":
-            st.latex(rf"f(x,y) = {_number(cfg.source)}")
+            st.latex(rf"f_{{\Delta}}(x,z) = {_number(cfg.source)}")
         elif cfg.problem == "polynomial":
-            st.latex(r"f(x,y) = -2000\bigl[x(1-x)+y(1-y)\bigr]")
+            st.latex(r"f_{\Delta}(x,z) = -2000\bigl[x(1-x)+z(1-z)\bigr]")
         elif cfg.problem == "sine":
-            st.latex(r"f(x,y) = -200\pi^2\sin(\pi x)\sin(\pi y)")
+            st.latex(r"f_{\Delta}(x,z) = -200\pi^2\sin(\pi x)\sin(\pi z)")
         else:
-            st.latex(r"f(x,y)=0")
+            st.latex(r"f_{\Delta}(x,z)=0")
 
         st.markdown("**Граничные условия — известные значения на сторонах**")
         if cfg.problem == "hot_top":
@@ -63,20 +71,16 @@ def render_problem_info(cfg):
                 r"\begin{aligned}"
                 rf"u(x,1)&={_number(cfg.top)} &&\text{{верх}}\\"
                 rf"u(x,0)&={_number(cfg.bottom)} &&\text{{низ}}\\"
-                rf"u(0,y)&={_number(cfg.left)} &&\text{{левая сторона}}\\"
-                rf"u(1,y)&={_number(cfg.right)} &&\text{{правая сторона}}"
+                rf"u(0,z)&={_number(cfg.left)} &&\text{{левая сторона}}\\"
+                rf"u(1,z)&={_number(cfg.right)} &&\text{{правая сторона}}"
                 r"\end{aligned}"
             )
         elif cfg.problem in ("polynomial", "sine"):
-            st.latex(r"u(x,0)=u(x,1)=0,\qquad u(0,y)=u(1,y)=0")
+            st.latex(r"u(x,0)=u(x,1)=0,\qquad u(0,z)=u(1,z)=0")
         else:
             st.latex(
-                r"\begin{aligned}"
-                r"u(x,1)&=40+20x &&\text{верх}\\"
-                r"u(x,0)&=10+20x &&\text{низ}\\"
-                r"u(0,y)&=10+30y &&\text{левая сторона}\\"
-                r"u(1,y)&=30+30y &&\text{правая сторона}"
-                r"\end{aligned}"
+                r"\begin{aligned}u(x,1)&=40+20x &&\text{верх}\\u(x,0)&=10+20x &&\text{низ}\\u(0,z)&=10+30z "
+                r"&&\text{левая сторона}\\u(1,z)&=30+30z &&\text{правая сторона}\end{aligned}"
             )
 
         if cfg.problem == "hot_top":
@@ -85,8 +89,7 @@ def render_problem_info(cfg):
                 center = sum(v / 4 for v in (cfg.top, cfg.bottom, cfg.left, cfg.right))
                 st.latex(rf"u\!\left(\frac12,\frac12\right)={_number(center)}")
                 st.write(
-                    "При постоянных значениях сторон и f = 0 ответ в центре равен "
-                    "среднему четырёх граничных значений. Это следует из симметрии квадрата."
+                    "При постоянных значениях сторон и fΔ = 0 ответ в центре равен среднему четырёх граничных значений. Это следует из симметрии квадрата."
                 )
             else:
                 st.write(
@@ -99,14 +102,13 @@ def render_problem_info(cfg):
             )
             if cfg.source != 0:
                 st.caption(
-                    "Знак источника: в принятой записи Δu = f нагрев соответствует отрицательному f "
-                    "(для теплопроводности с единичным коэффициентом)."
+                    "Знак источника: в принятой записи Δu = fΔ нагрев соответствует отрицательному fΔ = −f (для теплопроводности с единичным коэффициентом)."
                 )
         else:
             st.markdown("**Известное точное решение**")
             solutions = {
                 "polynomial": r"u_*(x,y)=1000x(1-x)y(1-y)",
-                "sine": r"u_*(x,y)=100\sin(\pi x)\sin(\pi y)",
+                "sine": "u_*(x,z)=100\\sin(\\pi x)\\sin(\\pi z)",
                 "affine": r"u_*(x,y)=10+20x+30y",
             }
             st.latex(solutions[cfg.problem])
