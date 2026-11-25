@@ -7,7 +7,9 @@ from scipy.integrate import solve_ivp
 from scipy.stats import t as student_t
 
 from .nonlinear import (
+    NONLINEAR_MC_METHODS,
     NonlinearSettings,
+    failure_message,
     make_nonlinear_problem,
     newton_system,
     solve_nonlinear,
@@ -17,6 +19,7 @@ from .study_policy import (
     ACCURACY_DESCRIPTION,
     ACCURACY_METRIC,
     SELECTION_POLICY,
+    RetryableSolverError,
     mean_relative_error,
     phase_seed_index,
     search_budgets,
@@ -445,6 +448,7 @@ def nonlinear_targets(
     *,
     settings=None,
     deterministic=None,
+    variants=None,
 ):
     """Select with stable full-chain pilots and retry checks at larger budgets."""
     if not budgets or any(isinstance(n, bool) or int(n) != n or n < 2 for n in budgets):
@@ -456,6 +460,57 @@ def nonlinear_targets(
         if settings is None
         else settings
     )
+    if variants is not None:
+        validate_variants(variants)
+        rows = []
+        evidence = dict(
+            selection_policy=SELECTION_POLICY,
+            accuracy_metric=ACCURACY_METRIC,
+            accuracy=ACCURACY_DESCRIPTION,
+            pilots=[],
+            validations=[],
+            deterministic_runs=[],
+        )
+        for index, variant in enumerate(variants):
+            selected, proof = nonlinear_targets(
+                problem,
+                dt,
+                T,
+                point,
+                repeats,
+                budgets,
+                seed,
+                settings=replace(base, mc_variant=variant),
+                deterministic=deterministic,
+            )
+            for row in selected:
+                if row["method"] == "picard" and index:
+                    continue
+                rows.append(
+                    {**row, "method": variant if row["method"] == "mc" else "picard"}
+                )
+            for phase in ("pilots", "validations"):
+                for record in proof[phase]:
+                    evidence[phase].append(
+                        {
+                            **record,
+                            "variant": variant,
+                            "metrics": [
+                                {
+                                    **metric,
+                                    "method": (
+                                        variant
+                                        if metric["method"] == "mc"
+                                        else "picard"
+                                    ),
+                                }
+                                for metric in record["metrics"]
+                            ],
+                        }
+                    )
+            if not index:
+                evidence["deterministic_runs"] = proof["deterministic_runs"]
+        return rows, evidence
     if any(budget > base.max_walks for budget in budgets):
         raise ValueError("Начальный бюджет исследования не должен превышать max_walks")
     pilots = []
@@ -478,10 +533,18 @@ def nonlinear_targets(
             pilots.append((candidate, comparison, phase))
         metric = comparison.metrics[1]
         if not metric["completed"]:
-            reasons = sorted(
-                {r.reason for r in comparison.stochastic if not r.completed}
+            failed = [r for r in comparison.stochastic if not r.completed]
+            # More independent paths can resolve stochastic Picard nonconvergence.
+            # Resource exhaustion and invalid operators still stop the search.
+            error_type = (
+                RetryableSolverError
+                if all(r.reason.endswith(": max_outer") for r in failed)
+                else RuntimeError
             )
-            raise RuntimeError("; ".join(reasons))
+            raise error_type(
+                f"Не завершено {len(failed)}/{len(comparison.stochastic)} запусков. "
+                + failure_message(failed[0])
+            )
         if metric["relative_error_pct"] is None:
             raise RuntimeError("Нулевой эталон: относительная ошибка не определена")
         return dict(
@@ -548,6 +611,7 @@ def nonlinear_targets(
                 phase=phase,
                 metrics=c.metrics,
                 seeds=[r.settings.seed for r in c.stochastic],
+                failures=[failure_message(r) for r in c.stochastic if not r.completed],
             )
             for s, c, phase in pilots
         ],
@@ -556,8 +620,41 @@ def nonlinear_targets(
                 candidate=i,
                 metrics=c.metrics,
                 seeds=[r.settings.seed for r in c.stochastic],
+                failures=[failure_message(r) for r in c.stochastic if not r.completed],
             )
             for i, c in validations.items()
         ],
     )
     return rows, evidence
+
+
+def validate_variants(variants):
+    if (
+        not variants
+        or len(set(variants)) != len(variants)
+        or any(v not in NONLINEAR_MC_METHODS for v in variants)
+    ):
+        raise ValueError("Выберите различные варианты MC")
+
+
+def compare_nonlinear_methods(
+    problem, dt, T, point, repeats, deterministic, stochastic, variants
+):
+    validate_variants(variants)
+    from .heat import time_grid
+
+    times, _ = time_grid(dt, T)
+    if len(times) * (problem.n + 1) ** 2 * (repeats + 3) * len(variants) > 8_000_000:
+        raise ValueError("Все ансамбли вместе ограничены 8 млн значений")
+    return {
+        variant: compare_nonlinear(
+            problem,
+            dt,
+            T,
+            point,
+            repeats,
+            deterministic,
+            replace(stochastic, mc_variant=variant),
+        )
+        for variant in variants
+    }

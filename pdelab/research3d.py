@@ -77,6 +77,7 @@ def _series3d(study, problem, points, method, budget, budget_index, phase, deadl
             tol=float(budget) if method == "lod_serial" else config.tol,
             seed=seed,
             max_iter=config.max_iter,
+            coarse_n=config.coarse_n if method == "mc_control" else None,
         )
         if not result.converged:
             raise RuntimeError("ЛОМ не достиг допуска невязки")
@@ -100,6 +101,9 @@ def _series3d(study, problem, points, method, budget, budget_index, phase, deadl
                 "steps": result.steps,
                 "walks": result.walks,
                 "iterations": result.iterations,
+                "coarse_n": result.extras.get("coarse_n"),
+                "preparation_seconds": result.extras.get("preparation_seconds"),
+                "path_seconds": result.extras.get("path_seconds"),
             }
         )
     error = mean_relative_error(values, study.reference_value)
@@ -114,9 +118,7 @@ def accuracy_study3d(settings, progress=None):
         or len(set(methods)) != len(methods)
         or any(method not in METHODS_3D for method in methods)
     ):
-        raise ValueError(
-            "Для исследования выберите различные методы lod_serial и/или mc"
-        )
+        raise ValueError("Для исследования выберите различные доступные методы 3D")
     for name, value, lower in (
         ("repeats", settings.repeats, 2),
         ("max_walks", settings.max_walks, 2),

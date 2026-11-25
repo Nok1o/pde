@@ -7,7 +7,7 @@ from dataclasses import asdict
 from importlib.metadata import version
 from pathlib import Path
 
-from .nonlinear import NonlinearSettings, make_nonlinear_problem
+from .nonlinear import NONLINEAR_MC_METHODS, NonlinearSettings, make_nonlinear_problem
 from .nonlinear_io import csv_bytes, export_comparison, json_bytes, study_figure
 from .nonlinear_study import (
     compare_nonlinear,
@@ -43,6 +43,15 @@ def main(argv=None):
     parser.add_argument("--point", nargs=2, type=int, metavar=("X", "Z"))
     parser.add_argument("--repeats", type=int, default=4)
     parser.add_argument("--walks", type=int, default=128)
+    parser.add_argument(
+        "--mc-variant", choices=list(NONLINEAR_MC_METHODS), default="mc"
+    )
+    parser.add_argument(
+        "--variants",
+        nargs="+",
+        choices=list(NONLINEAR_MC_METHODS),
+        help="Варианты для targets; для run используйте --mc-variant",
+    )
     parser.add_argument("--max-walks", type=int, default=2048)
     parser.add_argument(
         "--schedule", choices=["constant", "linear", "geometric"], default="geometric"
@@ -67,6 +76,8 @@ def main(argv=None):
     parser.add_argument("--out", type=Path, default=Path("runs/nonlinear"))
     argv = sys.argv[1:] if argv is None else list(argv)
     args = parser.parse_args(argv)
+    if args.variants is not None and args.command != "targets":
+        parser.error("--variants применяется только к targets")
     if args.command == "study":
         allowed = {"--repeats", "--seed", "--out"}
         rejected = [
@@ -91,6 +102,7 @@ def main(argv=None):
         max_steps=args.max_steps,
         seed=args.seed,
         max_total_walks=args.max_total_walks,
+        mc_variant=args.mc_variant,
     )
     deterministic = NonlinearSettings(
         tolerance=args.tol,
@@ -130,6 +142,9 @@ def main(argv=None):
                 args.seed,
                 settings=settings,
                 deterministic=deterministic,
+                variants=(
+                    args.variants if args.variants is not None else [args.mc_variant]
+                ),
             )
             (args.out / "targets.csv").write_bytes(csv_bytes(rows))
             (args.out / "target-evidence.json").write_bytes(json_bytes(evidence))
@@ -192,6 +207,11 @@ def main(argv=None):
                             mc=asdict(settings),
                             picard=asdict(deterministic),
                             budgets=args.budgets,
+                            variants=(
+                                args.variants
+                                if args.variants is not None
+                                else [args.mc_variant]
+                            ),
                         )
                     ),
                     repeats=args.repeats,

@@ -147,8 +147,18 @@ def main(argv=None):
         command_parser.add_argument("--point", type=int, nargs=2, metavar=("X", "Z"))
         command_parser.add_argument("--seed", type=int, default=42)
         command_parser.add_argument("--max-transitions", type=int, default=1000000)
+        command_parser.add_argument("--coarse-n", type=int)
         command_parser.add_argument("--out", type=Path, default=Path("runs") / name)
     subparsers.choices["heat-mc"].add_argument("--walks", type=int, default=4096)
+    subparsers.choices["heat-mc"].add_argument(
+        "--method", choices=["mc", "mc_control"], default="mc"
+    )
+    subparsers.choices["heat-mc-study"].add_argument(
+        "--methods",
+        nargs="+",
+        choices=["lod", "mc", "mc_control"],
+        default=["lod", "mc", "mc_control"],
+    )
     subparsers.choices["heat-mc-study"].add_argument("--repeats", type=int, default=5)
     subparsers.choices["heat-mc-study"].add_argument(
         "--max-walks", type=int, default=16384
@@ -175,6 +185,8 @@ def main(argv=None):
                     args.walks,
                     args.seed,
                     args.max_transitions,
+                    method=args.method,
+                    coarse_n=args.coarse_n,
                 )
                 export_heat_mc(result, problem, args.dt, args.out)
                 print(
@@ -191,6 +203,8 @@ def main(argv=None):
                     args.seed,
                     args.seconds_per_method,
                     args.max_transitions,
+                    methods=args.methods,
+                    coarse_n=args.coarse_n,
                 )
                 export_heat_mc_study(study, args.out)
             print(f"Результат: {args.out.resolve()}")

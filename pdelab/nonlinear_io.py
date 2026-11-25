@@ -11,6 +11,12 @@ import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
+from .nonlinear import NONLINEAR_MC_METHODS
+
+
+def mc_label(comparison):
+    return NONLINEAR_MC_METHODS[comparison.stochastic[0].settings.mc_variant]
+
 
 def json_data(value):
     if isinstance(value, dict):
@@ -51,6 +57,11 @@ def history_rows(comparison):
                 rows.append(
                     dict(
                         method=result.method,
+                        mc_variant=(
+                            result.settings.mc_variant
+                            if result.method == "mc"
+                            else None
+                        ),
                         repeat=repeat,
                         layer=index,
                         time=float(result.times[index]),
@@ -110,7 +121,9 @@ def time_figure(comparison):
             )
         )
         figure.add_trace(
-            go.Scatter(x=reference.times, y=mean, name="Picard + MC · среднее")
+            go.Scatter(
+                x=reference.times, y=mean, name=mc_label(comparison) + " · среднее"
+            )
         )
     figure.update_layout(
         xaxis_title="Физическое время t", yaxis_title="u в выбранной точке", height=400
@@ -132,7 +145,7 @@ def field_figure(comparison, error=False):
     if all(r.completed for r in comparison.stochastic):
         fields.append(
             (
-                "Picard + MC · среднее",
+                mc_label(comparison) + " · среднее",
                 np.mean([r.fields[-1] for r in comparison.stochastic], axis=0),
             )
         )
@@ -173,7 +186,7 @@ def residual_figure(comparison):
                         x=[row["outer"] for row in history],
                         y=[row["nonlinear_residual"] for row in history],
                         mode="lines+markers",
-                        name=f"{result.method} · слой {layer}",
+                        name=f"{mc_label(comparison) if result.method == 'mc' else 'Picard + ЛОМ'} · слой {layer}",
                     )
                 )
     figure.update_layout(
@@ -209,6 +222,7 @@ def comparison_files(comparison):
     np.savez_compressed(buffer, **arrays)
     all_results = [comparison.deterministic, *comparison.stochastic]
     payload = dict(
+        mc_variant=comparison.stochastic[0].settings.mc_variant,
         n=reference.problem.n,
         alpha=reference.problem.alpha,
         dt=reference.dt,

@@ -96,6 +96,34 @@ def test_failed_pilot_has_no_confirmed_mc_time():
     assert evidence["validations"] == []
 
 
+def test_plain_mc_nonconvergence_checks_all_requested_budgets_and_explains_failure():
+    rows, evidence = nonlinear_targets(
+        make_nonlinear_problem(8),
+        T=0.01,
+        repeats=2,
+        budgets=(32, 128, 512),
+        settings=NonlinearSettings(
+            tolerance=0.001,
+            change_tolerance=0.001,
+            relaxation=0.7,
+            max_outer=12,
+            max_walks=2048,
+            max_total_walks=2_000_000,
+            mc_variant="mc_plain",
+        ),
+    )
+    assert [p["settings"]["walks"] for p in evidence["pilots"]] == [32, 128, 512]
+    assert evidence["validations"] == []
+    for row in rows:
+        if row["method"] != "mc":
+            continue
+        assert row["status"] == "solver_failed" and row["seconds"] is None
+        assert row["walks"] == 512
+        assert "невязка" in row["reason"] and "допуск 0.001" in row["reason"]
+        assert "всего путей" in row["reason"]
+    assert all(p["failures"] for p in evidence["pilots"])
+
+
 def test_nonlinear_targets_retry_failed_check_on_fresh_larger_budget(monkeypatch):
     from types import SimpleNamespace
 
@@ -163,8 +191,13 @@ def test_ui_comparison_history_targets_export_and_old_modes():
     app = AppTest.from_file(
         Path(__file__).parents[1] / "app.py", default_timeout=60
     ).run()
-    app.radio(key="evolution").set_value("Нелинейная теплопроводность").run()
+    app.radio(key="evolution").set_value("Квазилинейная теплопроводность").run()
     assert not app.exception
+    assert set(app.multiselect(key="nl_methods_v2").value) == {
+        "mc_plain",
+        "mc",
+        "mc_reuse",
+    }
     app.select_slider(key="nl_n").set_value(4).run()
     app.number_input(key="nl_T").set_value(0.02)
     app.number_input(key="nl_repeats").set_value(2)
@@ -174,10 +207,21 @@ def test_ui_comparison_history_targets_export_and_old_modes():
     assert len(app.latex) >= 4
     app.button(key="nl_export").click().run()
     assert app.session_state["nl_archive"]
+    app.selectbox(key="nl_shown_method").set_value("mc_reuse").run()
+    assert "nl_archive" not in app.session_state
+    app.button(key="nl_export").click().run()
+    with zipfile.ZipFile(io.BytesIO(app.session_state["nl_archive"])) as archive:
+        assert json.loads(archive.read("experiment.json"))["mc_variant"] == "mc_reuse"
     app.multiselect(key="nl_budgets").set_value([32])
     app.button(key="nl_targets_run").click().run()
     assert not app.exception and not app.error
-    assert len(app.session_state["nl_targets"][1]) == 6
+    assert len(app.session_state["nl_targets"][1]) == 12
+    assert {r["method"] for r in app.session_state["nl_targets"][1]} == {
+        "picard",
+        "mc_plain",
+        "mc",
+        "mc_reuse",
+    }
     app.number_input(key="nl_alpha").set_value(1.0).run()
     assert any("изменены" in item.value for item in app.info)
     app.radio(key="evolution").set_value("Теплопроводность").run()
@@ -192,6 +236,35 @@ def test_fixed_study_rejects_ignored_arguments(tmp_path):
             main(["study", option, value, "--out", str(tmp_path)])
         assert error.value.code == 2
     assert not list(tmp_path.iterdir())
+
+
+def test_ui_example_replaces_old_widget_values_and_clears_stale_results():
+    app = AppTest.from_file(
+        Path(__file__).parents[1] / "app.py", default_timeout=60
+    ).run()
+    app.radio(key="evolution").set_value("Квазилинейная теплопроводность").run()
+    app.select_slider(key="nl_n").set_value(4).run()
+    app.number_input(key="nl_T").set_value(0.02)
+    app.number_input(key="nl_repeats").set_value(2)
+    app.button(key="nl_run").click().run()
+    assert app.session_state["nl_result"] is not None
+    app.button(key="nl_all_methods_example").click().run()
+    assert not app.exception and not app.error
+    assert app.select_slider(key="nl_n").value == 8
+    assert app.select_slider(key="nl_mc_tol").value == 0.03
+    assert app.number_input(key="nl_outer").value == 20
+    assert app.select_slider(key="nl_max_walks").value == 131072
+    assert app.number_input(key="nl_total_walks").value == 100_000_000
+    assert app.multiselect(key="nl_budgets").value == [128]
+    assert set(app.multiselect(key="nl_methods_v2").value) == {
+        "mc_plain",
+        "mc",
+        "mc_reuse",
+    }
+    assert (
+        "nl_result" not in app.session_state
+        and "nl_comparisons" not in app.session_state
+    )
 
 
 def test_fixed_study_records_actual_method_settings(monkeypatch, tmp_path):

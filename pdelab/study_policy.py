@@ -4,11 +4,15 @@ from time import perf_counter
 
 import numpy as np
 
-SELECTION_POLICY = "stable_pilot_adaptive_retry_v4"
+SELECTION_POLICY = "stable_pilot_adaptive_retry_v5"
 ACCURACY_METRIC = "mean_run_relative_l1_v1"
 ACCURACY_DESCRIPTION = "100 * mean_runs(sum_points(abs(u_run-reference)) / sum_points(abs(reference))); error of individual runs in the validation series"
 CALIBRATION_FRACTION = 0.5
 DETERMINISTIC_METHODS = {"lod", "lod_serial", "picard"}
+
+
+class RetryableSolverError(RuntimeError):
+    """An incomplete stochastic solve that may converge at a larger budget."""
 
 
 def mean_relative_error(values, reference):
@@ -173,6 +177,17 @@ def search_budgets(
                             else "solver_failed"
                         ),
                     )
+                    if isinstance(exc, RetryableSolverError):
+                        # Earlier completed pilots belong to another budget.
+                        # Keep them in attempts, not as this failed run's error.
+                        row.update(
+                            budget=None,
+                            calibration_error_pct=None,
+                            relative_error_pct=None,
+                            validation_seconds=None,
+                        )
+            if stochastic and isinstance(exc, RetryableSolverError):
+                continue
             break
         pilot_error = max(p["relative_error_pct"] for p in pilots)
         pilot_seconds = float(np.mean([p["seconds"] for p in pilots]))
@@ -210,6 +225,8 @@ def search_budgets(
                         status=f"Бюджет найден, проверка не завершена: {exc}",
                         status_code="validation_incomplete",
                     )
+            if stochastic and isinstance(exc, RetryableSolverError):
+                continue
             break
         error = confirmation["relative_error_pct"]
         for row in eligible:

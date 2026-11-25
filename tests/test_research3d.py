@@ -37,7 +37,7 @@ def test_failed_validation_retries_with_larger_budget_and_fresh_streams(monkeypa
         if row["method"] != "lod_serial":
             assert row["budget"] == 128
             assert row["validation_attempts"] == 2
-    for method in ("mc", "graded", "wos"):
+    for method in ("mc", "mc_control", "graded", "wos"):
         assert calls[(method, 64)] == calls[(method, 128)] == 8
         trials = [trial for trial in study.trials if trial["method"] == method]
         assert len({trial["seed"] for trial in trials}) == len(trials)
@@ -47,7 +47,7 @@ def test_real_study_and_export(tmp_path):
     study = accuracy_study3d(
         StudySettings3D(Config3D(problem="constant", n=8), repeats=2, max_walks=64)
     )
-    assert len(study.rows) == 12
+    assert len(study.rows) == 15
     assert all(row["status"] == "Достигнута" for row in study.rows)
     for row in study.rows:
         matching = [

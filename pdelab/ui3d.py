@@ -10,7 +10,7 @@ import pandas as pd
 import streamlit as st
 
 from .experiment3d import Config3D, experiment_payload3d, rows_csv, run_experiment3d
-from .problem3d import PRESETS_3D, workspace_bytes
+from .problem3d import DIRECT_MAX_N, PRESETS_3D, workspace_bytes
 from .research3d import (
     StudySettings3D,
     accuracy_study3d,
@@ -24,6 +24,19 @@ from .views3d import residual_figure3d, slice_figure3d
 from .workload3d import interactive_mc_limit_message
 
 GRIDS = [8, 12, 16, 24, 32, 48, 64]
+
+
+def _control_grid(n, key):
+    maximum = min(n, DIRECT_MAX_N)
+    if st.session_state.get(key, 4) > maximum:
+        st.session_state[key] = maximum
+    return st.number_input(
+        "Интервалов контрольной сетки",
+        min_value=4,
+        max_value=maximum,
+        value=max(4, n // 4),
+        key=key,
+    )
 
 
 def _point_controls(n, prefix):
@@ -129,6 +142,14 @@ def _research_tab(config):
             key="study3d_seconds",
             help="Проверяется между запусками. Начатый запуск завершается полностью.",
         )
+    methods = st.multiselect(
+        "Методы исследования",
+        list(METHODS_3D),
+        default=list(METHODS_3D),
+        format_func=METHODS_3D.get,
+        key="study3d_methods",
+    )
+    coarse_n = _control_grid(n, "study3d_coarse") if "mc_control" in methods else None
     settings = StudySettings3D(
         Config3D(
             problem=config.problem,
@@ -139,12 +160,19 @@ def _research_tab(config):
             index=index,
             seed=config.seed,
             max_iter=config.max_iter,
+            coarse_n=coarse_n,
         ),
         int(repeats),
         maximum,
         seconds,
+        methods=tuple(methods),
     )
-    if st.button("Запустить исследование", key="study3d_run", type="primary"):
+    if st.button(
+        "Запустить исследование",
+        key="study3d_run",
+        type="primary",
+        disabled=not methods,
+    ):
         progress = st.progress(0.0)
         try:
             st.session_state["study3d_result"] = accuracy_study3d(
@@ -258,6 +286,7 @@ def render_3d_app():
             format_func=METHODS_3D.get,
             key="cube_methods",
         )
+        coarse_n = _control_grid(n, "cube_coarse") if "mc_control" in methods else None
         walks = st.select_slider(
             "Путей на точку",
             options=[64, 256, 1024, 2048, 4096, 16384, 65536],
@@ -274,7 +303,9 @@ def render_3d_app():
             seed = st.number_input(
                 "Seed", min_value=0, max_value=2**32 - 1, value=42, key="cube_seed"
             )
-        config = Config3D(problem, n, mode, point, plane, index, walks, seed, tol)
+        config = Config3D(
+            problem, n, mode, point, plane, index, walks, seed, tol, coarse_n=coarse_n
+        )
         limit_message = interactive_mc_limit_message(config, methods)
         if limit_message:
             st.error(limit_message)

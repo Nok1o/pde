@@ -5,12 +5,14 @@ from time import perf_counter
 import numpy as np
 from numba import njit
 
+from .control3d import prepare_control3d, validate_coarse3d
 from .problem3d import blank_field3d, laplacian3d, make_problem3d, validate_points3d
 from .solvers import NUMBA_LOCK, Result
 
 METHODS_3D = {
     "lod_serial": "ЛОМ",
     "mc": "Монте-Карло",
+    "mc_control": "MC с контрольным приближением",
     "graded": "MC · сгущённая сетка",
     "wos": "WoS · 1-й род",
 }
@@ -190,15 +192,23 @@ def solve3d(
     max_iter=20000,
     max_steps=None,
     tau=None,
+    coarse_n=None,
+    control=None,
 ):
     points = validate_points3d(problem.n, points)
+    if method != "mc_control" and (coarse_n is not None or control is not None):
+        raise ValueError("Контрольное приближение требует method=mc_control")
+    if coarse_n is not None:
+        validate_coarse3d(problem.n, coarse_n)
+    if coarse_n is not None and control is not None:
+        raise ValueError("Задайте контрольную сетку или готовое приближение")
     if method in ("wos", "graded"):
         from .stationary_extensions import solve_extended
 
         return solve_extended(problem, points, method, walks, seed, max_steps)
     if method not in METHODS_3D:
         raise ValueError(
-            "В 3D доступны только lod_serial и mc; хвосты и слои ещё не перенесены"
+            "В 3D доступны только lod_serial, mc, mc_control, graded и wos"
         )
     for name, value, lower, upper in (
         ("walks", walks, 2, 2**31 - 1),
@@ -224,13 +234,37 @@ def solve3d(
         if method == "lod_serial":
             result = _lod3d(problem, tol, int(max_iter), tau)
         else:
+            prepared = None
+            if method == "mc_control":
+                prepared = (
+                    control
+                    if control is not None
+                    else prepare_control3d(problem, coarse_n)
+                )
+                prepared.validate(problem)
+            path_started = perf_counter()
             means, squared, counts, steps, samples = _mc3d(
-                problem.f, problem.boundary, points, int(walks), int(seed), int(limit)
+                problem.f if prepared is None else prepared.source,
+                problem.boundary if prepared is None else prepared.boundary,
+                points,
+                int(walks),
+                int(seed),
+                int(limit),
             )
+            path_seconds = perf_counter() - path_started
             values = blank_field3d(problem)
             errors = np.full_like(values, np.nan)
             sample_count = np.zeros_like(values, dtype=np.int64)
             indices = tuple(points.T)
+            if prepared is not None:
+                means += prepared.values[indices]
+                samples += prepared.values[tuple(points[0])]
+                boundary_points = np.any((points == 0) | (points == problem.n), axis=1)
+                means[boundary_points] = problem.boundary[
+                    tuple(points[boundary_points].T)
+                ]
+                if boundary_points[0]:
+                    samples[:] = problem.boundary[tuple(points[0])]
             values[indices] = means
             errors[indices] = np.sqrt(
                 np.maximum(squared, 0)
@@ -238,7 +272,7 @@ def solve3d(
             )
             sample_count[indices] = counts
             result = Result(
-                method="mc",
+                method=method,
                 values=values,
                 stderr=errors,
                 sample_count=sample_count,
@@ -246,6 +280,16 @@ def solve3d(
                 walks=int(counts.sum()),
                 extras={"samples": samples},
             )
+            if prepared is not None:
+                result.extras.update(
+                    preparation_seconds=(
+                        prepared.preparation_seconds if control is None else 0.0
+                    ),
+                    control_build_seconds=prepared.preparation_seconds,
+                    path_seconds=path_seconds,
+                    coarse_n=prepared.coarse_n,
+                    control_reused=control is not None,
+                )
         result.elapsed = perf_counter() - started
     return result
 

@@ -1,6 +1,7 @@
 """Independent backward space-time paths for the backward Euler heat system.
 
-No estimated or deterministic previous solution fields are used by solve_heat_mc.
+Ordinary MC uses only the input data. Controlled MC adds a deterministic coarse
+history and estimates its fine-grid residual with independent complete paths.
 The source reward is paid on each visit; a temporal jump is paid only at t=0.
 """
 
@@ -10,9 +11,10 @@ from time import perf_counter
 import numpy as np
 from numba import njit
 
-from .heat import _field, time_grid
+from .control import _interpolate
+from .heat import HeatProblem, _field, solve_heat, time_grid
 from .operator import FrozenOperator
-from .problem import validate_points
+from .problem import laplacian, validate_points
 from .solvers import NUMBA_LOCK
 
 
@@ -96,6 +98,9 @@ class HeatMCResult:
     temporal_transitions: int
     memory_bytes: int
     diagnostic_step: bool
+    method: str = "mc"
+    coarse_n: int | None = None
+    control_reused: bool = False
 
     @property
     def walks(self):
@@ -104,6 +109,9 @@ class HeatMCResult:
     def rows(self):
         return [
             dict(
+                method=self.method,
+                coarse_n=self.coarse_n,
+                control_reused=self.control_reused,
                 x_index=int(x),
                 y_index=int(y),
                 t=float(self.times[-1]),
@@ -150,7 +158,17 @@ def _warmup():
 
 
 def _estimate(
-    problem, initial, times, steps, points, walks, seed, max_transitions, diagnostic
+    problem,
+    initial,
+    times,
+    steps,
+    points,
+    walks,
+    seed,
+    max_transitions,
+    diagnostic,
+    coarse_n=None,
+    control=None,
 ):
     points, walks, seed, max_transitions = _settings(
         problem.n, points, walks, seed, max_transitions
@@ -195,6 +213,23 @@ def _estimate(
         np.array(probabilities) if probabilities else np.zeros((1, *shape, 4))
     )
     temporal = np.array(temporal) if temporal else np.ones((1, *shape))
+    base = None
+    control_reused = control is not None
+    if coarse_n is not None:
+        control = prepare_heat_control(problem, times, steps, coarse_n)
+    if control is not None:
+        base = np.asarray(control, dtype=float)
+        if base.shape != rewards.shape or not np.isfinite(base).all():
+            raise ValueError("Контрольное поле должно иметь форму (время, z, x)")
+        # Exact residual of backward Euler, including the previous control layer.
+        initial = initial - base[0]
+        boundary = boundary - base
+        for m, step in enumerate(steps, 1):
+            residual = base[m - 1, 1:-1, 1:-1] - base[m, 1:-1, 1:-1]
+            residual += step * problem.a2 * laplacian(base[m], 1 / problem.n)
+            rewards[m, 1:-1, 1:-1] += temporal[kinds[m]] * residual
+        if not all(np.isfinite(a).all() for a in (initial, boundary, rewards)):
+            raise ValueError("Контрольная поправка должна быть конечной")
     prepared = perf_counter()
     values, stderr, spatial, time_steps = _paths(
         initial,
@@ -209,6 +244,8 @@ def _estimate(
         max_transitions,
         len(times) - 1,
     )
+    if base is not None:
+        values += base[-1][tuple(points.T)]
     finished = perf_counter()
     # Explicit resident numerical buffers, not process RSS or JIT/compiler memory.
     memory = sum(
@@ -239,20 +276,43 @@ def _estimate(
         finished - prepared,
         spatial,
         time_steps,
-        memory,
+        memory + (base.nbytes if base is not None else 0),
         diagnostic,
+        "mc_control" if base is not None else "mc",
+        coarse_n,
+        control_reused,
     )
 
 
 def solve_heat_mc(
-    problem, dt=0.01, T=0.2, points=None, walks=4096, seed=42, max_transitions=1_000_000
+    problem,
+    dt=0.01,
+    T=0.2,
+    points=None,
+    walks=4096,
+    seed=42,
+    max_transitions=1_000_000,
+    *,
+    method="mc",
+    coarse_n=None,
+    control=None,
 ):
     """Standalone estimate at T, including preparation of all known F/g data.
 
     Paths terminate exactly on the initial field or Dirichlet data. Hitting
     max_transitions raises instead of returning a truncated, biased estimate.
     Each complete path is an independent observation including all its time jumps.
+    Supplied control history preparation is outside the timer and marked as reused.
     """
+    if method not in HEAT_MC_METHODS:
+        raise ValueError("Неизвестный метод MC для теплопроводности")
+    if method == "mc" and (coarse_n is not None or control is not None):
+        raise ValueError("Контрольное поле требует method=mc_control")
+    if method == "mc_control" and control is None:
+        coarse_n = max(4, problem.n // 4) if coarse_n is None else coarse_n
+        validate_coarse(problem.n, coarse_n)
+    elif coarse_n is not None:
+        raise ValueError("Выберите готовое поле или контрольную сетку")
     times, steps = time_grid(dt, T)
     return _estimate(
         problem,
@@ -264,6 +324,8 @@ def solve_heat_mc(
         seed,
         max_transitions,
         False,
+        coarse_n=coarse_n,
+        control=control,
     )
 
 
@@ -295,3 +357,45 @@ def heat_mc_step(
         max_transitions,
         True,
     )
+
+
+HEAT_MC_METHODS = {"mc": "Обычный MC", "mc_control": "MC с контрольным приближением"}
+
+
+def validate_coarse(n, coarse_n):
+    if (
+        isinstance(coarse_n, (bool, np.bool_))
+        or not np.isfinite(coarse_n)
+        or int(coarse_n) != coarse_n
+        or not 4 <= coarse_n <= n
+    ):
+        raise ValueError("Контрольная сетка: целое от 4 до основной сетки")
+
+
+def prepare_heat_control(problem, times, steps, coarse_n):
+    """Coarse backward Euler from input data, never from problem.exact.
+
+    Time layers are unchanged, including a short final step. Spatial transfer
+    is bilinear. The correction uses the fine operator, so coarse error is not
+    silently accepted as an answer. Called inside the measured preparation.
+    """
+    validate_coarse(problem.n, coarse_n)
+    axis = np.linspace(0, 1, int(coarse_n) + 1)
+    coarse = HeatProblem(
+        "Контрольное поле",
+        int(coarse_n),
+        problem.a2,
+        _interpolate(problem.initial, problem.axis, axis),
+        lambda x, z, t: _interpolate(
+            problem.evaluate(problem.source, t), problem.axis, axis
+        ),
+        lambda x, z, t: _interpolate(
+            problem.evaluate(problem.boundary, t), problem.axis, axis
+        ),
+    )
+    result = solve_heat(
+        coarse, steps[0] if len(steps) else 1.0, times[-1], method="direct"
+    )
+    if not np.allclose(result.times, times, rtol=0, atol=1e-14):
+        raise ValueError("Контрольное поле требует одинаковых временных слоёв")
+    return np.array([_interpolate(u, axis, problem.axis) for u in result.fields])

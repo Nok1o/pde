@@ -72,6 +72,7 @@ def test_cube_ui_runs_queries_switches_planes_and_invalidates_export():
     assert app.multiselect(key="cube_methods").value == [
         "lod_serial",
         "mc",
+        "mc_control",
         "graded",
         "wos",
     ]
@@ -81,9 +82,13 @@ def test_cube_ui_runs_queries_switches_planes_and_invalidates_export():
     app.number_input(key="cube_point_x").set_value(2)
     app.number_input(key="cube_point_y").set_value(3)
     app.number_input(key="cube_point_z").set_value(5)
+    app.number_input(key="cube_coarse").set_value(5)
     app.button(key="cube_run").click().run()
     assert not app.exception
     assert app.session_state["cube_result"].points.tolist() == [[5, 3, 2]]
+    assert (
+        app.session_state["cube_result"].results["mc_control"].extras["coarse_n"] == 5
+    )
     for plane in ("xz", "yz", "xy"):
         app.selectbox(key="cube_view_plane").set_value(plane).run()
         assert not app.exception
@@ -108,11 +113,15 @@ def test_cube_ui_study_runs_without_main_calculation():
     app.select_slider(key="study3d_grid").set_value(8)
     app.number_input(key="study3d_repeats").set_value(2)
     app.select_slider(key="study3d_walks").set_value(64)
+    app.number_input(key="study3d_coarse").set_value(5)
     app.run()
     app.button(key="study3d_run").click().run()
     assert not app.exception
     assert "cube_result" not in app.session_state
-    assert app.dataframe[0].value.shape == (3, 5)
+    assert app.dataframe[0].value.shape == (3, 6)
+    study = app.session_state["study3d_result"]
+    assert study.settings.config.coarse_n == 5
+    assert all(t["coarse_n"] == 5 for t in study.trials if t["method"] == "mc_control")
 
 
 def test_cli_study_respects_selected_method(tmp_path):

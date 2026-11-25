@@ -5,12 +5,56 @@ import pytest
 from pdelab.study_policy import (
     ACCURACY_METRIC,
     SELECTION_POLICY,
+    RetryableSolverError,
     accuracy_metadata,
     calibration_target,
     display_timing_rows,
     mean_relative_error,
     search_budgets,
 )
+
+
+@pytest.mark.parametrize("failed_phase", ["calibration", "validation"])
+def test_nonconvergence_retries_larger_budget_with_fresh_series(failed_phase):
+    calls = []
+
+    def measure(budget, index, phase, deadline):
+        calls.append((budget, index, phase))
+        if budget == 32 and phase == failed_phase:
+            raise RetryableSolverError("layer 1: max_outer")
+        return dict(relative_error_pct=0.2, seconds=budget / 1000)
+
+    row = search_budgets("mc", [32, 128], measure, 60, targets=(1.0,))[0]
+    assert row["status_code"] == "confirmed" and row["budget"] == 128
+    assert row["seconds"] == 0.128
+    assert len(calls) == len(set(calls))
+    assert calls[-4:] == [
+        (128, 1, phase)
+        for phase in ("calibration", "calibration_2", "calibration_3", "validation")
+    ]
+    assert any(a["status"] == "solver_failed" for a in row["attempts"])
+
+
+def test_nonconvergence_exhaustion_preserves_failure_without_success_time():
+    def measure(*args):
+        raise RetryableSolverError("layer 1: max_outer")
+
+    row = search_budgets("mc", [32, 128], measure, 60, targets=(1.0,))[0]
+    assert row["status_code"] == "solver_failed" and row["seconds"] is None
+    assert row["interrupted_budget"] == 128
+    assert [a["budget"] for a in row["attempts"]] == [32, 128]
+
+
+def test_failed_larger_budget_does_not_display_an_earlier_pilot_error():
+    def measure(budget, *args):
+        if budget == 32:
+            return dict(relative_error_pct=2.0, seconds=0.01)
+        raise RetryableSolverError("layer 1: max_outer")
+
+    row = search_budgets("mc", [32, 128], measure, 60, targets=(1.0,))[0]
+    assert row["budget"] is None and row["interrupted_budget"] == 128
+    assert row["calibration_error_pct"] is None and row["relative_error_pct"] is None
+    assert row["attempts"][0]["relative_error_pct"] == 2.0
 
 
 def test_margin_selects_a_larger_budget_before_any_final_checks():

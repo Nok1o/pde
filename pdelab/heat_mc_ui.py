@@ -8,7 +8,7 @@ import pandas as pd
 import streamlit as st
 
 from .heat import make_heat_problem, solve_heat, time_grid
-from .heat_mc import heat_mc_step, solve_heat_mc
+from .heat_mc import HEAT_MC_METHODS, heat_mc_step, solve_heat_mc
 from .heat_mc_study import VALIDATION_POLICY, heat_mc_study
 from .heat_mc_views import heat_mc_archive
 from .study_policy import render_accuracy_results
@@ -30,11 +30,37 @@ def render_heat_mc(settings):
     st.caption(
         "Самостоятельные траектории идут назад до μ или границы. Источник и граница всех нужных времён входят в подготовку и полное время."
     )
-    diagnostic = st.checkbox(
-        "Диагностика только первого шага с заданным μ", key="heat_mc_diagnostic"
+    methods = st.multiselect(
+        "Методы MC",
+        list(HEAT_MC_METHODS),
+        default=list(HEAT_MC_METHODS),
+        format_func=HEAT_MC_METHODS.get,
+        key="heat_mc_methods",
     )
-    x = st.slider("Точка MC по x", 1, settings.n - 1, settings.n // 2, key="heat_mc_x")
-    y = st.slider("Точка MC по z", 1, settings.n - 1, settings.n // 2, key="heat_mc_y")
+    with st.expander("Контрольное приближение по времени"):
+        st.write(
+            "На грубой сетке строим историю v. На основной сетке MC вычисляет поправку δ; подготовка v включена во время метода."
+        )
+        st.latex(r"u^m=v^m+\delta^m,\qquad (I-\tau_m aL_h)\delta^m=\delta^{m-1}+r^m")
+        st.latex(r"r^m=v^{m-1}+\tau_m f^m-(I-\tau_m aL_h)v^m")
+        st.caption(
+            "m — номер временного слоя; Lₕ — сеточный оператор вторых производных; τₘ — шаг времени. Начальное и граничное значения поправки равны заданным данным минус v."
+        )
+    if st.session_state.get("heat_mc_coarse", 4) > settings.n:
+        st.session_state["heat_mc_coarse"] = settings.n
+    coarse_n = st.number_input(
+        "Интервалов контрольной сетки",
+        min_value=4,
+        max_value=settings.n,
+        value=max(4, settings.n // 4),
+        key="heat_mc_coarse",
+    )
+    diagnostic = st.checkbox(
+        "Диагностика обычного MC: только первый шаг с заданным μ",
+        key="heat_mc_diagnostic",
+    )
+    x = st.slider("Точка MC по x", 0, settings.n, settings.n // 2, key="heat_mc_x")
+    y = st.slider("Точка MC по z", 0, settings.n, settings.n // 2, key="heat_mc_y")
     walks = st.select_slider(
         "Полных траекторий на точку",
         [64, 256, 1024, 4096, 16384, 65536],
@@ -50,9 +76,16 @@ def render_heat_mc(settings):
         key="heat_mc_seed",
     )
     current = dict(
-        **asdict(settings), x=x, y=y, walks=walks, seed=seed, diagnostic=diagnostic
+        **asdict(settings),
+        x=x,
+        y=y,
+        walks=walks,
+        seed=seed,
+        diagnostic=diagnostic,
+        methods=methods,
+        coarse_n=coarse_n,
     )
-    if st.button("Рассчитать MC по времени", key="heat_mc_run"):
+    if st.button("Рассчитать MC по времени", key="heat_mc_run", disabled=not methods):
         try:
             _limit(settings, walks, diagnostic)
             p = make_heat_problem(settings.preset, settings.n, settings.a2)
@@ -63,15 +96,65 @@ def render_heat_mc(settings):
                         raise ValueError("Для диагностики шага нужно T>0")
                     result = heat_mc_step(p, p.initial, t, t, [[y, x]], walks, seed)
                 else:
-                    result = solve_heat_mc(
-                        p, settings.dt, settings.T, [[y, x]], walks, seed
-                    )
+                    results = [
+                        solve_heat_mc(
+                            p,
+                            settings.dt,
+                            settings.T,
+                            [[y, x]],
+                            walks,
+                            seed,
+                            method=method,
+                            coarse_n=coarse_n if method == "mc_control" else None,
+                        )
+                        for method in methods
+                    ]
+                    result = results[0]
                 direct = solve_heat(
                     p,
                     min(settings.dt, result.times[-1]) if diagnostic else settings.dt,
                     result.times[-1],
                     method="direct",
                 )
+                lod = (
+                    solve_heat(p, settings.dt, settings.T, tol=settings.tol)
+                    if not diagnostic
+                    else None
+                )
+            if diagnostic:
+                results = [result]
+            target = (
+                float(p.evaluate(p.exact, result.times[-1])[y, x])
+                if p.exact
+                else float(direct.fields[-1, y, x])
+            )
+            rows = []
+            if lod is not None:
+                value = float(lod.fields[-1, y, x])
+                rows.append(
+                    {
+                        "Метод": "ЛОМ",
+                        "u": value,
+                        "Время, с": lod.seconds,
+                        "Отн. ошибка, %": (
+                            100 * abs(value - target) / abs(target) if target else None
+                        ),
+                    }
+                )
+            for calculation in results:
+                value = float(calculation.values[0])
+                rows.append(
+                    {
+                        "Метод": HEAT_MC_METHODS[calculation.method],
+                        "u": value,
+                        "Время, с": calculation.seconds,
+                        "Отн. ошибка, %": (
+                            100 * abs(value - target) / abs(target) if target else None
+                        ),
+                    }
+                )
+            st.session_state["heat_mc_comparison"] = rows
+            st.session_state["heat_mc_results"] = results
             st.session_state["heat_mc_query"] = (result, p, current, direct)
         except (ValueError, RuntimeError) as exc:
             st.error(str(exc))
@@ -82,6 +165,27 @@ def render_heat_mc(settings):
     if previous != current:
         st.info("Настройки MC изменены. Выполните новый расчёт.")
     ref = float(direct.fields[-1, result.points[0, 0], result.points[0, 1]])
+    st.dataframe(
+        pd.DataFrame(st.session_state.get("heat_mc_comparison", [])), hide_index=True
+    )
+    st.download_button(
+        "Скачать таблицу сравнения",
+        pd.DataFrame(st.session_state.get("heat_mc_comparison", []))
+        .to_csv(index=False)
+        .encode("utf-8-sig"),
+        "heat-comparison.csv",
+        "text/csv",
+        key="heat_comparison_download",
+        on_click="ignore",
+    )
+    results = st.session_state.get("heat_mc_results", [result])
+    selected = st.selectbox(
+        "Подробности и архив метода",
+        [r.method for r in results],
+        format_func=HEAT_MC_METHODS.get,
+        key="heat_mc_details",
+    )
+    result = next(r for r in results if r.method == selected)
     row = result.rows()[0]
     row["direct_reference"] = ref
     row["error_to_grid"] = row["value"] - ref
@@ -117,15 +221,15 @@ def render_heat_mc_study(settings):
     )
     x = st.slider(
         "Точка исследования по x",
-        1,
-        settings.n - 1,
+        0,
+        settings.n,
         settings.n // 2,
         key="heat_study_x",
     )
     y = st.slider(
         "Точка исследования по z",
-        1,
-        settings.n - 1,
+        0,
+        settings.n,
         settings.n // 2,
         key="heat_study_y",
     )
@@ -150,15 +254,35 @@ def render_heat_mc_study(settings):
         value=10.0,
         key="heat_study_seconds",
     )
+    methods = st.multiselect(
+        "Методы исследования",
+        ["lod", *HEAT_MC_METHODS],
+        default=["lod", *HEAT_MC_METHODS],
+        format_func={"lod": "ЛОМ", **HEAT_MC_METHODS}.get,
+        key="heat_study_methods",
+    )
+    if st.session_state.get("heat_study_coarse", 4) > settings.n:
+        st.session_state["heat_study_coarse"] = settings.n
+    coarse_n = st.number_input(
+        "Контрольная сетка исследования",
+        min_value=4,
+        max_value=settings.n,
+        value=max(4, settings.n // 4),
+        key="heat_study_coarse",
+    )
     current = dict(
         **asdict(settings),
+        methods=methods,
+        coarse_n=coarse_n,
         x=x,
         y=y,
         repeats=repeats,
         max_walks=max_walks,
         seconds=seconds,
     )
-    if st.button("Исследовать MC по времени", key="heat_study_run"):
+    if st.button(
+        "Исследовать MC по времени", key="heat_study_run", disabled=not methods
+    ):
         try:
             _limit(settings, max_walks)
             with st.spinner("Подбор и независимая проверка…"):
@@ -170,6 +294,8 @@ def render_heat_mc_study(settings):
                     repeats,
                     max_walks,
                     seconds_per_method=seconds,
+                    methods=methods,
+                    coarse_n=coarse_n,
                 )
             st.session_state["heat_mc_study"] = (study, current)
         except (ValueError, RuntimeError) as exc:
@@ -186,7 +312,7 @@ def render_heat_mc_study(settings):
         st.info("Настройки исследования изменены. Выполните новую серию.")
     table = pd.DataFrame(study["rows"])
     render_accuracy_results(
-        study["rows"], {"lod": "ЛОМ", "mc": "Монте-Карло"}, key="heat_study_results"
+        study["rows"], {"lod": "ЛОМ", **HEAT_MC_METHODS}, key="heat_study_results"
     )
     with st.expander("Статусы и отдельные замеры", key="heat_mc_ui_expander_189"):
         st.dataframe(table, hide_index=True)

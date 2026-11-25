@@ -18,6 +18,9 @@ def heat_mc_archive(result, problem, dt):
     writer.writeheader()
     writer.writerows(rows)
     metadata = dict(
+        method=result.method,
+        coarse_n=result.coarse_n,
+        control_reused=result.control_reused,
         problem=problem.name,
         n=problem.n,
         a2=problem.a2,
@@ -41,9 +44,17 @@ def heat_mc_archive(result, problem, dt):
         previous_solution_preparation=(
             "Not included; previous field supplied"
             if result.diagnostic_step
-            else "None: paths go back to initial data"
+            else (
+                "Supplied control history: build not included; residual preparation included"
+                if result.control_reused
+                else (
+                    "Coarse full history included in preparation; fine residual corrected by MC"
+                    if result.method == "mc_control"
+                    else "None: paths go back to initial data"
+                )
+            )
         ),
-        uncertainty="SE of independent complete paths; no estimated previous fields",
+        uncertainty="SE of independent complete paths; control is fixed before sampling",
         python=platform.python_version(),
         numpy=np.__version__,
         numba=numba.__version__,

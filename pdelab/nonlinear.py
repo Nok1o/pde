@@ -98,8 +98,11 @@ class NonlinearSettings:
     max_steps: int = 100000
     seed: int = 42
     max_total_walks: int = 20_000_000
+    mc_variant: str = "mc"
 
     def validate(self):
+        if self.mc_variant not in NONLINEAR_MC_METHODS:
+            raise ValueError("Неизвестный вариант нелинейного MC")
         for name in ("tolerance", "change_tolerance", "linear_tolerance"):
             value = getattr(self, name)
             if not np.isfinite(value) or not 0 < value < 1:
@@ -220,7 +223,8 @@ def picard_layer(
                     budget,
                     _seed(settings.seed, layer, outer),
                     settings.max_steps,
-                    control=u,
+                    control=u if settings.mc_variant != "mc_plain" else None,
+                    reuse=settings.mc_variant == "mc_reuse",
                 )
         except (ValueError, RuntimeError) as exc:
             result.walks += getattr(exc, "walks", 0)
@@ -268,7 +272,8 @@ def picard_layer(
                     budget,
                     _seed(settings.seed, layer, outer, 1),
                     settings.max_steps,
-                    control=candidate,
+                    control=candidate if settings.mc_variant != "mc_plain" else None,
+                    reuse=settings.mc_variant == "mc_reuse",
                 )
             except (ValueError, RuntimeError) as exc:
                 result.walks += getattr(exc, "walks", 0)
@@ -439,6 +444,27 @@ class NonlinearResult:
         return sum(layer.steps for layer in self.layers)
 
 
+def failure_message(result):
+    """Explain an unfinished chain without calling its last layer a final answer."""
+    layers = getattr(result, "layers", [])
+    if not layers or not layers[-1].history:
+        return result.reason
+    last = layers[-1].history[-1]
+    settings = result.settings
+    message = (
+        f"{result.reason}; итераций {len(layers[-1].history)}/{settings.max_outer}; "
+        f"невязка {last['nonlinear_residual']:.3g} (допуск {settings.tolerance:g}); "
+        f"изменение {last['relative_change']:.3g} (допуск {settings.change_tolerance:g}); "
+        f"N={last['budget']}, всего путей {result.walks}"
+    )
+    if last["validation_residual"] is not None:
+        message += (
+            f"; независимая проверка: невязка {last['validation_residual']:.3g}, "
+            f"изменение {last['validation_change']:.3g}"
+        )
+    return message
+
+
 def solve_nonlinear(problem, dt=0.01, T=0.02, method="picard", settings=None):
     settings = NonlinearSettings() if settings is None else settings
     settings.validate()
@@ -531,3 +557,10 @@ def solve_stationary_nonlinear(n=8, alpha=0.5, method="picard", settings=None):
         )
     warmup_frozen()
     return picard_layer(problem, initial, b, boundary, 0, settings, method)
+
+
+NONLINEAR_MC_METHODS = {
+    "mc_plain": "Picard + обычный MC",
+    "mc": "Picard + MC с контрольной поправкой",
+    "mc_reuse": "Picard + MC: контрольная поправка и хвосты",
+}

@@ -6,7 +6,12 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from .nonlinear import NonlinearSettings, make_nonlinear_problem
+from .nonlinear import (
+    NONLINEAR_MC_METHODS,
+    NonlinearSettings,
+    failure_message,
+    make_nonlinear_problem,
+)
 from .nonlinear_io import (
     comparison_archive,
     csv_bytes,
@@ -16,8 +21,11 @@ from .nonlinear_io import (
     residual_figure,
     time_figure,
 )
-from .nonlinear_study import compare_nonlinear, nonlinear_targets
-from .study_policy import render_accuracy_results
+from .nonlinear_study import (
+    compare_nonlinear_methods,
+    nonlinear_targets,
+)
+from .study_policy import readable_status, render_accuracy_results
 from .ui_state import select_section
 
 
@@ -99,13 +107,61 @@ def _problem_info(alpha):
         st.write("Обновляем поле с релаксацией ξ и повторяем до сходимости:")
         st.latex(r"\hat y^{s+1}=(1-\xi)\hat y^{s}+\xi\widetilde y^{s+1}")
         st.write(
+            "Обычный MC оценивает всё решение замороженной линейной задачи. Контрольный MC оценивает только поправку к текущему приближению v:"
+        )
+        st.latex(r"A_s\delta=b-A_sv,\qquad \widetilde y^{s+1}=v+\delta")
+        st.write(
+            "Aₛ — оператор при фиксированной проводимости, b — правая часть слоя. В варианте с хвостами продолжение пути после первого посещения узла даёт дополнительную оценку для этого узла. При изменении проводимости накопления сбрасываются."
+        )
+        st.write(
             "Ньютон + прямой решатель служит отдельным сеточным эталоном. "
             "Основные сравниваемые варианты — Пикар + ЛОМ и Пикар + MC."
         )
 
 
+def _apply_all_methods_example():
+    """Apply a reproducible case explicitly, including previously saved widgets."""
+    st.session_state.update(
+        nl_n=8,
+        nl_alpha=0.5,
+        nl_dt=0.01,
+        nl_T=0.02,
+        nl_x=4,
+        nl_y=4,
+        nl_repeats=4,
+        nl_relaxation=0.7,
+        nl_tol=1e-7,
+        nl_mc_tol=0.03,
+        nl_outer=20,
+        nl_linear_tol=1e-10,
+        nl_walks=128,
+        nl_max_walks=131072,
+        nl_schedule="geometric",
+        nl_seed=42,
+        nl_total_walks=100_000_000,
+        nl_methods_v2=list(NONLINEAR_MC_METHODS),
+        nl_budgets=[128],
+    )
+    for key in (
+        "nl_result",
+        "nl_comparisons",
+        "nl_settings",
+        "nl_targets",
+        "nl_archive",
+        "nl_archive_method",
+        "nl_shown_method",
+    ):
+        st.session_state.pop(key, None)
+
+
 def render_nonlinear_app():
-    st.title("Нелинейная теплопроводность")
+    st.title("Квазилинейная теплопроводность")
+    st.button(
+        "Применить проверенные настройки всех методов",
+        key="nl_all_methods_example",
+        on_click=_apply_all_methods_example,
+        help="Сетка 8, γ=0,5, τ=0,01, T=0,02, центр, 4 повтора, seed=42; допуск MC 0,03, 20 итераций, максимум 131072 пути на узел и 100 млн на запуск. Начальный бюджет исследования — 128. Прежние результаты будут очищены.",
+    )
     with st.sidebar:
         n = st.select_slider(
             "Интервалов по оси", [4, 6, 8, 12, 16, 24, 32], value=8, key="nl_n"
@@ -180,7 +236,7 @@ def render_nonlinear_app():
             )
             maximum = st.select_slider(
                 "Максимальный бюджет на узел",
-                [128, 512, 2048, 8192],
+                [128, 512, 2048, 8192, 32768, 131072, 524288],
                 value=2048,
                 key="nl_max_walks",
             )
@@ -198,10 +254,26 @@ def render_nonlinear_app():
             seed = st.number_input(
                 "Seed", min_value=0, max_value=2**32 - 1, value=42, key="nl_seed"
             )
+            total_walks = st.number_input(
+                "Лимит путей на полный запуск",
+                min_value=1,
+                max_value=1_000_000_000,
+                value=2_000_000,
+                step=1_000_000,
+                key="nl_total_walks",
+            )
+        variants = st.multiselect(
+            "Варианты MC",
+            list(NONLINEAR_MC_METHODS),
+            default=list(NONLINEAR_MC_METHODS),
+            format_func=NONLINEAR_MC_METHODS.get,
+            key="nl_methods_v2",
+        )
         run = st.button(
             "Рассчитать",
             type="primary",
             key="nl_run",
+            disabled=not variants,
             on_click=select_section,
             args=("nonlinear_sections", "Сравнение"),
         )
@@ -221,7 +293,7 @@ def render_nonlinear_app():
         max_walks=maximum,
         schedule=schedule,
         seed=seed,
-        max_total_walks=2_000_000,
+        max_total_walks=total_walks,
     )
     settings = dict(
         n=n,
@@ -230,10 +302,17 @@ def render_nonlinear_app():
         T=final,
         point=point,
         repeats=repeats,
+        variants=variants,
         lod=asdict(lod_settings),
         mc=asdict(mc_settings),
     )
     _problem_info(alpha)
+    if "mc_plain" in variants and mc_tol <= 0.001 and maximum <= 2048:
+        st.info(
+            "Для обычного MC выбран строгий допуск при малом бюджете: "
+            "он может не завершить Пикара. Кнопка сверху применяет проверенный "
+            "пример с явно другими параметрами. Это не гарантия сходимости для произвольной задачи."
+        )
     try:
         lod_settings.validate()
         mc_settings.validate()
@@ -243,7 +322,7 @@ def render_nonlinear_app():
     if run:
         try:
             with st.spinner("Временные слои, Picard и независимые цепочки MC…"):
-                result = compare_nonlinear(
+                comparisons = compare_nonlinear_methods(
                     make_nonlinear_problem(n, alpha),
                     dt,
                     final,
@@ -251,7 +330,10 @@ def render_nonlinear_app():
                     repeats,
                     lod_settings,
                     mc_settings,
+                    variants,
                 )
+            result = comparisons[variants[0]]
+            st.session_state["nl_comparisons"] = comparisons
             st.session_state["nl_result"] = result
             st.session_state["nl_settings"] = settings
             st.session_state.pop("nl_archive", None)
@@ -263,6 +345,17 @@ def render_nonlinear_app():
         on_change="rerun",
     )
     result = st.session_state.get("nl_result")
+    comparisons = st.session_state.get("nl_comparisons", {})
+    if comparisons:
+        shown = st.selectbox(
+            "Вариант на графиках и в архиве",
+            list(comparisons),
+            format_func=NONLINEAR_MC_METHODS.get,
+            key="nl_shown_method",
+        )
+        result = comparisons[shown]
+        if st.session_state.get("nl_archive_method") != shown:
+            st.session_state.pop("nl_archive", None)
     with comparison_tab:
         if result is not None:
             if st.session_state["nl_settings"] != settings:
@@ -275,15 +368,33 @@ def render_nonlinear_app():
                 rmse="RMSE",
                 relative_error_pct="Отн. ошибка, %",
             )
+            metrics = result.metrics
+            if comparisons:
+                metrics = [
+                    {
+                        **next(iter(comparisons.values())).metrics[0],
+                        "method": "Picard + ЛОМ",
+                    }
+                ]
+                metrics.extend(
+                    {**item.metrics[1], "method": NONLINEAR_MC_METHODS[key]}
+                    for key, item in comparisons.items()
+                )
             st.dataframe(
-                pd.DataFrame(result.metrics)[list(labels)].rename(columns=labels),
+                pd.DataFrame(metrics)[list(labels)].rename(columns=labels),
                 hide_index=True,
                 width="stretch",
             )
             for calculation in [result.deterministic, *result.stochastic]:
                 if not calculation.completed:
                     st.warning(
-                        f"{calculation.method}, seed={calculation.settings.seed}: {calculation.reason}"
+                        f"{calculation.method}, seed={calculation.settings.seed}: "
+                        + readable_status(
+                            dict(
+                                status="solver_failed",
+                                reason=failure_message(calculation),
+                            )
+                        )
                     )
             st.plotly_chart(time_figure(result), width="stretch")
             st.plotly_chart(
@@ -309,6 +420,9 @@ def render_nonlinear_app():
                 )
             if st.button("Подготовить архив", key="nl_export"):
                 st.session_state["nl_archive"] = comparison_archive(result)
+                st.session_state["nl_archive_method"] = result.stochastic[
+                    0
+                ].settings.mc_variant
             if "nl_archive" in st.session_state:
                 st.download_button(
                     "Скачать ZIP",
@@ -331,7 +445,11 @@ def render_nonlinear_app():
             key="nl_budgets",
         )
         target_settings = {**settings, "budgets": budgets}
-        if st.button("Проверить 1/5/10%", key="nl_targets_run", disabled=not budgets):
+        if st.button(
+            "Проверить 1/5/10%",
+            key="nl_targets_run",
+            disabled=not budgets or not variants,
+        ):
             try:
                 with st.spinner("Подбор бюджета и независимая проверка…"):
                     rows, evidence = nonlinear_targets(
@@ -344,6 +462,7 @@ def render_nonlinear_app():
                         seed,
                         settings=mc_settings,
                         deterministic=lod_settings,
+                        variants=variants,
                     )
                 st.session_state["nl_targets"] = (target_settings, rows, evidence)
             except (ValueError, RuntimeError) as exc:
@@ -376,7 +495,7 @@ def render_nonlinear_app():
             )
             render_accuracy_results(
                 saved[1],
-                {"picard": "Picard + ЛОМ", "mc": "Picard + MC"},
+                {"picard": "Picard + ЛОМ", **NONLINEAR_MC_METHODS},
                 key="nl_study_results",
             )
             st.download_button(

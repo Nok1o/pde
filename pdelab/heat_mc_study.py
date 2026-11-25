@@ -10,7 +10,7 @@ import numba
 import numpy as np
 
 from .heat import solve_heat
-from .heat_mc import _settings, _warmup, solve_heat_mc
+from .heat_mc import HEAT_MC_METHODS, _settings, _warmup, solve_heat_mc, validate_coarse
 from .problem import validate_points
 from .research import _walk_budgets
 from .study_policy import (
@@ -35,7 +35,19 @@ def heat_mc_study(
     seed=42,
     seconds_per_method=60,
     max_transitions=1_000_000,
+    *,
+    methods=("lod", "mc"),
+    coarse_n=None,
 ):
+    if (
+        not methods
+        or len(set(methods)) != len(methods)
+        or any(m not in ("lod", *HEAT_MC_METHODS) for m in methods)
+    ):
+        raise ValueError("Выберите различные методы теплопроводности")
+    if "mc_control" in methods:
+        coarse_n = max(4, problem.n // 4) if coarse_n is None else coarse_n
+        validate_coarse(problem.n, coarse_n)
     if (
         isinstance(repeats, bool)
         or not np.isfinite(repeats)
@@ -67,6 +79,8 @@ def heat_mc_study(
     if reference == 0:
         raise ValueError("При нулевом эталоне относительная ошибка не определена")
     settings = dict(
+        methods=list(methods),
+        coarse_n=coarse_n,
         problem=problem.name,
         n=problem.n,
         a2=problem.a2,
@@ -95,7 +109,7 @@ def heat_mc_study(
     _warmup()
     solve_heat(problem, dt, min(dt, T), tol=1e-2)
     started = perf_counter()
-    for method_index, method in enumerate(("lod", "mc")):
+    for method_index, method in enumerate(methods):
         budgets = (
             (1e-2, 1e-4, 1e-6, 1e-8, 1e-10)
             if method == "lod"
@@ -118,7 +132,7 @@ def heat_mc_study(
                         ]
                     ).generate_state(1)[0]
                 )
-                if method == "mc":
+                if method != "lod":
                     result = solve_heat_mc(
                         problem,
                         dt,
@@ -127,6 +141,8 @@ def heat_mc_study(
                         walks=budget,
                         seed=trial_seed,
                         max_transitions=max_transitions,
+                        method=method,
+                        coarse_n=coarse_n if method == "mc_control" else None,
                     )
                     value = float(result.values[0])
                     preparation = result.preparation_seconds
@@ -146,7 +162,7 @@ def heat_mc_study(
                         budget=float(budget),
                         phase=phase,
                         repeat=repeat,
-                        seed=trial_seed if method == "mc" else None,
+                        seed=trial_seed if method != "lod" else None,
                         value=value,
                         seconds=result.seconds,
                         preparation_seconds=preparation,

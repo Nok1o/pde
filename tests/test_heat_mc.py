@@ -223,7 +223,14 @@ def test_ui_mc_and_research_work_without_grid_calculation():
     app.select_slider(key="heat_study_walks").set_value(64)
     app.button(key="heat_study_run").click().run()
     assert not app.exception
-    assert len(app.session_state["heat_mc_study"][0]["rows"]) == 6
+    assert len(app.session_state["heat_mc_study"][0]["rows"]) == 9
+    assert {r.method for r in app.session_state["heat_mc_results"]} == {
+        "mc",
+        "mc_control",
+    }
+    assert len(app.session_state["heat_mc_comparison"]) == 3
+    app.selectbox(key="heat_mc_details").set_value("mc_control").run()
+    assert not app.exception and not app.error
     app.session_state["heat_mc_study"][0]["settings"].pop("validation_policy")
     app.run()
     assert "heat_mc_study" not in app.session_state
