@@ -195,6 +195,20 @@ def render_heat3d_app():
         alpha = st.number_input(
             "α в k(u)=1+αu²", min_value=0.0, max_value=100.0, value=0.5, key="h3_alpha"
         )
+        capacity_gamma = st.number_input(
+            "γ в c(u)=1+γu²",
+            min_value=0.0,
+            max_value=100.0,
+            value=0.0,
+            key="h3_capacity_gamma",
+        )
+        reaction_sigma = st.number_input(
+            "σ в источнике F−σu³",
+            min_value=0.0,
+            max_value=100.0,
+            value=0.0,
+            key="h3_reaction_sigma",
+        )
         kinds, betas = [], []
         with st.expander("Граничные условия", key="h3_boundaries"):
             for face in FACES:
@@ -349,6 +363,8 @@ def render_heat3d_app():
         case=case,
         n=n,
         alpha=alpha,
+        capacity_gamma=capacity_gamma,
+        reaction_sigma=reaction_sigma,
         dt=dt,
         T=final,
         mode=mode,
@@ -382,13 +398,15 @@ def render_heat3d_app():
     current = dict(configuration=asdict(config), solver_settings=asdict(settings))
     with st.expander("Уравнение, эталон и смысл ошибки", key="h3_explanation"):
         st.latex(
-            r"u_t=\nabla\cdot((1+\alpha u^2)\nabla u)+F(x,y,z,t),\quad (x,y,z)\in(0,1)^3"
+            r"(1+\gamma u^2)u_t=\nabla\cdot((1+\alpha u^2)\nabla u)+F(x,y,z,t)-\sigma u^3,\quad (x,y,z)\in(0,1)^3"
         )
         if case == "sine":
             st.latex(r"u^*(x,y,z,t)=1+e^{-t}\sin(\pi x)\sin(\pi y)\sin(\pi z)")
         else:
             st.latex(r"u^*(x,y,z,t)=1+t+\frac{x+2y+3z+xy+xz+yz+x^2+y^2+z^2}{4}")
-        st.latex(r"F=u_t^*-(1+\alpha(u^*)^2)\Delta u^*-2\alpha u^*|\nabla u^*|^2")
+        st.latex(
+            r"F=(1+\gamma(u^*)^2)u_t^*-(1+\alpha(u^*)^2)\Delta u^*-2\alpha u^*|\nabla u^*|^2+\sigma(u^*)^3"
+        )
         st.latex(r"u(x,y,z,0)=u^*(x,y,z,0)")
         if 1 in kinds:
             st.latex(r"\text{1 род:}\quad u=g,\qquad g=u^*|_{\Gamma}")
@@ -401,12 +419,18 @@ def render_heat3d_app():
                 "n — внешняя нормаль, β > 0 — коэффициент теплообмена; r — заданные граничные данные. На рёбрах вклады граней складываются; условие 1 рода фиксирует общий узел."
             )
         st.write(
-            "u — температура, k(u)=1+αu² — теплопроводность, F — источник. "
-            "Параметр α задаёт силу нелинейности; при α=0 уравнение линейное. "
+            "u — температура, k(u)=1+αu² — теплопроводность, c(u)=1+γu² — теплоёмкость. "
+            "F — заданная часть источника, −σu³ — нелинейный отток. "
+            "При α=γ=σ=0 уравнение линейное; γ=σ=0 сохраняет исходную модель. "
             "u* — известное проверочное решение, используемое для оценки ошибки."
         )
+        st.latex(
+            r"c(v)\frac{w-u^{old}}{\Delta t}=\nabla_h\cdot(k(v)\nabla_h w)+F-\sigma v^2 w"
+        )
         st.write(
-            "Источник и границы согласованы с выбранным аналитическим решением. Неявный Эйлер использует фактический последний шаг до T; коэффициенты заморожены на всё линейное решение Пикара."
+            "v — текущая итерация Пикара, w — новое приближение. Источник и границы согласованы с аналитическим решением. "
+            "Неявный Эйлер использует фактический последний шаг до T; c(v), k(v) и σv² заморожены на всё линейное решение. "
+            "Условия приёмки проверяют исходную нелинейную задачу. Отрицательные γ и σ не поддерживаются."
         )
         st.write(
             "Ошибка в области Q — относительная L2-норма к аналитическому решению. В исследовании усредняются ошибки отдельных полных запусков. Независимый Ньютон — отдельная сеточная диагностика; невязка не заменяет ошибку к аналитическому решению."

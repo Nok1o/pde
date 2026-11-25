@@ -23,6 +23,12 @@ def main(argv=None):
     parser.add_argument("--case", choices=("sine", "polynomial"), default="sine")
     parser.add_argument("--n", type=int, default=8)
     parser.add_argument("--alpha", type=float, default=0.5)
+    parser.add_argument(
+        "--capacity-gamma", type=float, default=0.0, help="γ ≥ 0 в c(u)=1+γu²"
+    )
+    parser.add_argument(
+        "--reaction-sigma", type=float, default=0.0, help="σ ≥ 0 в источнике F−σu³"
+    )
     add_boundary_arguments(parser)
     parser.add_argument("--dt", type=float, default=0.01)
     parser.add_argument("--T", type=float, default=0.02)
@@ -102,6 +108,8 @@ def main(argv=None):
         case=args.case,
         n=args.n,
         alpha=args.alpha,
+        capacity_gamma=args.capacity_gamma,
+        reaction_sigma=args.reaction_sigma,
         dt=args.dt,
         T=args.T,
         mode=args.query,

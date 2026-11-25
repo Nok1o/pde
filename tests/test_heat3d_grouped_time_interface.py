@@ -17,7 +17,10 @@ from pdelab.heat3d_picard_mc import CONTROL_MC_METHODS, GROUPED_MC_METHODS
 METHODS = ("lod", "block", "mc", "mc_grouped", "mc_control", "mc_control_grouped")
 
 
-def test_cli_all_six_methods_export_actual_group_settings_and_reproduce(tmp_path):
+@pytest.mark.parametrize("gamma,sigma", [(0.0, 0.0), (0.4, 0.25)])
+def test_cli_all_six_methods_export_actual_group_settings_and_reproduce(
+    tmp_path, gamma, sigma
+):
     out = tmp_path / "run"
     assert (
         main(
@@ -33,6 +36,10 @@ def test_cli_all_six_methods_export_actual_group_settings_and_reproduce(tmp_path
                 ".003",
                 "--x0",
                 "3",
+                "--capacity-gamma",
+                str(gamma),
+                "--reaction-sigma",
+                str(sigma),
                 "--point",
                 "0",
                 "2",
@@ -53,6 +60,9 @@ def test_cli_all_six_methods_export_actual_group_settings_and_reproduce(tmp_path
     )
     saved = json.loads((out / "result.json").read_bytes())
     assert saved["metadata"]["solver_settings"]["batch_size"] == 7
+    assert saved["metadata"]["configuration"]["capacity_gamma"] == gamma
+    assert saved["metadata"]["configuration"]["reaction_sigma"] == sigma
+    assert "c(u_new)" in saved["metadata"]["material_model"]["time_discretization"]
     with (out / "table.csv").open(encoding="utf-8-sig") as stream:
         csv_rows = list(csv.DictReader(stream))
     for row, csv_row in zip(saved["rows"], csv_rows, strict=True):
@@ -66,6 +76,8 @@ def test_cli_all_six_methods_export_actual_group_settings_and_reproduce(tmp_path
             assert row["coarse_n"] == (4 if method in CONTROL_MC_METHODS else None)
     replay = shlex.split(saved["metadata"]["reproduction"])[3:]
     assert replay[replay.index("--batch-size") + 1] == "7"
+    assert float(replay[replay.index("--capacity-gamma") + 1]) == gamma
+    assert float(replay[replay.index("--reaction-sigma") + 1]) == sigma
     replay[replay.index("--out") + 1] = str(tmp_path / "replay")
     assert main(replay) == 0
     regenerated = json.loads((tmp_path / "replay/result.json").read_bytes())
@@ -175,6 +187,8 @@ def test_ui_groups_advance_time_study_and_preserve_saved_results(monkeypatch):
     app.selectbox(key="h3_case").set_value("polynomial")
     app.selectbox(key="h3_kind_x0").set_value(3)
     app.number_input(key="h3_x").set_value(0)
+    app.number_input(key="h3_capacity_gamma").set_value(0.4)
+    app.number_input(key="h3_reaction_sigma").set_value(0.25)
     app.number_input(key="h3_T").set_value(0.003)
     app.number_input(key="h3_dt").set_value(0.002)
     app.number_input(key="h3_walks").set_value(1024)
@@ -193,6 +207,15 @@ def test_ui_groups_advance_time_study_and_preserve_saved_results(monkeypatch):
         assert row["completed_until"] == 0.003 and row["validation_walks"] > 0
         assert row["batch_size"] == 7 and csv_row["batch_size"] == "7"
     before = app.session_state["h3_comparison"]
+    assert before["metadata"]["configuration"]["capacity_gamma"] == 0.4
+    assert before["metadata"]["configuration"]["reaction_sigma"] == 0.25
+    app.number_input(key="h3_capacity_gamma").set_value(0.6).run()
+    assert (
+        app.session_state["h3_comparison"]["metadata"]["configuration"][
+            "capacity_gamma"
+        ]
+        == 0.4
+    )
     app.number_input(key="h3_batch_size").set_value(13).run()
     assert app.session_state["h3_comparison"]["history"] == before["history"]
     assert (
@@ -206,6 +229,8 @@ def test_ui_groups_advance_time_study_and_preserve_saved_results(monkeypatch):
     assert not app.error and not app.exception
     study = json.loads(downloads["h3_study_json"])
     assert len(study["rows"]) == 6
+    assert study["metadata"]["configuration"]["capacity_gamma"] == 0.6
+    assert study["metadata"]["configuration"]["reaction_sigma"] == 0.25
     assert study["metadata"]["solver_settings"]["batch_size"] == 13
     assert study["budgets_by_method"] == {
         method: [1024] for method in GROUPED_MC_METHODS
