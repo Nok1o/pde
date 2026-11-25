@@ -50,7 +50,7 @@ def test_cli_comparison_exports_query_history_and_independent_reference(tmp_path
         )
         == 0
     )
-    payload = json.loads((tmp_path / "result.json").read_text())
+    payload = json.loads((tmp_path / "result.json").read_text(encoding="utf-8"))
     metadata = payload["metadata"]
     row = payload["rows"][0]
     assert metadata["points_zyx"] == [[3, 2, 1]]
@@ -99,7 +99,7 @@ def test_failed_run_exports_status_and_actual_cost_without_target_values(tmp_pat
     with pytest.raises(SystemExit) as exc:
         main(["run", "--n", "4", "--max-outer", "1", "--out", str(tmp_path)])
     assert exc.value.code == 2
-    payload = json.loads((tmp_path / "result.json").read_text())
+    payload = json.loads((tmp_path / "result.json").read_text(encoding="utf-8"))
     row = payload["rows"][0]
     assert row["status"] == "outer_limit" and row["physical_steps"] == 0
     assert row["relative_error_pct"] is None
@@ -113,7 +113,7 @@ def test_failed_run_exports_status_and_actual_cost_without_target_values(tmp_pat
 
 def test_repeated_exports_remove_only_obsolete_managed_artifacts(tmp_path):
     user_file = tmp_path / "notes.txt"
-    user_file.write_text("keep")
+    user_file.write_text("keep", encoding="utf-8")
     assert main(["run", "--n", "4", "--T", "0", "--out", str(tmp_path)]) == 0
     assert (tmp_path / "query-values.npz").exists()
     assert (
@@ -128,7 +128,7 @@ def test_repeated_exports_remove_only_obsolete_managed_artifacts(tmp_path):
     assert main(["run", "--n", "4", "--T", "0", "--out", str(tmp_path)]) == 0
     assert not (tmp_path / "trials.csv").exists()
     assert not (tmp_path / "series.csv").exists()
-    assert user_file.read_text() == "keep"
+    assert user_file.read_text(encoding="utf-8") == "keep"
 
 
 def test_cli_study_matches_service_and_exports_separate_final_trials(tmp_path):
@@ -157,7 +157,7 @@ def test_cli_study_matches_service_and_exports_separate_final_trials(tmp_path):
         str(tmp_path),
     ]
     assert main(args) == 0
-    payload = json.loads((tmp_path / "result.json").read_text())
+    payload = json.loads((tmp_path / "result.json").read_text(encoding="utf-8"))
     expected = study_heat3d(
         HeatConfig3D(n=4, T=0, mode="slice", plane="yz", index=1),
         repeats=2,
@@ -209,7 +209,7 @@ def test_unreached_study_preserves_rows_and_returns_failure(tmp_path):
             ]
         )
     assert exc.value.code == 2
-    payload = json.loads((tmp_path / "result.json").read_text())
+    payload = json.loads((tmp_path / "result.json").read_text(encoding="utf-8"))
     assert all(
         row["status"] == "pilot_incomplete" and row["solver_status"] == "outer_limit"
         for row in payload["rows"]
@@ -229,7 +229,7 @@ def test_cli_requested_unavailable_diagnostic_returns_failure_after_export(tmp_p
     with pytest.raises(SystemExit) as exc:
         main(["run", "--n", "24", "--T", "0", "--newton", "--out", str(tmp_path)])
     assert exc.value.code == 2
-    result = json.loads((tmp_path / "result.json").read_text())
+    result = json.loads((tmp_path / "result.json").read_text(encoding="utf-8"))
     assert result["rows"][0]["status"] == "completed"
     assert result["grid_diagnostic"]["status"] == "unsupported"
 
