@@ -31,7 +31,9 @@ def main(argv=None):
     parser.add_argument("--dt", type=float, default=0.01)
     parser.add_argument("--point", nargs=3, type=int, metavar=("X", "Y", "Z"))
     parser.add_argument(
-        "--method", choices=("mc", "mc_grouped", "mc_control"), default="mc"
+        "--method",
+        choices=("mc", "mc_grouped", "mc_control", "mc_control_grouped"),
+        default="mc",
     )
     parser.add_argument("--batch-size", type=int, default=128)
     parser.add_argument("--walks", type=int, default=4096)
@@ -48,7 +50,10 @@ def main(argv=None):
     )
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args(argv)
-    batch_size = args.batch_size if args.method == "mc_grouped" else None
+    controlled = args.method in ("mc_control", "mc_control_grouped")
+    batch_size = (
+        args.batch_size if args.method in ("mc_grouped", "mc_control_grouped") else None
+    )
     if args.out.exists() and any(args.out.iterdir()):
         parser.error(
             "Папка результата должна быть пустой: предыдущие попытки не перезаписываются"
@@ -58,7 +63,7 @@ def main(argv=None):
     try:
         warm_start = perf_counter()
         warmup_mc3d(batch_size=batch_size)
-        if args.method == "mc_control":
+        if controlled:
             warmup_lines3d()
         warm_seconds = perf_counter() - warm_start
         start = perf_counter()
@@ -80,8 +85,10 @@ def main(argv=None):
             max_transitions=args.max_transitions,
             max_workspace_bytes=args.max_workspace_bytes,
         )
+        if batch_size is not None:
+            settings["batch_size"] = batch_size
         operator = None
-        if args.method == "mc_control":
+        if controlled:
             context_seconds = perf_counter() - start
             result = solve_controlled_frozen_mc3d(
                 problem,
@@ -97,8 +104,6 @@ def main(argv=None):
             )
             construction_seconds = context_seconds + result.operator_seconds
         else:
-            if args.method == "mc_grouped":
-                settings["batch_size"] = batch_size
             operator = freeze_heat3d(problem, previous, previous, args.dt, args.dt)
             construction_seconds = perf_counter() - start
             result = solve_frozen_mc3d(operator, points, **settings)
