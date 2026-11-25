@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 from benchmarks import heat3d_fixed
+from benchmarks.heat3d_six_report import group_rows
 from pdelab.heat3d_solver import HeatSettings3D
 
 
@@ -52,3 +53,24 @@ def test_fixed_budget_retains_failed_work_without_average_of_successes(
     else:
         assert summary["relative_error_pct"] == pytest.approx(10.0)
         assert summary["completed_mean_seconds"] == 2.0
+
+
+def test_group_ratio_requires_two_complete_series():
+    def payload(complete, seconds):
+        return {
+            "fixed_budget": {
+                "summary": {
+                    "complete": complete,
+                    "completed_mean_seconds": seconds,
+                }
+            },
+            "process": {"peak_rss_bytes_before_export": 100},
+        }
+
+    rows = group_rows(
+        [
+            ("case--mc", payload(False, None), "fixed_budget"),
+            ("case--mc_grouped-b32", payload(True, 2.0), "fixed_budget"),
+        ]
+    )
+    assert all(row["time_ratio_to_ordinary"] is None for row in rows)
