@@ -181,7 +181,7 @@ def _evaluate_boundaries(
         )
         rhs = capacity * previous * inverse_dt + source if scale else None
         diagonal = (
-            (capacity + 2 * problem.capacity_gamma * values * difference_in_time)
+            (capacity + (problem.capacity_gamma * values * difference_in_time) * 2)
             * inverse_dt
             + 3 * reaction
             if jacobian

@@ -8,7 +8,8 @@ import pytest
 from pdelab.boundary3d import FACES
 from pdelab.heat3d_mc import frozen_mc_coefficients
 from pdelab.heat3d_operator import freeze_heat3d
-from pdelab.heat3d_problem import make_heat_problem3d
+from pdelab.heat3d_problem import HeatFace3D, HeatProblem3D, make_heat_problem3d
+from pdelab.heat3d_solver import solve_heat3d
 
 
 @pytest.mark.parametrize("name", ["capacity_gamma", "reaction_sigma"])
@@ -71,3 +72,22 @@ def test_material_zero_limit_and_safe_extreme_values():
     for function in (p.capacity, p.reaction_coefficient):
         with pytest.raises(ValueError):
             function([1e200])
+
+
+def test_large_finite_capacity_parameter_keeps_zero_solution_finite():
+    def zero(x, y, z, t):
+        return 0.0
+
+    problem = HeatProblem3D(
+        name="zero",
+        n=4,
+        alpha=0,
+        initial=zero,
+        source=zero,
+        faces={face: HeatFace3D(1, zero) for face in FACES},
+        capacity_gamma=1e308,
+    )
+    for method in ("lod", "newton"):
+        result = solve_heat3d(problem, method=method, dt=0.01, T=0.02)
+        assert result.status == "completed"
+        np.testing.assert_array_equal(result.values, 0.0)
