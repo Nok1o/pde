@@ -52,6 +52,10 @@ def test_cli_all_six_methods_export_actual_group_settings_and_reproduce(
                 "7",
                 "--coarse-n",
                 "4",
+                "--history-mode",
+                "layers",
+                "--conductivity-refresh-layers",
+                "4",
                 "--out",
                 str(out),
             ]
@@ -60,6 +64,8 @@ def test_cli_all_six_methods_export_actual_group_settings_and_reproduce(
     )
     saved = json.loads((out / "result.json").read_bytes())
     assert saved["metadata"]["solver_settings"]["batch_size"] == 7
+    assert saved["metadata"]["solver_settings"]["history_mode"] == "layers"
+    assert saved["metadata"]["solver_settings"]["conductivity_refresh_layers"] == 4
     assert saved["metadata"]["configuration"]["capacity_gamma"] == gamma
     assert saved["metadata"]["configuration"]["reaction_sigma"] == sigma
     assert "c(u_new)" in saved["metadata"]["material_model"]["time_discretization"]
@@ -69,6 +75,14 @@ def test_cli_all_six_methods_export_actual_group_settings_and_reproduce(
         method = row["method"]
         assert row["status"] == "completed" and row["physical_steps"] == 2
         assert row["completed_until"] == 0.003
+        assert row["history_mode"] == "layers"
+        assert row["conductivity_refresh_layers"] == 4
+        assert row["conductivity_reuses"] == 1
+        history = [record for record in saved["history"] if record["method"] == method]
+        assert len(history) == 2
+        assert row["history_records_discarded"] == sum(
+            record["records_discarded"] for record in history
+        )
         assert row["batch_size"] == (7 if method in GROUPED_MC_METHODS else None)
         assert csv_row["batch_size"] == ("7" if method in GROUPED_MC_METHODS else "")
         if row["walks_applicable"]:
@@ -93,6 +107,11 @@ def test_cli_all_six_methods_export_actual_group_settings_and_reproduce(
             "transitions",
             "relative_error_pct",
             "validation_walks",
+            "history_mode",
+            "history_records_discarded",
+            "conductivity_refresh_layers",
+            "conductivity_reuses",
+            "conductivity_fallbacks",
         ):
             assert row[key] == repeated[key]
 
@@ -116,6 +135,10 @@ def test_grouped_study_keeps_per_method_settings_and_failed_attempts(tmp_path):
                 "3",
                 "--max-walks",
                 "1",
+                "--history-mode",
+                "layers",
+                "--conductivity-refresh-layers",
+                "4",
                 "--batch-size",
                 "7",
                 "--budgets",
@@ -138,6 +161,11 @@ def test_grouped_study_keeps_per_method_settings_and_failed_attempts(tmp_path):
     for collection in ("rows", "trials", "series"):
         for row in study[collection]:
             method = row["method"]
+            assert row["history_mode"] == "layers"
+            assert row["conductivity_refresh_layers"] == 4
+            assert isinstance(row["conductivity_reuses"], int)
+            assert isinstance(row["conductivity_fallbacks"], int)
+            assert isinstance(row["history_records_discarded"], int)
             assert row["batch_size"] == (7 if method in GROUPED_MC_METHODS else None)
             if method not in ("lod", "block"):
                 assert row["coarse_n"] == (4 if method in CONTROL_MC_METHODS else None)
@@ -195,6 +223,8 @@ def test_ui_groups_advance_time_study_and_preserve_saved_results(monkeypatch):
     app.number_input(key="h3_mc_seed").set_value(179)
     app.number_input(key="h3_batch_size").set_value(7)
     app.number_input(key="h3_coarse_n").set_value(4)
+    app.selectbox(key="h3_history_mode").set_value("layers")
+    app.number_input(key="h3_conductivity_refresh_layers").set_value(4)
     app.button(key="h3_run").click().run()
     assert not app.error and not app.exception
     with zipfile.ZipFile(io.BytesIO(downloads["h3_comparison_zip"])) as archive:
@@ -207,6 +237,22 @@ def test_ui_groups_advance_time_study_and_preserve_saved_results(monkeypatch):
         assert row["completed_until"] == 0.003 and row["validation_walks"] > 0
         assert row["batch_size"] == 7 and csv_row["batch_size"] == "7"
     before = app.session_state["h3_comparison"]
+    assert before["metadata"]["solver_settings"]["history_mode"] == "layers"
+    assert before["metadata"]["solver_settings"]["conductivity_refresh_layers"] == 4
+    app.selectbox(key="h3_history_mode").set_value("full").run()
+    app.number_input(key="h3_conductivity_refresh_layers").set_value(2).run()
+    assert (
+        app.session_state["h3_comparison"]["metadata"]["solver_settings"][
+            "history_mode"
+        ]
+        == "layers"
+    )
+    assert (
+        app.session_state["h3_comparison"]["metadata"]["solver_settings"][
+            "conductivity_refresh_layers"
+        ]
+        == 4
+    )
     assert before["metadata"]["configuration"]["capacity_gamma"] == 0.4
     assert before["metadata"]["configuration"]["reaction_sigma"] == 0.25
     app.number_input(key="h3_capacity_gamma").set_value(0.6).run()
@@ -232,6 +278,8 @@ def test_ui_groups_advance_time_study_and_preserve_saved_results(monkeypatch):
     assert study["metadata"]["configuration"]["capacity_gamma"] == 0.6
     assert study["metadata"]["configuration"]["reaction_sigma"] == 0.25
     assert study["metadata"]["solver_settings"]["batch_size"] == 13
+    assert study["metadata"]["solver_settings"]["history_mode"] == "full"
+    assert study["metadata"]["solver_settings"]["conductivity_refresh_layers"] == 2
     assert study["budgets_by_method"] == {
         method: [1024] for method in GROUPED_MC_METHODS
     }

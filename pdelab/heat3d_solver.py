@@ -225,6 +225,8 @@ def _record(
         transitions=0,
         reason="completed" if accepted else layer.reason,
         lagged_conductivity=layer.lagged_conductivity,
+        conductivity_reuses=layer.conductivity_reuses,
+        conductivity_fallbacks=layer.conductivity_fallbacks,
     )
     if relaxation is not None:
         row["relaxation"] = relaxation
@@ -626,7 +628,7 @@ def solve_heat3d(
     if unsupported:
         if any(face.kind not in (1, 3) for face in problem.faces.values()):
             reason = "Поддержаны граничные условия 1 и 3 рода"
-        elif method == "block":
+        elif method == "block" and problem.n > BLOCK_MAX_N:
             reason = (
                 f"Матричная прогонка ограничена n≤{BLOCK_MAX_N} из-за плотных блоков"
             )

@@ -50,6 +50,11 @@ MC_DIAGNOSTICS = (
     "interpolation_seconds",
     "defect_seconds",
 )
+OPTIMIZATION_DIAGNOSTICS = (
+    "history_records_discarded",
+    "conductivity_reuses",
+    "conductivity_fallbacks",
+)
 STATUS_LABELS = {
     "not_requested": "Проверка не выбрана",
     "completed": "Завершён",
@@ -295,6 +300,10 @@ def _reproduction(
         str(settings.max_seconds),
         "--max-workspace-bytes",
         str(settings.max_workspace_bytes),
+        "--history-mode",
+        settings.history_mode,
+        "--conductivity-refresh-layers",
+        str(settings.conductivity_refresh_layers),
     ]
     if config.mode == "point" and config.point is not None:
         parts += ["--point", *(str(v) for v in config.point)]
@@ -465,6 +474,8 @@ def _study_diagnostics(study, method, diagnostics, settings):
             row.update(
                 method=method,
                 method_name=METHOD_NAMES[method],
+                history_mode=settings.history_mode,
+                conductivity_refresh_layers=settings.conductivity_refresh_layers,
                 batch_size=(
                     settings.batch_size if method in GROUPED_MC_METHODS else None
                 ),
@@ -485,7 +496,11 @@ def _study_diagnostics(study, method, diagnostics, settings):
                     if (trial["phase"], trial["candidate"])
                     == (row["phase"], row["candidate"])
                 ]
-                for key in (*BLOCK_DIAGNOSTICS, *MC_DIAGNOSTICS):
+                for key in (
+                    *BLOCK_DIAGNOSTICS,
+                    *MC_DIAGNOSTICS,
+                    *OPTIMIZATION_DIAGNOSTICS,
+                ):
                     values = [trial.get(key) for trial in trials]
                     if any(value is not None for value in values):
                         row[key] = (
@@ -560,7 +575,10 @@ def study_heat3d(
             diagnostics.append(
                 {
                     key: getattr(result, key)
-                    for key in (MC_DIAGNOSTICS if stochastic else BLOCK_DIAGNOSTICS)
+                    for key in (
+                        *(MC_DIAGNOSTICS if stochastic else BLOCK_DIAGNOSTICS),
+                        *OPTIMIZATION_DIAGNOSTICS,
+                    )
                     if getattr(result, key, None) is not None
                 }
             )

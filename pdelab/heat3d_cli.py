@@ -58,6 +58,18 @@ def main(argv=None):
     parser.add_argument("--max-inner", type=int, default=20000)
     parser.add_argument("--max-seconds", type=float, default=60.0)
     parser.add_argument("--max-workspace-bytes", type=int, default=256 * 1024**2)
+    parser.add_argument(
+        "--history-mode",
+        choices=("full", "layers"),
+        default="full",
+        help="Все итерации или только итоговая запись каждого физического слоя",
+    )
+    parser.add_argument(
+        "--conductivity-refresh-layers",
+        type=int,
+        default=1,
+        help="Максимальный возраст пробной проводимости в слоях; 1 — без задержки",
+    )
     parser.add_argument("--repeats", type=int, default=5)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument(
@@ -142,6 +154,8 @@ def main(argv=None):
         max_inner=args.max_inner,
         max_seconds=args.max_seconds,
         max_workspace_bytes=args.max_workspace_bytes,
+        history_mode=args.history_mode,
+        conductivity_refresh_layers=args.conductivity_refresh_layers,
         walks=args.walks,
         seed=args.seed,
         coarse_n=args.coarse_n,

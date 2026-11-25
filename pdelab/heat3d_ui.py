@@ -86,6 +86,29 @@ def _downloads(result, key):
     )
 
 
+def _optimization_diagnostics(rows):
+    labels = {
+        "method_name": "Метод",
+        "phase": "Серия",
+        "budget": "Бюджет",
+        "history_mode": "Хранение истории",
+        "history_records_discarded": "Сокращено промежуточных записей",
+        "conductivity_refresh_layers": "Максимальный возраст k, слоёв",
+        "conductivity_reuses": "Проб с прежней проводимостью",
+        "conductivity_fallbacks": "Возвратов к свежей проводимости",
+    }
+    st.dataframe(
+        pd.DataFrame(
+            [
+                {label: row[key] for key, label in labels.items() if key in row}
+                for row in rows
+            ]
+        ),
+        hide_index=True,
+        width="stretch",
+    )
+
+
 def _saved_settings(result, current):
     saved = result["metadata"]
     if (
@@ -351,6 +374,21 @@ def render_heat3d_app():
                 value=256,
                 key="h3_memory",
             )
+        with st.expander("Хранение истории и проводимость", key="h3_optimizations"):
+            history_mode = st.selectbox(
+                "Сохранять историю",
+                ("full", "layers"),
+                format_func={"full": "Все итерации", "layers": "Итог каждого слоя"}.get,
+                key="h3_history_mode",
+            )
+            conductivity_refresh_layers = st.number_input(
+                "Максимальный возраст пробной проводимости, слоёв",
+                min_value=1,
+                max_value=10000,
+                value=1,
+                help="1 — обычный Пикар. При большем значении первый шаг слоя может использовать прежнюю проводимость. Приёмка всегда проверяет текущее нелинейное уравнение; при неудаче проводимость обновляется.",
+                key="h3_conductivity_refresh_layers",
+            )
         run = st.button(
             "Рассчитать 3D",
             type="primary",
@@ -387,6 +425,8 @@ def render_heat3d_app():
         max_inner=inner,
         max_seconds=seconds,
         max_workspace_bytes=memory * 1024**2,
+        history_mode=history_mode,
+        conductivity_refresh_layers=conductivity_refresh_layers,
         walks=walks,
         seed=mc_seed,
         coarse_n=coarse_n,
@@ -562,10 +602,18 @@ def render_heat3d_app():
                         width="stretch",
                     )
             with st.expander("История невязок и итераций", key="h3_history"):
+                if (
+                    result["metadata"]["solver_settings"].get("history_mode")
+                    == "layers"
+                ):
+                    st.caption(
+                        "Сохранён итог каждого слоя. Затраты включают все его итерации; невязка и seed относятся к последней записи."
+                    )
                 st.dataframe(
                     pd.DataFrame(result["history"]), hide_index=True, width="stretch"
                 )
                 _block_diagnostics(result["rows"])
+                _optimization_diagnostics(result["rows"])
             _downloads(result, "h3_comparison")
     with study_tab:
         st.caption(
@@ -713,4 +761,8 @@ def render_heat3d_app():
                     "Затраты матричной прогонки по сериям", key="h3_block_study"
                 ):
                     _block_diagnostics(study["series"])
+            with st.expander(
+                "Хранение и проводимость по сериям", key="h3_optimization_study"
+            ):
+                _optimization_diagnostics(study["series"])
             _downloads(study, "h3_study")
