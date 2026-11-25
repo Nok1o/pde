@@ -1,0 +1,35 @@
+{
+  "schema_version": "measurement_v1",
+  "selection_policy": "frozen_budget_holdout_v1",
+  "accuracy_metric": "mean_run_relative_l2_v1",
+  "state": "plan_only_no_measurements",
+  "root_seed": 20261125,
+  "repeats": 5,
+  "targets_pct": [1, 5, 10],
+  "calibration_fraction": {"mc": 0.5, "lod_serial": 1.0},
+  "methods": [{"index": 0, "name": "lod_serial"}, {"index": 1, "name": "mc"}],
+  "grids": [16, 32],
+  "queries_xyz": [[0.5, 0.5, 0.5], [0.25, 0.5, 0.75]],
+  "execution_order": "n16 center first; extend only after resource review; no Cartesian product",
+  "cases": [
+    {"index": 0, "name": "stationary_shifted_sine", "snapshot_time": 0, "state": "unverified_adapter_required"},
+    {"index": 1, "name": "stationary_cross_polynomial", "snapshot_time": 0, "state": "unverified_adapter_required"}
+  ],
+  "boundary_series": ["all_dirichlet", "y0_robin_beta1", "all_robin_beta1"],
+  "budgets": {
+    "mc_paths_per_estimate": [64, 256, 1024, 4096, 16384, 65536],
+    "lod_relative_residual_tolerance": [0.01, 0.001, 0.0001, 0.00001],
+    "lod_max_iterations": 20000,
+    "mc_max_transitions_per_path": 1000000
+  },
+  "limits": {
+    "pilot_seconds_per_case_method": 120,
+    "control_seconds_per_case_method": 120,
+    "time_limit_kind": "soft_total_phase_budget_finish_started_run",
+    "max_workspace_bytes": 2147483648,
+    "memory_limit_kind": "preflight_estimate_skip_if_exceeded"
+  },
+  "scenario": "cold_solve",
+  "baseline_commit_reviewed": "a411f8bbcebc4fcd09116f028c370e56bde62296",
+  "note": "Runner must record its actual commit/environment and freeze selection before control. Do not treat this file as measured data."
+}
