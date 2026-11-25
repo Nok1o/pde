@@ -173,7 +173,7 @@ class HeatOperator3D:
 
 
 def freeze_heat3d(problem, previous, iterate, t, dt):
-    """Freeze k for one implicit layer; essential nodes always use physical g(t)."""
+    """Freeze k, c and cubic loss for one implicit physical-time layer."""
     if not np.isfinite(dt) or dt <= 0:
         raise ValueError("Длина слоя dt должна быть конечной и положительной")
     previous = _field(previous, problem.shape, "previous")
@@ -181,6 +181,8 @@ def freeze_heat3d(problem, previous, iterate, t, dt):
     fixed, boundary = dirichlet_data3d(problem, t)
     iterate[fixed] = boundary[fixed]
     conductivity = problem.conductivity(iterate)
+    capacity = problem.capacity(iterate)
+    reaction = problem.reaction_coefficient(iterate)
     weights = np.zeros((*problem.shape, 6))
     with np.errstate(over="ignore", invalid="ignore", divide="ignore"):
         for direction in range(0, 6, 2):
@@ -198,8 +200,8 @@ def freeze_heat3d(problem, previous, iterate, t, dt):
             axis, end = FACE_AXES[face]
             inward = 2 * axis + (end != 0)
             weights[index + (inward,)] *= 2
-        diagonal = 1 / dt + weights.sum(axis=-1)
-        rhs = previous / dt + problem.evaluate(problem.source, t)
+        diagonal = capacity / dt + weights.sum(axis=-1) + reaction
+        rhs = capacity * (previous / dt) + problem.evaluate(problem.source, t)
         for face, index in face_indices().items():
             condition = problem.faces[face]
             if condition.kind == 3:

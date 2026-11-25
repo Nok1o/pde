@@ -166,14 +166,27 @@ def _evaluate_boundaries(
     indices = np.full(values.shape, -1, dtype=int) if jacobian else None
     if jacobian:
         indices[free] = np.arange(size)
-    diagonal = np.full(values.shape, inverse_dt) if jacobian else None
     with np.errstate(over="ignore", invalid="ignore"):
         scaled = np.sqrt(alpha) * values
         conductivity = 1 + scaled * scaled
         if not np.isfinite(conductivity).all():
             raise ValueError("Проводимость должна быть конечной")
-        residual = (values - previous) * inverse_dt - source
-        rhs = previous * inverse_dt + source if scale else None
+        # Independent material formulas; do not call the production coefficient
+        # helpers or frozen operator when differentiating the nonlinear problem.
+        capacity = 1 + (np.sqrt(problem.capacity_gamma) * values) ** 2
+        reaction = (np.sqrt(problem.reaction_sigma) * values) ** 2
+        difference_in_time = values - previous
+        residual = (
+            capacity * difference_in_time * inverse_dt + reaction * values - source
+        )
+        rhs = capacity * previous * inverse_dt + source if scale else None
+        diagonal = (
+            (capacity + 2 * problem.capacity_gamma * values * difference_in_time)
+            * inverse_dt
+            + 3 * reaction
+            if jacobian
+            else None
+        )
         for index, beta, load in robin:
             # k * du/dn is already present in r; no additional k belongs here.
             residual[index] += 2 * n * (beta * values[index] - load)

@@ -38,13 +38,18 @@ def free_nodes(problem):
 
 @pytest.mark.parametrize("configuration", ["mixed", "all3"])
 @pytest.mark.parametrize("alpha", [0.0, 0.5])
-def test_every_robin_jacobian_column_matches_finite_differences(configuration, alpha):
+@pytest.mark.parametrize("gamma,sigma", [(0.0, 0.0), (0.6, 0.4)])
+def test_every_robin_jacobian_column_matches_finite_differences(
+    configuration, alpha, gamma, sigma
+):
     problem = make_heat_problem3d(
         "polynomial",
         n=4,
         alpha=alpha,
         kinds=face_kinds(configuration),
         beta={face: 0.8 + 0.3 * i for i, face in enumerate(face_kinds(configuration))},
+        capacity_gamma=gamma,
+        reaction_sigma=sigma,
     )
     rng = np.random.default_rng(427)
     values = problem.initial_values() + rng.normal(scale=0.2, size=problem.shape)
@@ -129,9 +134,17 @@ def test_explicit_dirichlet_problem_preserves_legacy_rows_and_scale():
 @pytest.mark.parametrize("configuration", ["mixed", "all3"])
 @pytest.mark.parametrize("case", ["sine", "polynomial"])
 @pytest.mark.parametrize("alpha", [0.0, 0.5])
-def test_complete_robin_chain_matches_three_solvers(configuration, case, alpha):
+@pytest.mark.parametrize("gamma,sigma", [(0.0, 0.0), (0.5, 0.25)])
+def test_complete_robin_chain_matches_three_solvers(
+    configuration, case, alpha, gamma, sigma
+):
     problem = make_heat_problem3d(
-        case, n=4, alpha=alpha, kinds=face_kinds(configuration)
+        case,
+        n=4,
+        alpha=alpha,
+        kinds=face_kinds(configuration),
+        capacity_gamma=gamma,
+        reaction_sigma=sigma,
     )
     points = np.array(list(np.ndindex(problem.shape)))
     exact = problem.evaluate(problem.exact, 0.03)

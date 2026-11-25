@@ -18,7 +18,7 @@ from pdelab.heat3d_operator import (
 from pdelab.heat3d_problem import HeatFace3D, HeatProblem3D, make_heat_problem3d
 
 
-def _problem(essential=(), alpha=0.6):
+def _problem(essential=(), alpha=0.6, gamma=0.0, sigma=0.0):
     def initial(x, y, z, t):
         return 1 + x + 2 * y + 3 * z + t
 
@@ -36,6 +36,8 @@ def _problem(essential=(), alpha=0.6):
             )
             for i, face in enumerate(FACES)
         },
+        capacity_gamma=gamma,
+        reaction_sigma=sigma,
     )
 
 
@@ -51,7 +53,7 @@ def _independent_system(problem, previous, iterate, t, dt):
     fixed = np.zeros(shape, dtype=bool)
     boundary = np.zeros(shape)
     reaction = np.zeros(shape)
-    load = problem.evaluate(problem.source, t) + previous / dt
+    load = problem.evaluate(problem.source, t).copy()
     field = iterate.copy()
     for node in np.ndindex(shape):
         z, y, x = np.array(node) / n
@@ -65,6 +67,9 @@ def _independent_system(problem, previous, iterate, t, dt):
                 load[node] += 2 * n * datum
     field[fixed] = boundary[fixed]
     k = 1 + problem.alpha * field**2
+    mass = (1 + problem.capacity_gamma * field**2) / dt
+    loss = problem.reaction_sigma * field**2
+    load += mass * previous
     matrix = np.zeros((field.size, field.size))
     rhs = load.ravel().copy()
     for node in np.ndindex(shape):
@@ -72,7 +77,7 @@ def _independent_system(problem, previous, iterate, t, dt):
         if fixed[node]:
             matrix[row, row], rhs[row] = 1, boundary[node]
             continue
-        matrix[row, row] = 1 / dt + reaction[node]
+        matrix[row, row] = mass[node] + loss[node] + reaction[node]
         for axis in range(3):
             for step in (-1, 1):
                 neighbor = list(node)
@@ -91,8 +96,11 @@ def _independent_system(problem, previous, iterate, t, dt):
 
 
 @pytest.mark.parametrize("essential", [(), ("x0",), ("x0", "y1", "z0"), FACES])
-def test_scalar_dual_volume_rows_include_mixed_elimination_and_all_kind1(essential):
-    problem = _problem(essential)
+@pytest.mark.parametrize("gamma,sigma", [(0.0, 0.0), (0.7, 0.3)])
+def test_scalar_dual_volume_rows_include_mixed_elimination_and_all_kind1(
+    essential, gamma, sigma
+):
+    problem = _problem(essential, gamma=gamma, sigma=sigma)
     rng = np.random.default_rng(26)
     previous = rng.uniform(0.5, 1.5, problem.shape)
     iterate = rng.uniform(-1, 2, problem.shape)

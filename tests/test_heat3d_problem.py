@@ -26,8 +26,13 @@ def derivative(fn, coords, t, component, step):
 
 @pytest.mark.parametrize("kind", ["sine", "polynomial"])
 @pytest.mark.parametrize("alpha", [0.0, 0.5])
-def test_source_against_numerical_flux_divergence(kind, alpha):
-    problem = make_heat_problem3d(kind, alpha=alpha)
+@pytest.mark.parametrize(
+    "gamma,sigma", [(0.0, 0.0), (0.4, 0.0), (0.0, 0.3), (0.4, 0.3)]
+)
+def test_source_against_numerical_flux_divergence(kind, alpha, gamma, sigma):
+    problem = make_heat_problem3d(
+        kind, alpha=alpha, capacity_gamma=gamma, reaction_sigma=sigma
+    )
     coords = (np.array([0.17, 0.43, 0.72]), np.array([0.31, 0.58, 0.81]), 0.37)
     t, h = 0.13, 2e-5
     ut = (problem.exact(*coords, t + h) - problem.exact(*coords, t - h)) / (2 * h)
@@ -42,7 +47,12 @@ def test_source_against_numerical_flux_divergence(kind, alpha):
 
         divergence += derivative(flux, coords, t, component, h)
     np.testing.assert_allclose(
-        problem.source(*coords, t), ut - divergence, atol=4e-6, rtol=2e-6
+        problem.source(*coords, t),
+        (1 + gamma * problem.exact(*coords, t) ** 2) * ut
+        - divergence
+        + sigma * problem.exact(*coords, t) ** 3,
+        atol=4e-6,
+        rtol=2e-6,
     )
 
 
