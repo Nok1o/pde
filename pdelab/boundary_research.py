@@ -43,8 +43,9 @@ def boundary_accuracy_study(
         raise ValueError("Нужно минимум два независимых повтора")
     if not np.isfinite(seconds_per_method) or seconds_per_method <= 0:
         raise ValueError("Лимит времени должен быть положительным")
-    config = replace(config, mode="point")
     is3d = isinstance(config, BoundaryConfig3D)
+    if not is3d:
+        config = replace(config, mode="point")
     make = problem_from_config3d if is3d else problem_from_config
     operator_type = BoundaryOperator3D if is3d else BoundaryOperator
     solver = solve_boundary3d if is3d else solve_boundary
@@ -64,7 +65,9 @@ def boundary_accuracy_study(
     if is3d:
         from .boundary3d import select_boundary_points3d
 
-        points = select_boundary_points3d(config.n, "point", config.point)
+        points = select_boundary_points3d(
+            config.n, config.mode, config.point, config.plane, config.index
+        )
     else:
         points = select_boundary_points(config.n, "point", config.point)
     if problem.exact is None and is3d and problem.n > DIRECT_MAX_N:
@@ -72,13 +75,13 @@ def boundary_accuracy_study(
     reference = (
         operator.solve() if problem.exact is None else operator.normalize(problem.exact)
     )
-    target = float(reference[tuple(points[0])])
-    (warmup_boundary3d if is3d else warmup_boundary)()
     if is3d:
+        target_values = reference[tuple(points.T)]
+        warmup_boundary3d(methods)
         study = study_stationary3d(
             problem,
             points,
-            reference[tuple(points.T)],
+            target_values,
             methods,
             repeats=repeats,
             seed=config.seed,
@@ -101,8 +104,13 @@ def boundary_accuracy_study(
             budgets=list(budgets),
             tolerances=list(tolerances),
             reference_kind="grid" if problem.exact is None else "analytic",
-            reference_value=target,
+            points_zyx=points.tolist(),
+            reference_value=(
+                float(target_values[0]) if len(points) == 1 else target_values.tolist()
+            ),
         )
+    warmup_boundary()
+    target = float(reference[tuple(points[0])])
     trials, rows = [], []
 
     def measure(method, budget, budget_index, phase, deadline):

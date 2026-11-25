@@ -1,6 +1,7 @@
 """Mixed boundary data on six faces; coordinates (x,y,z), arrays [z,y,x]."""
 
-from dataclasses import dataclass, replace
+from copy import copy
+from dataclasses import dataclass
 from types import MappingProxyType
 
 import numpy as np
@@ -62,7 +63,12 @@ class BoundaryProblem3D:
 
     def without_reference(self):
         """Supply only the sampled source and faces to a stationary backend."""
-        return self if self.exact is None else replace(self, exact=None)
+        if self.exact is None:
+            return self
+        # The frozen source and face data are safe to share with the solver.
+        inputs = copy(self)
+        object.__setattr__(inputs, "exact", None)
+        return inputs
 
     @property
     def pure_neumann(self):

@@ -35,11 +35,13 @@ def worker(case_id, method):
             result = solve_boundary3d(
                 p, points, method, walks=WALKS, seed=seed, batch_size=BATCH_SIZE
             )
+            wall_seconds = perf_counter() - start
             work = result.extras
             row.update(
                 status="completed",
                 reason="",
-                seconds=result.elapsed,
+                seconds=wall_seconds,
+                solver_seconds=result.elapsed,
                 walks=result.walks,
                 started_walks=work.get("started_walks", result.walks),
                 transitions=result.steps,
@@ -48,11 +50,13 @@ def worker(case_id, method):
             )
             del result
         except GroupedWalkFailure as exc:
+            wall_seconds = perf_counter() - start
             work = exc.diagnostics
             row.update(
                 status=exc.status,
                 reason=str(exc),
-                seconds=exc.seconds,
+                seconds=wall_seconds,
+                solver_seconds=exc.seconds,
                 walks=work["walks"],
                 started_walks=work["started_walks"],
                 transitions=work["transitions"],
@@ -63,6 +67,7 @@ def worker(case_id, method):
                 status="solver_failed",
                 reason=str(exc),
                 seconds=perf_counter() - start,
+                solver_seconds=None,
                 walks=None,
                 started_walks=None,
                 transitions=None,
@@ -95,6 +100,13 @@ def worker(case_id, method):
     )
 
 
+def benchmark_hashes():
+    return {
+        name: hashlib.sha256(Path(__file__).with_name(name).read_bytes()).hexdigest()
+        for name in ("robin_cache3d.py", "robin_events3d.py")
+    }
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     mode = parser.add_mutually_exclusive_group(required=True)
@@ -110,6 +122,7 @@ def main():
         raise ValueError("Choose a new output file")
     args.out.parent.mkdir(parents=True, exist_ok=True)
     before = source_state()
+    scripts = benchmark_hashes()
     results = []
     for case_id in range(len(CASES)):
         for method in METHODS:
@@ -126,6 +139,7 @@ def main():
     if (
         before["combined_sha256"] != after["combined_sha256"]
         or before["commit"] != after["commit"]
+        or scripts != benchmark_hashes()
     ):
         raise RuntimeError("Measured source changed during the comparison")
     write_json(
@@ -133,9 +147,7 @@ def main():
         dict(
             baseline_metadata=metadata(),
             source=before,
-            comparison_script_sha256=hashlib.sha256(
-                Path(__file__).read_bytes()
-            ).hexdigest(),
+            benchmark_sha256=scripts,
             batch_size=BATCH_SIZE,
             max_steps=1000 * N**2,
             results=results,

@@ -209,7 +209,6 @@ def solve_boundary3d(
         return solve_extended(problem, points, method, walks, seed, max_steps)
     if method not in METHODS_BOUNDARY_3D:
         raise ValueError("Неизвестный метод для стационарной задачи 3D")
-    points = validate_points3d(problem.n, points)
     for name, value, minimum, maximum in (
         ("walks", walks, 2, 2**31 - 1),
         ("seed", seed, 0, 2**32 - 1),
@@ -242,6 +241,7 @@ def solve_boundary3d(
             max_steps=limit,
             batch_size=batch_size,
         )
+    points = validate_points3d(problem.n, points)
     with NUMBA_LOCK:
         started = perf_counter()
         operator = BoundaryOperator3D(problem)
@@ -277,21 +277,18 @@ def solve_boundary3d(
         return result
 
 
-_warmed = False
+_warmed_methods = set()
 
 
-def warmup_boundary3d():
-    global _warmed
+def warmup_boundary3d(methods=("lod_serial", "mc", "mc_grouped")):
     with NUMBA_LOCK:
-        if _warmed:
-            return
-        p = make_boundary_problem3d(n=4)
-        for method in METHODS_BOUNDARY_3D:
-            if method in ("wos", "graded"):
-                continue
-            solve_boundary3d(p, [[2, 2, 2]], method, walks=4, max_iter=1)
+        missing = set(methods).difference(_warmed_methods, {"wos", "graded"})
+        if missing:
+            problem = make_boundary_problem3d(n=4)
+            for method in sorted(missing):
+                solve_boundary3d(problem, [[2, 2, 2]], method, walks=4, max_iter=1)
+                _warmed_methods.add(method)
         warmup3d()
-        _warmed = True
 
 
 def trace_boundary_walk3d(problem, point=None, seed=2026, max_steps=20000):

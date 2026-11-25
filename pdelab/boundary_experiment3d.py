@@ -117,7 +117,7 @@ def _prepare(config, methods, budgets=None, tolerances=None):
     )
     grid = operator.solve() if problem.n <= DIRECT_MAX_N else None
     reference = grid if problem.exact is None else operator.normalize(problem.exact)
-    warmup_boundary3d()
+    warmup_boundary3d(methods)
     return problem, points, grid, reference, methods
 
 

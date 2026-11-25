@@ -6,12 +6,92 @@ import json
 import zipfile
 from pathlib import Path
 
+import numpy as np
 import pytest
 import streamlit as st
 from streamlit.testing.v1 import AppTest
 
 from pdelab.boundary_cli3d import main
 from pdelab.boundary_solvers3d import CACHED_METHODS
+
+
+def test_warmup_compiles_only_requested_boundary_variants_once(monkeypatch):
+    from pdelab import boundary_solvers3d as solvers
+
+    called = []
+    monkeypatch.setattr(solvers, "_warmed_methods", set())
+    monkeypatch.setattr(solvers, "warmup3d", lambda: None)
+    monkeypatch.setattr(
+        solvers,
+        "solve_boundary3d",
+        lambda p, q, method, **kwargs: called.append(method),
+    )
+    solvers.warmup_boundary3d(["mc"])
+    solvers.warmup_boundary3d(["mc", "mc_cached"])
+    solvers.warmup_boundary3d(["mc_cached", "mc_grouped_cached"])
+    assert called == ["mc", "mc_cached", "mc_grouped_cached"]
+
+
+def test_backend_view_shares_only_immutable_inputs():
+    from pdelab.boundary3d import make_boundary_problem3d
+
+    problem = make_boundary_problem3d(n=4)
+    inputs = problem.without_reference()
+    assert inputs.exact is None and problem.exact is not None
+    assert inputs.f is problem.f and not inputs.f.flags.writeable
+    assert inputs.faces is problem.faces
+    assert inputs.without_reference() is inputs
+
+
+def test_ui_estimates_paths_for_every_selected_stochastic_method():
+    from pdelab.boundary_experiment3d import BoundaryConfig3D
+    from pdelab.boundary_workload3d import boundary_limit_message3d, boundary_workload3d
+
+    config = BoundaryConfig3D(n=32, walks=4096, kinds=("robin",) + ("neumann",) * 5)
+    methods = ["lod_serial", *CACHED_METHODS]
+    assert boundary_workload3d(config, methods) == (8192, 69_214_208)
+    assert boundary_limit_message3d(config, ["mc_cached"]) is None
+    assert boundary_limit_message3d(config, methods)
+
+
+def test_cli_study_evaluates_the_requested_field(tmp_path):
+    main(
+        [
+            "study",
+            "--n",
+            "4",
+            "--mode",
+            "field",
+            "--methods",
+            "mc_cached",
+            "--budgets",
+            "8",
+            "--repeats",
+            "2",
+            "--out",
+            str(tmp_path),
+        ]
+    )
+    study = json.loads((tmp_path / "study.json").read_text())
+    assert study["config"]["mode"] == "field"
+    assert len(study["points_zyx"]) == len(study["reference_value"]) == 125
+    target = np.array(study["reference_value"])
+    for trial in study["trials"]:
+        values = np.array(trial["values"])
+        assert values.shape == target.shape
+        assert trial["walks"] == 8 * (27 + 9)
+    for series in study["series"]:
+        values = [
+            trial["values"]
+            for trial in study["trials"]
+            if trial["phase"] == series["phase"]
+        ]
+        expected = (
+            100
+            * np.mean(np.linalg.norm(values - target, axis=1))
+            / np.linalg.norm(target)
+        )
+        assert series["relative_error_pct"] == pytest.approx(expected)
 
 
 def test_cli_comparison_and_budget_series(tmp_path, monkeypatch):
