@@ -15,6 +15,7 @@ from time import perf_counter
 import numpy as np
 
 from .boundary3d import FACES
+from .heat3d_picard_mc import MC_METHODS
 from .heat3d_problem import make_heat_problem3d
 from .problem3d import select_points3d
 from .study_protocol import (
@@ -28,6 +29,8 @@ METHOD_NAME = "Пикар + ЛОМ (направленные прогонки, 3
 METHOD_NAMES = {
     "lod": METHOD_NAME,
     "block": "Пикар + матричная прогонка (3D)",
+    "mc": "Пикар + обычный MC (3D)",
+    "mc_control": "Пикар + грубая сетка и MC-поправка (3D)",
 }
 BLOCK_DIAGNOSTICS = (
     "assembly_seconds",
@@ -35,6 +38,14 @@ BLOCK_DIAGNOSTICS = (
     "solve_seconds",
     "factorizations",
     "factor_reuses",
+)
+MC_DIAGNOSTICS = (
+    "completed_walks",
+    "validation_walks",
+    "coarse_iterations",
+    "coarse_seconds",
+    "interpolation_seconds",
+    "defect_seconds",
 )
 STATUS_LABELS = {
     "not_requested": "Проверка не выбрана",
@@ -57,7 +68,7 @@ STATUS_LABELS = {
 }
 APPLICABILITY = (
     "Нелинейная нестационарная теплопроводность в 3D, условия 1 или 3 рода на каждой грани. "
-    "MC пока доступен только для диагностики одной замороженной системы."
+    "Обычный MC и MC с грубой сеткой вычисляют полное поле на каждой итерации Пикара."
 )
 
 
@@ -87,7 +98,7 @@ def _inputs(config, settings):
         or any(method not in METHOD_NAMES for method in config.methods)
         or len(set(config.methods)) != len(config.methods)
     ):
-        raise ValueError("Выберите неповторяющиеся методы из lod, block")
+        raise ValueError("Выберите различные доступные методы 3D-теплопроводности")
     if config.n > 64:
         raise ValueError("Для этого режима требуется n ≤ 64")
     if not np.isfinite(config.dt) or config.dt <= 0:
@@ -125,8 +136,13 @@ def _inputs(config, settings):
     points = select_points3d(
         config.n, config.mode, config.point, config.plane, config.index
     )
-    settings = HeatSettings3D() if settings is None else settings
+    settings = (
+        HeatSettings3D.for_methods(config.methods) if settings is None else settings
+    )
     settings.validate()
+    for method in config.methods:
+        if method in MC_METHODS:
+            settings.validate_mc(method)
     return problem, points, settings
 
 
@@ -202,7 +218,7 @@ def _record(result, exact):
         relative_error_pct=None,
         absolute_error=None,
         accuracy_metric=METRIC_ID,
-        walks_applicable=False,
+        walks_applicable=result.method in MC_METHODS,
         error_reason="" if result.status == "completed" else "Расчёт не достиг T",
         diagnostic_field_available=result.diagnostic_field is not None,
     )
@@ -214,7 +230,15 @@ def _record(result, exact):
 
 
 def _reproduction(
-    config, settings, command, *, repeats=5, seed=42, budgets=(), margin=0.8
+    config,
+    settings,
+    command,
+    *,
+    repeats=5,
+    seed=42,
+    budgets=(),
+    walk_budgets=(),
+    margin=0.8,
 ):
     parts = [
         "python",
@@ -265,6 +289,23 @@ def _reproduction(
         ]
     if command == "run" and config.newton:
         parts.append("--newton")
+    if any(m in MC_METHODS for m in config.methods):
+        parts += [
+            "--walks",
+            str(settings.walks),
+            "--coarse-n",
+            str(settings.coarse_n),
+            "--max-walks",
+            str(settings.max_walks),
+            "--max-transitions",
+            str(settings.max_transitions),
+            "--max-path-steps",
+            str(settings.max_path_steps),
+        ]
+        if command == "run":
+            parts += ["--seed", str(settings.seed)]
+        elif walk_budgets:
+            parts += ["--walk-budgets", *(str(v) for v in walk_budgets)]
     if command == "study":
         parts += [
             "--repeats",
@@ -273,9 +314,9 @@ def _reproduction(
             str(seed),
             "--margin",
             str(margin),
-            "--budgets",
-            *(str(v) for v in budgets),
         ]
+        if budgets:
+            parts += ["--budgets", *(str(v) for v in budgets)]
     parts += ["--out", "runs/heat3d-" + command]
     return shlex.join(parts)
 
@@ -301,7 +342,16 @@ def compare_heat3d(config=HeatConfig3D(), settings=None, progress=None):
             progress=_method_progress(progress, method, index, progress_count),
         )
         runs[method] = result
-        records.append(_record(result, exact))
+        record = _record(result, exact)
+        if method in MC_METHODS:
+            record.update(
+                walks_per_free_node=settings.walks,
+                seed=settings.seed,
+                coarse_n=settings.coarse_n if method == "mc_control" else None,
+                tolerance=settings.tolerance,
+                change_tolerance=settings.change_tolerance,
+            )
+        records.append(record)
         if result.values is not None:
             arrays[method] = result.values
         if result.diagnostic_field is not None:
@@ -378,13 +428,20 @@ def _method_progress(progress, method, index, count):
     return report
 
 
-def _study_diagnostics(study, method, diagnostics):
+def _study_diagnostics(study, method, diagnostics, settings):
     """Attach backend costs without changing candidate selection or its metric."""
     for trial, diagnostic in zip(study["trials"], diagnostics, strict=True):
         trial.update(diagnostic)
     for collection in ("rows", "trials", "series"):
         for row in study[collection]:
             row.update(method=method, method_name=METHOD_NAMES[method])
+            if method in MC_METHODS:
+                row.update(
+                    budget_kind="walks_per_free_node_per_solve",
+                    coarse_n=settings.coarse_n if method == "mc_control" else None,
+                    tolerance=settings.tolerance,
+                    change_tolerance=settings.change_tolerance,
+                )
             if collection != "trials":
                 trials = [
                     trial
@@ -392,7 +449,7 @@ def _study_diagnostics(study, method, diagnostics):
                     if (trial["phase"], trial["candidate"])
                     == (row["phase"], row["candidate"])
                 ]
-                for key in BLOCK_DIAGNOSTICS:
+                for key in (*BLOCK_DIAGNOSTICS, *MC_DIAGNOSTICS):
                     values = [trial.get(key) for trial in trials]
                     if any(value is not None for value in values):
                         row[key] = (
@@ -409,6 +466,7 @@ def study_heat3d(
     repeats=5,
     seed=42,
     budgets=(1e-3, 1e-5, 1e-7, 1e-9),
+    walk_budgets=(256, 1024, 4096),
     calibration_fraction=0.8,
     progress=None,
 ):
@@ -419,10 +477,22 @@ def study_heat3d(
             "Исследование использует аналитический эталон; Ньютон доступен в сравнении"
         )
     budgets = tuple(budgets)
-    if not budgets or any(
-        not np.isfinite(budget) or not 0 < budget < 1 for budget in budgets
+    if any(m not in MC_METHODS for m in config.methods) and (
+        not budgets
+        or any(not np.isfinite(budget) or not 0 < budget < 1 for budget in budgets)
     ):
         raise ValueError("Допуски исследования должны быть строго между 0 и 1")
+    walk_budgets = tuple(walk_budgets)
+    if any(m in MC_METHODS for m in config.methods) and (
+        not walk_budgets
+        or any(
+            isinstance(b, (bool, np.bool_))
+            or not isinstance(b, (int, np.integer))
+            or not 2 <= b < 2**31
+            for b in walk_budgets
+        )
+    ):
+        raise ValueError("Бюджеты MC должны быть целыми от 2 до 2³¹−1")
     problem, points, settings = _inputs(config, settings)
     started = perf_counter()
     exact = problem.evaluate(problem.exact, config.T)[tuple(points.T)]
@@ -431,23 +501,28 @@ def study_heat3d(
     studies = []
     for index, method in enumerate(config.methods):
         diagnostics = []
+        stochastic = method in MC_METHODS
 
         def runner(budget, trial_seed):
-            # Deterministic runners retain the stream ID as protocol evidence.
+            trial_settings = (
+                replace(settings, walks=int(budget), seed=trial_seed)
+                if stochastic
+                else replace(
+                    settings, tolerance=float(budget), change_tolerance=float(budget)
+                )
+            )
             result = solve_heat3d(
                 problem,
                 points,
                 dt=config.dt,
                 T=config.T,
-                settings=replace(
-                    settings, tolerance=float(budget), change_tolerance=float(budget)
-                ),
+                settings=trial_settings,
                 method=method,
             )
             diagnostics.append(
                 {
                     key: getattr(result, key)
-                    for key in BLOCK_DIAGNOSTICS
+                    for key in (MC_DIAGNOSTICS if stochastic else BLOCK_DIAGNOSTICS)
                     if getattr(result, key, None) is not None
                 }
             )
@@ -455,17 +530,34 @@ def study_heat3d(
 
         study = run_accuracy_study(
             runner,
-            budgets,
+            walk_budgets if stochastic else budgets,
             exact,
             repeats=repeats,
             seed=seed,
             calibration_fraction=calibration_fraction,
             method=method,
+            budget_kind=(
+                "walks_per_free_node_per_solve"
+                if stochastic
+                else "relative_residual_tolerance"
+            ),
+            walks_applicable=stochastic,
+            retain_values=stochastic,
             progress=_method_progress(progress, method, index, len(config.methods)),
         )
-        _study_diagnostics(study, method, diagnostics)
+        _study_diagnostics(study, method, diagnostics, settings)
         studies.append(study)
     study = dict(studies[0])
+    study["budgets_by_method"] = {
+        method: list(walk_budgets if method in MC_METHODS else budgets)
+        for method in config.methods
+    }
+    if any(m in MC_METHODS for m in config.methods) and any(
+        m not in MC_METHODS for m in config.methods
+    ):
+        study["budgets"] = (
+            None  # candidates have different units; see budgets_by_method
+        )
     for key in ("rows", "trials", "series"):
         study[key] = [row for item in studies for row in item[key]]
     for key in ("pilot_seconds", "final_seconds", "elapsed_seconds"):
@@ -477,8 +569,20 @@ def study_heat3d(
         repeats=repeats,
         seed=seed,
         budgets=list(budgets),
+        walk_budgets=list(walk_budgets),
         calibration_fraction=calibration_fraction,
-        budget_parameters=["tolerance", "change_tolerance"],
+        budget_parameters=(
+            {
+                method: (
+                    ["walks"]
+                    if method in MC_METHODS
+                    else ["tolerance", "change_tolerance"]
+                )
+                for method in config.methods
+            }
+            if any(m in MC_METHODS for m in config.methods)
+            else ["tolerance", "change_tolerance"]
+        ),
         reproduction=_reproduction(
             config,
             settings,
@@ -486,10 +590,11 @@ def study_heat3d(
             repeats=repeats,
             seed=seed,
             budgets=budgets,
+            walk_budgets=walk_budgets,
             margin=calibration_fraction,
         ),
         analytic_reference_seconds=analytic_seconds,
-        seed_usage="Independent phase/candidate/repeat stream identifiers within each method; deterministic LOM and block solvers do not consume random numbers.",
+        seed_usage="Each MC repeat starts the whole history from the prescribed initial data. Trial seeds derive from phase/candidate/repeat, and layer/outer/update-or-check select separate streams. Methods share trial seeds for paired comparisons.",
     )
     return dict(metadata=metadata, **study)
 
