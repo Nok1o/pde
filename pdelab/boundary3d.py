@@ -1,6 +1,6 @@
 """Mixed boundary data on six faces; coordinates (x,y,z), arrays [z,y,x]."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from types import MappingProxyType
 
 import numpy as np
@@ -59,6 +59,10 @@ class BoundaryProblem3D:
     def sides(self):
         """Common boundary-operator interface, also used by the 2D model."""
         return self.faces
+
+    def without_reference(self):
+        """Supply only the sampled source and faces to a stationary backend."""
+        return self if self.exact is None else replace(self, exact=None)
 
     @property
     def pure_neumann(self):

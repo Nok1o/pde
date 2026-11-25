@@ -13,12 +13,17 @@ from .boundary3d import (
     select_boundary_points3d,
 )
 from .boundary_solvers import METHODS_BOUNDARY, _factor_lines
-from .grouped_solver3d import GROUPED_NAME, solve_grouped3d
+from .grouped_solver3d import CACHED_METHODS, GROUPED_NAME, solve_particle_mc3d
 from .problem3d import Problem3D, validate_points3d
+from .reflections3d import reflected_step as _reflected_step
 from .solvers import NUMBA_LOCK, Result
 from .solvers3d import solve3d, splitting_parameter3d, warmup3d
 
-METHODS_BOUNDARY_3D = {**METHODS_BOUNDARY, "mc_grouped": GROUPED_NAME}
+METHODS_BOUNDARY_3D = {
+    **METHODS_BOUNDARY,
+    "mc_grouped": GROUPED_NAME,
+    **CACHED_METHODS,
+}
 
 
 def _factors(operator, tau, axis):
@@ -110,24 +115,6 @@ def _lod(operator, tol, max_iter):
             "tau": tau,
         },
     )
-
-
-@njit(inline="always")
-def _reflected_step(z, y, x, n, direction):
-    # Each outward proposal is reflected into the cube, giving inward weight 2.
-    if direction == 0:
-        z += 1 if z < n else -1
-    elif direction == 1:
-        z -= 1 if z > 0 else -1
-    elif direction == 2:
-        y += 1 if y < n else -1
-    elif direction == 3:
-        y -= 1 if y > 0 else -1
-    elif direction == 4:
-        x += 1 if x < n else -1
-    else:
-        x -= 1 if x > 0 else -1
-    return z, y, x
 
 
 @njit(cache=True, nogil=True)
@@ -245,10 +232,11 @@ def solve_boundary3d(
         or limit < 1
     ):
         raise ValueError("max_steps должно быть положительным целым")
-    if method == "mc_grouped":
-        return solve_grouped3d(
+    if method == "mc_grouped" or method in CACHED_METHODS:
+        return solve_particle_mc3d(
             problem,
             points,
+            method,
             walks=walks,
             seed=seed,
             max_steps=limit,

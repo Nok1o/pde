@@ -15,8 +15,13 @@ from .boundary_experiment3d import (
     boundary_archive3d,
     problem_from_config3d,
     run_boundary_experiment3d,
+    selected_boundary_methods3d,
 )
-from .boundary_solvers3d import METHODS_BOUNDARY_3D, trace_boundary_walk3d
+from .boundary_solvers3d import (
+    CACHED_METHODS,
+    METHODS_BOUNDARY_3D,
+    trace_boundary_walk3d,
+)
 from .boundary_ui import KIND_LABELS
 from .boundary_views3d import boundary_trace_figure3d
 from .boundary_workload3d import boundary_limit_message3d
@@ -61,7 +66,9 @@ def _controls():
             )
             data.append(
                 st.number_input(
-                    "μ (I род) / φ (II и III род)", value=0.0, key=f"bc3d_{face}_value"
+                    "μ (условие 1 рода) / φ (условия 2 и 3 рода)",
+                    value=0.0,
+                    key=f"bc3d_{face}_value",
                 )
                 if problem == "custom"
                 else 0.0
@@ -192,7 +199,7 @@ def _formulas(config):
                 )
             st.latex(rf"{face[0]}={face[1]}:\quad {left}={right}")
         st.caption(
-            "Условие 2-го рода задаёт внешнюю производную. На рёбрах и в углах складываются вклады соседних граней; условие 1-го рода имеет приоритет."
+            "Условие 2 рода задаёт внешнюю производную. На рёбрах и в углах складываются вклады соседних граней. Условие 1 рода фиксирует значение узла."
         )
 
 
@@ -312,7 +319,7 @@ def _benchmark(config, methods):
 
 
 def render_boundary_app3d():
-    st.title("Куб · условия I, II и III рода")
+    st.title("Куб · условия 1, 2 и 3 рода")
     with st.sidebar:
         config = _controls()
     _formulas(config)
@@ -324,19 +331,22 @@ def render_boundary_app3d():
         st.error(str(exc))
         return
     pure_neumann = operator.pure_neumann
+    defaults = selected_boundary_methods3d(operator)
     del operator
-    available = ["lod_serial"] if pure_neumann else list(METHODS_BOUNDARY_3D)
-    if any(kind != "dirichlet" for kind in config.kinds):
-        available = [m for m in available if m != "wos"]
+    available = defaults.copy()
     if pure_neumann:
         st.caption(
-            "Условия только 2-го рода: среднее с весами объёмов равно нулю. MC без поглощения пока не поддерживается."
+            "При отсутствии поглощения доступен ЛОМ с нулевым средним по объёму."
         )
+    elif "robin" in config.kinds:
+        available.extend(CACHED_METHODS)
+    else:
+        st.caption("Для кэша отражений нужно условие 3 рода хотя бы на одной грани.")
     with st.sidebar:
         methods = st.multiselect(
             "Методы",
             available,
-            default=available,
+            default=defaults,
             format_func=METHODS_BOUNDARY_3D.get,
             key="bc3d_methods",
         )
@@ -353,15 +363,19 @@ def render_boundary_app3d():
         if warning:
             st.error(warning)
         else:
+            progress = st.progress(0.0, text="Подготовка задачи и эталона")
             try:
-                with st.spinner("Расчёт…"):
-                    st.session_state["bc3d_result"] = run_boundary_experiment3d(
-                        config, methods
-                    )
+                st.session_state["bc3d_result"] = run_boundary_experiment3d(
+                    config,
+                    methods,
+                    progress=lambda value, text: progress.progress(value, text=text),
+                )
                 for key in ("bc3d_archive", "bc3d_view_index", "bc3d_view_plane"):
                     st.session_state.pop(key, None)
             except (ValueError, RuntimeError) as exc:
                 st.error(str(exc))
+            finally:
+                progress.empty()
     from .stationary_extensions import render_method_scope
 
     render_method_scope(3, mixed=True)

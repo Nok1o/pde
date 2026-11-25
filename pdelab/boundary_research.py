@@ -8,7 +8,11 @@ import numpy as np
 from .boundary import BoundaryOperator
 from .boundary3d import BoundaryOperator3D
 from .boundary_experiment import problem_from_config, selected_boundary_methods
-from .boundary_experiment3d import BoundaryConfig3D, problem_from_config3d
+from .boundary_experiment3d import (
+    BoundaryConfig3D,
+    problem_from_config3d,
+    selected_boundary_methods3d,
+)
 from .boundary_solvers import select_boundary_points, solve_boundary, warmup_boundary
 from .boundary_solvers3d import METHODS_BOUNDARY_3D, solve_boundary3d, warmup_boundary3d
 from .problem3d import DIRECT_MAX_N
@@ -47,9 +51,8 @@ def boundary_accuracy_study(
     problem = make(config)
     operator = operator_type(problem)
     operator.check_compatibility()
-    methods = selected_boundary_methods(
-        operator, methods, names=METHODS_BOUNDARY_3D if is3d else None
-    )
+    select_methods = selected_boundary_methods3d if is3d else selected_boundary_methods
+    methods = select_methods(operator, methods)
     if not tolerances and "lod_serial" in methods:
         raise ValueError("Выберите допуски ЛОМ")
     if not budgets and any(m != "lod_serial" for m in methods):
@@ -254,7 +257,9 @@ def render_boundary_research(config, methods, key):
         key=key + "_seconds",
     )
     selected = replace(config, n=n, point=point, mode="point")
-    if dimension == 3 and "mc_grouped" in methods:
+    if dimension == 3 and any(
+        m in ("mc_grouped", "mc_grouped_cached") for m in methods
+    ):
         batch_size = st.number_input(
             "Размер группы частиц исследования",
             min_value=1,
