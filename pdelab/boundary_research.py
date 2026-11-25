@@ -16,16 +16,16 @@ from .boundary_experiment3d import (
 from .boundary_solvers import select_boundary_points, solve_boundary, warmup_boundary
 from .boundary_solvers3d import METHODS_BOUNDARY_3D, solve_boundary3d, warmup_boundary3d
 from .problem3d import DIRECT_MAX_N
-from .research import LOD_SEARCH_TOLERANCES, TARGETS_PCT
+from .research import LOD_SEARCH_TOLERANCES
 from .stationary_study3d import study_stationary3d
 from .study_policy import (
     ACCURACY_DESCRIPTION,
     ACCURACY_METRIC,
     SELECTION_POLICY,
-    mean_relative_error,
     phase_seed_index,
     render_accuracy_results,
     search_budgets,
+    study_error_metrics,
 )
 
 
@@ -124,6 +124,7 @@ def boundary_accuracy_study(
                 ).generate_state(1)[0]
             )
             start = perf_counter()
+            result = None
             try:
                 result = solver(
                     problem,
@@ -152,31 +153,34 @@ def boundary_accuracy_study(
                     seconds=elapsed,
                     value=value,
                     status=reason,
+                    absolute_error=(
+                        study_error_metrics([value], target)["absolute_error"]
+                        if ok
+                        else None
+                    ),
+                    walks=(
+                        result.walks
+                        if result is not None and method != "lod_serial"
+                        else None
+                    ),
+                    steps=result.steps if result is not None else None,
                 )
             )
             if not ok:
                 return None, reason
             values.append(value)
             times.append(elapsed)
-        error = mean_relative_error(values, target)
-        return dict(error=error, seconds=float(np.mean(times))), "ok"
+        return (
+            dict(
+                **study_error_metrics(values, target),
+                seconds=float(np.mean(times)),
+                completed_repeats=len(values),
+                requested_repeats=repeats,
+            ),
+            "ok",
+        )
 
     for method in methods:
-        if target == 0:
-            rows.extend(
-                dict(
-                    method=method,
-                    target_pct=t,
-                    status="zero_reference",
-                    selection_policy=SELECTION_POLICY,
-                    accuracy_metric=ACCURACY_METRIC,
-                    seconds=None,
-                    relative_error_pct=None,
-                    budget=None,
-                )
-                for t in TARGETS_PCT
-            )
-            continue
 
         def series(budget, index, phase, deadline):
             measurement, reason = measure(
@@ -186,9 +190,7 @@ def boundary_accuracy_study(
                 if reason == "timeout":
                     raise TimeoutError("Лимит времени")
                 raise RuntimeError(reason)
-            return dict(
-                relative_error_pct=measurement["error"], seconds=measurement["seconds"]
-            )
+            return measurement
 
         method_rows = search_budgets(
             method,
@@ -197,10 +199,19 @@ def boundary_accuracy_study(
             seconds_per_method,
             fastest=True,
             clock=perf_counter,
+            relative_applicable=bool(target != 0),
         )
         for row in method_rows:
             row["status_detail"] = row["status"]
             row["status"] = row["status_code"]
+            if target == 0:
+                recorded = [t for t in trials if t["method"] == method]
+                row.update(
+                    requested_repeats=repeats,
+                    recorded_repeats=len(recorded),
+                    completed_repeats=sum(t["status"] == "ok" for t in recorded),
+                    spent_seconds=sum(t["seconds"] for t in recorded),
+                )
         rows.extend(method_rows)
     return dict(
         selection_policy=SELECTION_POLICY,

@@ -4,6 +4,8 @@ from time import perf_counter
 
 import numpy as np
 
+from .study_protocol import ABSOLUTE_METRIC_ID, error_metrics
+
 SELECTION_POLICY = "stable_pilot_adaptive_retry_v6"
 ACCURACY_METRIC = "mean_run_relative_l1_v1"
 ACCURACY_DESCRIPTION = "100 * mean_runs(sum_points(abs(u_run-reference)) / sum_points(abs(reference))); error of individual runs in the validation series"
@@ -11,7 +13,15 @@ CALIBRATION_FRACTION = 0.5
 DETERMINISTIC_METHODS = {"lod", "lod_serial", "picard"}
 
 
-class RetryableSolverError(RuntimeError):
+class SolverSeriesError(RuntimeError):
+    """Retain applicability discovered by a solver's numerical reference."""
+
+    def __init__(self, message, *, relative_applicable=None):
+        super().__init__(message)
+        self.relative_applicable = relative_applicable
+
+
+class RetryableSolverError(SolverSeriesError):
     """An incomplete stochastic solve that may converge at a larger budget."""
 
 
@@ -31,6 +41,15 @@ def mean_relative_error(values, reference):
     if scale == 0:
         raise ValueError("Нулевой эталон: относительная ошибка не определена")
     return float(100 * np.mean(np.abs(values - reference)) / scale)
+
+
+def study_error_metrics(values, reference):
+    """Keep legacy relative L1 semantics and add common absolute L2 diagnostics."""
+    metrics = error_metrics(values, reference)
+    metrics["accuracy_metric"] = ACCURACY_METRIC
+    if metrics["relative_applicable"]:
+        metrics["relative_error_pct"] = mean_relative_error(values, reference)
+    return metrics
 
 
 def accuracy_metadata(rows):
@@ -60,6 +79,7 @@ def phase_seed_index(phase):
         "validation": 1,
         "calibration_2": 2,
         "calibration_3": 3,
+        "absolute_diagnostic": 4,
     }[phase]
 
 
@@ -72,6 +92,7 @@ def search_budgets(
     *,
     fastest=False,
     clock=perf_counter,
+    relative_applicable=True,
 ):
     """Require three stable MC pilots, then retry failures at larger budgets.
 
@@ -85,6 +106,8 @@ def search_budgets(
     budgets = list(budgets)
     if stochastic:
         budgets = sorted(set(budgets))
+    if not budgets:
+        raise ValueError("Нужен хотя бы один бюджет исследования")
     rows = [
         dict(
             method=method,
@@ -92,6 +115,10 @@ def search_budgets(
             seconds=None,
             validation_seconds=None,
             relative_error_pct=None,
+            absolute_error=None,
+            absolute_metric=ABSOLUTE_METRIC_ID,
+            relative_applicable=relative_applicable,
+            diagnostic_seconds=None,
             calibration_error_pct=None,
             budget=None,
             interrupted_budget=None,
@@ -113,6 +140,7 @@ def search_budgets(
     best_pilot_times = {}
 
     def run_series(budget, index, phase):
+        nonlocal relative_applicable
         group = "validation" if phase == "validation" else "calibration"
         started = clock()
         remaining = seconds_per_phase - spent[group]
@@ -121,13 +149,22 @@ def search_budgets(
             if remaining <= 0:
                 raise TimeoutError("Лимит времени")
             result = measure(budget, index, phase, started + remaining)
-            if not np.isfinite(result["relative_error_pct"]):
+            relative_applicable = result.get("relative_applicable", relative_applicable)
+            error = result[
+                "relative_error_pct" if relative_applicable else "absolute_error"
+            ]
+            if error is None or not np.isfinite(error):
                 raise RuntimeError("Неконечная ошибка")
             if not np.isfinite(result["seconds"]) or result["seconds"] < 0:
                 raise RuntimeError("Некорректное время расчёта")
             attempt.update(result, status="completed")
             return result
         except (TimeoutError, RuntimeError) as exc:
+            if (
+                isinstance(exc, SolverSeriesError)
+                and exc.relative_applicable is not None
+            ):
+                relative_applicable = exc.relative_applicable
             attempt.update(
                 status="timeout" if isinstance(exc, TimeoutError) else "solver_failed",
                 reason=str(exc),
@@ -154,10 +191,15 @@ def search_budgets(
 
         pilots = []
         try:
-            pilots.append(run_series(budget, index, "calibration"))
+            phase = "calibration" if relative_applicable else "absolute_diagnostic"
+            pilots.append(run_series(budget, index, phase))
             # Do not spend extra pilot runs on an already insufficient budget.
-            if stochastic and any(
-                pilots[0]["relative_error_pct"] <= pilot_limit(r) for r in pending
+            if (
+                relative_applicable
+                and stochastic
+                and any(
+                    pilots[0]["relative_error_pct"] <= pilot_limit(r) for r in pending
+                )
             ):
                 for phase in ("calibration_2", "calibration_3"):
                     pilots.append(run_series(budget, index, phase))
@@ -186,8 +228,25 @@ def search_budgets(
                             relative_error_pct=None,
                             validation_seconds=None,
                         )
-            if stochastic and isinstance(exc, RetryableSolverError):
+            if (
+                relative_applicable
+                and stochastic
+                and isinstance(exc, RetryableSolverError)
+            ):
                 continue
+            break
+        if not relative_applicable:
+            diagnostic = pilots[0]
+            for row in rows:
+                row.update(
+                    budget=budget,
+                    absolute_error=diagnostic["absolute_error"],
+                    diagnostic_seconds=diagnostic["seconds"],
+                    solver_status="completed",
+                )
+                for key in ("completed_repeats", "requested_repeats"):
+                    if key in diagnostic:
+                        row[key] = diagnostic[key]
             break
         pilot_error = max(p["relative_error_pct"] for p in pilots)
         pilot_seconds = float(np.mean([p["seconds"] for p in pilots]))
@@ -239,6 +298,7 @@ def search_budgets(
                     budget=budget,
                     calibration_error_pct=pilot_error,
                     relative_error_pct=error,
+                    absolute_error=confirmation.get("absolute_error"),
                     validation_seconds=confirmation["seconds"],
                     seconds=confirmation["seconds"] if passed else None,
                     status=(
@@ -256,6 +316,18 @@ def search_budgets(
                     best_pilot_times[row["target_pct"]] = pilot_seconds
         # Unconfirmed targets remain pending at the next (strictly larger) MC budget.
     for row in rows:
+        if not relative_applicable:
+            row.update(
+                phase="absolute_diagnostic",
+                relative_applicable=False,
+                solver_status=row.get("solver_status", row["status_code"]),
+                reason=(
+                    "Норма эталона равна нулю: относительная цель неприменима. "
+                    + (row["status"] if row.get("solver_status") != "completed" else "")
+                ).strip(),
+                status="Нулевой эталон: процент не определён",
+                status_code="relative_target_not_applicable",
+            )
         row.update(
             attempts=attempts,
             calibration_seconds=spent["calibration"],
@@ -283,6 +355,12 @@ def readable_status(row):
     }
     if status == "validation_incomplete":
         return row.get("status_detail", row["status"])
+    if (
+        status == "relative_target_not_applicable"
+        and row.get("solver_status") not in (None, "completed")
+        and row.get("reason")
+    ):
+        return row["reason"]
     if status == "pilot_incomplete" and row.get("reason"):
         return "Подбор не завершён: " + row["reason"]
     if status == "solver_failed":
@@ -330,6 +408,8 @@ def error_label(row):
         )
         return f"{phase} {error:.3g}%"
     error = row.get("calibration_error_pct")
+    if error is None and row.get("absolute_error") is not None:
+        return f"абсолютная L2-ошибка {row['absolute_error']:.3g}"
     return f"подбор {error:.3g}%" if error is not None else "ошибка ещё не измерена"
 
 
@@ -361,7 +441,16 @@ def render_accuracy_results(rows, names=None, *, key):
     names = {} if names is None else names
     from .study_protocol import PROTOCOL_ID
 
-    if rows and all(r.get("selection_policy") == PROTOCOL_ID for r in rows):
+    if rows and all(
+        r.get("status_code", r.get("status")) == "relative_target_not_applicable"
+        for r in rows
+    ):
+        st.caption(
+            "Норма эталона равна нулю: цели 1/5/10% неприменимы. "
+            "Одна серия на первом заданном бюджете показывает абсолютную L2-ошибку "
+            "отдельных полных запусков и фактические затраты."
+        )
+    elif rows and all(r.get("selection_policy") == PROTOCOL_ID for r in rows):
         st.caption(
             "Средняя относительная L2-ошибка отдельных запусков. Подбор с запасом 0.8 → "
             "фиксированный бюджет → новая финальная серия. Неудача проверки не запускает повторный подбор."

@@ -293,8 +293,22 @@ def test_decay_boundary_has_exact_zero_and_undefined_relative_error(point):
     problem = make_heat_problem("decay", 8)
     assert problem.evaluate(problem.exact, 0.02)[point] == 0.0
     assert problem.initial[point] == 0.0
-    with pytest.raises(ValueError, match="нулевом эталоне"):
-        heat_mc_study(problem, T=0.02, point=point, repeats=2, max_walks=64)
+    study = heat_mc_study(
+        problem,
+        T=0.02,
+        point=point,
+        repeats=2,
+        max_walks=64,
+        methods=("lod", "mc", "mc_control"),
+    )
+    assert len(study["trials"]) == 6
+    for row in study["rows"]:
+        assert row["status"] == "relative_target_not_applicable"
+        assert row["absolute_error"] == 0
+        assert row["relative_error_pct"] is None and row["seconds"] is None
+        assert row["completed_repeats"] == row["requested_repeats"] == 2
+        assert row["budget"] is not None
+    assert all(t["phase"] == "absolute_diagnostic" for t in study["trials"])
 
 
 @pytest.mark.parametrize(
