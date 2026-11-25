@@ -1,0 +1,175 @@
+{
+  "description": "PDE-33: paired full/layers diagnostic storage; final measurement after integration",
+  "repeats": 3,
+  "seed": 33026,
+  "budgets": [
+    1e-07
+  ],
+  "walk_budgets": [
+    1024
+  ],
+  "calibration_fraction": 0.8,
+  "settings": {
+    "mc_tolerance": 0.2,
+    "mc_change_tolerance": 0.1,
+    "coarse_n": 4,
+    "max_outer": 8,
+    "max_seconds": 30,
+    "max_walks": 200000000,
+    "max_transitions": 2000000000,
+    "max_path_steps": 1000000,
+    "max_workspace_bytes": 268435456,
+    "batch_size": 128
+  },
+  "configuration": {
+    "case": "polynomial",
+    "alpha": 0.5,
+    "dt": 0.002
+  },
+  "variants": [
+    {
+      "id": "lod-full",
+      "method": "lod",
+      "settings": {
+        "history_mode": "full"
+      }
+    },
+    {
+      "id": "lod-layers",
+      "method": "lod",
+      "settings": {
+        "history_mode": "layers"
+      }
+    },
+    {
+      "id": "block-full",
+      "method": "block",
+      "settings": {
+        "history_mode": "full"
+      }
+    },
+    {
+      "id": "block-layers",
+      "method": "block",
+      "settings": {
+        "history_mode": "layers"
+      }
+    },
+    {
+      "id": "mc-full",
+      "method": "mc",
+      "settings": {
+        "history_mode": "full"
+      }
+    },
+    {
+      "id": "mc-layers",
+      "method": "mc",
+      "settings": {
+        "history_mode": "layers"
+      }
+    },
+    {
+      "id": "mc_grouped-full",
+      "method": "mc_grouped",
+      "settings": {
+        "history_mode": "full"
+      }
+    },
+    {
+      "id": "mc_grouped-layers",
+      "method": "mc_grouped",
+      "settings": {
+        "history_mode": "layers"
+      }
+    },
+    {
+      "id": "mc_control-full",
+      "method": "mc_control",
+      "settings": {
+        "history_mode": "full"
+      }
+    },
+    {
+      "id": "mc_control-layers",
+      "method": "mc_control",
+      "settings": {
+        "history_mode": "layers"
+      }
+    },
+    {
+      "id": "mc_control_grouped-full",
+      "method": "mc_control_grouped",
+      "settings": {
+        "history_mode": "full"
+      }
+    },
+    {
+      "id": "mc_control_grouped-layers",
+      "method": "mc_control_grouped",
+      "settings": {
+        "history_mode": "layers"
+      }
+    }
+  ],
+  "cases": [
+    {
+      "id": "n6-layers4-point-one3",
+      "configuration": {
+        "n": 6,
+        "T": 0.008,
+        "mode": "point",
+        "point": [
+          3,
+          3,
+          3
+        ],
+        "kinds": [
+          3,
+          1,
+          1,
+          1,
+          1,
+          1
+        ]
+      }
+    },
+    {
+      "id": "n6-layers16-field-kind1",
+      "configuration": {
+        "n": 6,
+        "T": 0.032,
+        "mode": "field"
+      }
+    },
+    {
+      "id": "n12-layers4-field-all3",
+      "configuration": {
+        "n": 12,
+        "T": 0.008,
+        "mode": "field",
+        "kinds": [
+          3,
+          3,
+          3,
+          3,
+          3,
+          3
+        ]
+      }
+    },
+    {
+      "id": "n12-layers16-point-kind1",
+      "configuration": {
+        "n": 12,
+        "T": 0.032,
+        "mode": "point",
+        "point": [
+          6,
+          6,
+          6
+        ]
+      }
+    }
+  ]
+}

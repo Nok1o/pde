@@ -34,8 +34,9 @@ class PicardSampler3D:
             seed = (seed + 1) % 2**32
         before = getsizeof(self.used_seeds)
         self.used_seeds.add(seed)
-        # The int itself is retained and already charged in the history row.
-        layer.history_storage += getsizeof(self.used_seeds) - before
+        # All seed integers outlive compacted diagnostic rows. Count them here;
+        # row_storage excludes these shared values so full mode pays once too.
+        layer.history_storage += getsizeof(self.used_seeds) - before + getsizeof(seed)
         return seed
 
     def draw(self, layer, operator, previous, iterate, outer, *, check=False):

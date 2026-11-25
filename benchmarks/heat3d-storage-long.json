@@ -1,0 +1,89 @@
+{
+  "description": "PDE-33: long deterministic histories, paired full/layers storage",
+  "repeats": 3,
+  "seed": 33026,
+  "budgets": [
+    1e-07
+  ],
+  "walk_budgets": [
+    1024
+  ],
+  "calibration_fraction": 0.8,
+  "settings": {
+    "mc_tolerance": 0.2,
+    "mc_change_tolerance": 0.1,
+    "coarse_n": 4,
+    "max_outer": 8,
+    "max_seconds": 30,
+    "max_walks": 200000000,
+    "max_transitions": 2000000000,
+    "max_path_steps": 1000000,
+    "max_workspace_bytes": 268435456,
+    "batch_size": 128
+  },
+  "configuration": {
+    "case": "polynomial",
+    "alpha": 0.5,
+    "T": 0.1
+  },
+  "variants": [
+    {
+      "id": "lod-full",
+      "method": "lod",
+      "settings": {
+        "history_mode": "full"
+      }
+    },
+    {
+      "id": "lod-layers",
+      "method": "lod",
+      "settings": {
+        "history_mode": "layers"
+      }
+    }
+  ],
+  "cases": [
+    {
+      "id": "n4-layers200-point",
+      "configuration": {
+        "n": 4,
+        "dt": 0.0005,
+        "mode": "point",
+        "point": [
+          2,
+          2,
+          2
+        ]
+      }
+    },
+    {
+      "id": "n4-layers1000-field",
+      "configuration": {
+        "n": 4,
+        "dt": 0.0001,
+        "mode": "field"
+      }
+    },
+    {
+      "id": "n8-layers200-field",
+      "configuration": {
+        "n": 8,
+        "dt": 0.0005,
+        "mode": "field"
+      }
+    },
+    {
+      "id": "n8-layers1000-point",
+      "configuration": {
+        "n": 8,
+        "dt": 0.0001,
+        "mode": "point",
+        "point": [
+          4,
+          4,
+          4
+        ]
+      }
+    }
+  ]
+}
