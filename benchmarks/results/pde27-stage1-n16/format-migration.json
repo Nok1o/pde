@@ -1,0 +1,11 @@
+{
+  "source_declared_series_schema": "measurement_v1",
+  "actual_schema": "boundary_audit_v1",
+  "original_file_sha256": {
+    "attempts.json": "bbf9bbf833e8f3c27c26ef358d1433e4d12e370adaa7a7229fd21e6978d580a7",
+    "protocol.json": "e042f5ef023bcc336ed1a08145eb94ffea06eed192b0a1ff1c15fa12feac02b8",
+    "results.json": "5b5f1968720f04fb231bfbba8ebd7d3b6391b64ce2f07fd431b0fe7d6d5ad065"
+  },
+  "changes": "Only schema_version labels added/corrected. No observations, timings, seeds, summaries, statuses or source.zip changed.",
+  "source_zip_sha256": "73f42116faefac47364eb76739e7cc7d743ede21d5587486e576625995d79991"
+}
