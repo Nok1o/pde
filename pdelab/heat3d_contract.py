@@ -126,3 +126,7 @@ class HeatRunResult3D:
     workspace_bytes: int  # estimate of numerical storage, NOT measured peak RSS
     peak_rss_bytes: int | None  # null unless measured; process baseline documented
     history: list[dict]  # per-layer/outer diagnostics, including failed candidate
+    diagnostic_field: np.ndarray | None = (
+        None  # full last candidate, never a solution at T
+    )
+    diagnostic_time: float | None = None  # attempted layer time of diagnostic_field
