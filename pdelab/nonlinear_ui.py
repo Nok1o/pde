@@ -6,7 +6,12 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from .nonlinear import NonlinearSettings, make_nonlinear_problem
+from .nonlinear import (
+    NONLINEAR_MC_METHODS,
+    NonlinearSettings,
+    failure_message,
+    make_nonlinear_problem,
+)
 from .nonlinear_io import (
     comparison_archive,
     csv_bytes,
@@ -16,20 +21,156 @@ from .nonlinear_io import (
     residual_figure,
     time_figure,
 )
-from .nonlinear_study import compare_nonlinear, nonlinear_targets
+from .nonlinear_study import (
+    compare_nonlinear_methods,
+    nonlinear_targets,
+)
+from .study_policy import readable_status, render_accuracy_results
+from .ui_state import select_section
+
+
+def _problem_info(alpha):
+    with st.expander("Формулы и описание", expanded=False, key="nonlinear_formulas"):
+        st.markdown("**1. Исходное уравнение**")
+        st.caption(
+            "Лекция 14: c — теплоёмкость, k — теплопроводность, f — источник. Координаты x,z — как в лекции 15."
+        )
+        st.latex(
+            r"c(u)\frac{\partial u}{\partial t}=\frac{\partial}{\partial x}\left(k(u)\frac{\partial u}"
+            r"{\partial x}\right)+\frac{\partial}{\partial z}\left(k(u)\frac{\partial u}{\partial z}"
+            r"\right)-p(x,z)u+f(x,z,t)"
+        )
+        st.write(
+            "u — температура; c(u) — коэффициент теплоёмкости; k(u) — теплопроводность; f — заданный источник тепла."
+        )
+
+        st.markdown("**2. Какие коэффициенты принимаем**")
+        st.latex(r"c(u)=1,\qquad p=0,\qquad k(u)=1+\gamma u^2")
+        st.write(f"Сейчас γ = {alpha:g}.")
+        st.write(
+            "При γ = 0 получаем k(u) = 1: задача становится линейной."
+            if alpha == 0
+            else "Теплопроводность зависит от температуры, поэтому задача нелинейная."
+        )
+
+        st.caption("γ ≥ 0 — параметр нашего теста, добавленный к обозначениям лекций.")
+        st.markdown("**3. Как задаём источник f**")
+        st.write("Для проверки методов выбираем известное точное решение:")
+        st.latex(r"u_*(x,z,t)=1+e^{-t}\sin(\pi x)\sin(\pi z)")
+        st.write(
+            "Подбираем источник так, чтобы это решение удовлетворяло уравнению. "
+            "В формуле источника u_* — известная функция, а не искомое численное поле."
+        )
+        st.latex(
+            r"f=\frac{\partial u_*}{\partial t}-\nabla\!\cdot\!\left(k(u_*)\nabla u_*\right)"
+        )
+        st.write("После вычисления производных:")
+        st.latex(
+            r"\begin{aligned}f(x,z,t)={}&-(u_*-1)+2\pi^2 k(u_*)(u_*-1)\\&-2\gamma "
+            r"u_*\left[\left(\frac{\partial u_*}{\partial x}\right)^2+\left(\frac{\partial u_*}{\partial z}"
+            r"\right)^2\right].\end{aligned}"
+        )
+
+        st.markdown("**4. Итоговое уравнение**")
+        st.write("Подставляем c(u) и k(u) в исходное уравнение:")
+        st.latex(
+            r"\begin{aligned}\frac{\partial u}{\partial t}={}&\frac{\partial}{\partial x}\left((1+\gamma "
+            r"u^2)\frac{\partial u}{\partial x}\right)\\&+\frac{\partial}{\partial z}\left((1+\gamma "
+            r"u^2)\frac{\partial u}{\partial z}\right)+f(x,z,t).\end{aligned}"
+        )
+
+        st.markdown("**5. Область, начальное и граничное условия**")
+        st.latex(r"\Omega=(0,1)^2,\qquad t\in[0,T]")
+        st.write("В начальный момент:")
+        st.latex(r"u(x,z,0)=1+\sin(\pi x)\sin(\pi z)")
+        st.write("На всех четырёх сторонах квадрата поддерживаем температуру 1:")
+        st.latex(r"u(0,z,t)=u(1,z,t)=u(x,0,t)=u(x,1,t)=1")
+
+    with st.expander(
+        "Как решаем: время → Пикар → ЛОМ или MC", key="nonlinear_method_formulas"
+    ):
+        st.write(
+            "Сначала переходим к следующему моменту времени. "
+            "На каждом временном слое уточняем поле итерациями Пикара; "
+            "линейную задачу внутри каждой итерации решаем прогонками или MC."
+        )
+        st.write(
+            "yᵐ — поле на предыдущем временном слое; ŷˢ — текущее приближение на новом слое. Фиксируем проводимость по ŷˢ:"
+        )
+        st.latex(r"k^{(s)}=1+\gamma(\hat y^{s})^2")
+        st.write("Решаем линейную сеточную задачу для нового приближения:")
+        st.latex(
+            r"\left(\frac{I}{\tau}-\nabla_h\!\cdot k^{(s)}\nabla_h\right)\widetilde y^{s+1}=\frac{y^m}{\tau}"
+            r"+f^{m+1}"
+        )
+        st.caption("I — единичный оператор; ∇ₕ обозначает производные на сетке.")
+        st.write("Обновляем поле с релаксацией ξ и повторяем до сходимости:")
+        st.latex(r"\hat y^{s+1}=(1-\xi)\hat y^{s}+\xi\widetilde y^{s+1}")
+        st.write(
+            "Обычный MC оценивает всё решение замороженной линейной задачи. Контрольный MC оценивает только поправку к текущему приближению v:"
+        )
+        st.latex(r"A_s\delta=b-A_sv,\qquad \widetilde y^{s+1}=v+\delta")
+        st.write(
+            "Aₛ — оператор при фиксированной проводимости, b — правая часть слоя. В варианте с хвостами продолжение пути после первого посещения узла даёт дополнительную оценку для этого узла. При изменении проводимости накопления сбрасываются."
+        )
+        st.write(
+            "Ньютон + прямой решатель служит отдельным сеточным эталоном. "
+            "Основные сравниваемые варианты — Пикар + ЛОМ и Пикар + MC."
+        )
+
+
+def _apply_all_methods_example():
+    """Apply a reproducible case explicitly, including previously saved widgets."""
+    st.session_state.update(
+        nl_n=8,
+        nl_alpha=0.5,
+        nl_dt=0.01,
+        nl_T=0.02,
+        nl_x=4,
+        nl_y=4,
+        nl_repeats=4,
+        nl_relaxation=0.7,
+        nl_tol=1e-7,
+        nl_mc_tol=0.03,
+        nl_outer=20,
+        nl_linear_tol=1e-10,
+        nl_walks=128,
+        nl_max_walks=131072,
+        nl_schedule="geometric",
+        nl_seed=42,
+        nl_total_walks=100_000_000,
+        nl_methods_v2=list(NONLINEAR_MC_METHODS),
+        nl_budgets=[128],
+    )
+    for key in (
+        "nl_result",
+        "nl_comparisons",
+        "nl_settings",
+        "nl_targets",
+        "nl_archive",
+        "nl_archive_method",
+        "nl_shown_method",
+    ):
+        st.session_state.pop(key, None)
 
 
 def render_nonlinear_app():
-    st.title("Нелинейная теплопроводность")
+    st.title("Квазилинейная теплопроводность")
+    st.button(
+        "Применить проверенные настройки всех методов",
+        key="nl_all_methods_example",
+        on_click=_apply_all_methods_example,
+        help="Сетка 8, γ=0,5, τ=0,01, T=0,02, центр, 4 повтора, seed=42; допуск MC 0,03, 20 итераций, максимум 131072 пути на узел и 100 млн на запуск. Начальный бюджет исследования — 128. Прежние результаты будут очищены.",
+    )
     with st.sidebar:
         n = st.select_slider(
             "Интервалов по оси", [4, 6, 8, 12, 16, 24, 32], value=8, key="nl_n"
         )
         alpha = st.number_input(
-            "α", min_value=0.0, max_value=100.0, value=0.5, key="nl_alpha"
+            "γ", min_value=0.0, max_value=100.0, value=0.5, key="nl_alpha"
         )
         dt = st.number_input(
-            "Физический шаг Δt",
+            "Физический шаг τ",
             min_value=0.0001,
             max_value=1.0,
             value=0.01,
@@ -46,16 +187,20 @@ def render_nonlinear_app():
                 st.session_state[key] = min(n, st.session_state[key])
             coordinates.append(
                 st.number_input(
-                    f"Узел {axis}", min_value=0, max_value=n, value=n // 2, key=key
+                    f"Узел {'z' if axis == 'y' else axis}",
+                    min_value=0,
+                    max_value=n,
+                    value=n // 2,
+                    key=key,
                 )
             )
         point = tuple(coordinates)
         repeats = st.number_input(
             "Полных повторов MC", min_value=2, max_value=20, value=4, key="nl_repeats"
         )
-        with st.expander("Нелинейные итерации"):
+        with st.expander("Нелинейные итерации", key="nonlinear_ui_expander_57"):
             relaxation = st.slider(
-                "Релаксация", 0.1, 1.0, 0.7, 0.1, key="nl_relaxation"
+                "Релаксация ξ", 0.1, 1.0, 0.7, 0.1, key="nl_relaxation"
             )
             tol = st.select_slider(
                 "Допуск Picard + ЛОМ",
@@ -76,7 +221,7 @@ def render_nonlinear_app():
                 value=12,
                 key="nl_outer",
             )
-        with st.expander("Линейный расчёт и бюджет MC"):
+        with st.expander("Линейный расчёт и бюджет MC", key="nonlinear_ui_expander_80"):
             linear_tol = st.select_slider(
                 "Линейный допуск ЛОМ",
                 [1e-8, 1e-10, 1e-12],
@@ -91,7 +236,7 @@ def render_nonlinear_app():
             )
             maximum = st.select_slider(
                 "Максимальный бюджет на узел",
-                [128, 512, 2048, 8192],
+                [128, 512, 2048, 8192, 32768, 131072, 524288],
                 value=2048,
                 key="nl_max_walks",
             )
@@ -109,7 +254,29 @@ def render_nonlinear_app():
             seed = st.number_input(
                 "Seed", min_value=0, max_value=2**32 - 1, value=42, key="nl_seed"
             )
-        run = st.button("Рассчитать", type="primary", key="nl_run")
+            total_walks = st.number_input(
+                "Лимит путей на полный запуск",
+                min_value=1,
+                max_value=1_000_000_000,
+                value=2_000_000,
+                step=1_000_000,
+                key="nl_total_walks",
+            )
+        variants = st.multiselect(
+            "Варианты MC",
+            list(NONLINEAR_MC_METHODS),
+            default=list(NONLINEAR_MC_METHODS),
+            format_func=NONLINEAR_MC_METHODS.get,
+            key="nl_methods_v2",
+        )
+        run = st.button(
+            "Рассчитать",
+            type="primary",
+            key="nl_run",
+            disabled=not variants,
+            on_click=select_section,
+            args=("nonlinear_sections", "Сравнение"),
+        )
     lod_settings = NonlinearSettings(
         tolerance=tol,
         change_tolerance=tol,
@@ -126,7 +293,7 @@ def render_nonlinear_app():
         max_walks=maximum,
         schedule=schedule,
         seed=seed,
-        max_total_walks=2_000_000,
+        max_total_walks=total_walks,
     )
     settings = dict(
         n=n,
@@ -135,20 +302,16 @@ def render_nonlinear_app():
         T=final,
         point=point,
         repeats=repeats,
+        variants=variants,
         lod=asdict(lod_settings),
         mc=asdict(mc_settings),
     )
-    with st.expander("Формулы и описание", expanded=True):
-        st.latex(
-            r"u_t=\nabla\cdot((1+\alpha u^2)\nabla u)+F,\quad C=1,\quad u|_{\partial\Omega}=1"
-        )
-        st.latex(r"u_*=1+e^{-t}\sin(\pi x)\sin(\pi y),\qquad u_0=u_*(x,y,0)")
-        st.latex(r"F=-(u_*-1)+2\pi^2(1+\alpha u_*^2)(u_*-1)-2\alpha u_*|\nabla u_*|^2")
-        st.latex(
-            r"\left(\frac{I}{\Delta t}-\nabla_h\cdot k(v^j)\nabla_h\right)\widetilde v^{j+1}=\frac{u^m}{\Delta t}+F^{m+1},\quad v^{j+1}=(1-\omega)v^j+\omega\widetilde v^{j+1}"
-        )
-        st.caption(
-            "Каждый повтор MC считает всю историю и все внутренние узлы. Newton — независимая проверка сеточной системы."
+    _problem_info(alpha)
+    if "mc_plain" in variants and mc_tol <= 0.001 and maximum <= 2048:
+        st.info(
+            "Для обычного MC выбран строгий допуск при малом бюджете: "
+            "он может не завершить Пикара. Кнопка сверху применяет проверенный "
+            "пример с явно другими параметрами. Это не гарантия сходимости для произвольной задачи."
         )
     try:
         lod_settings.validate()
@@ -159,7 +322,7 @@ def render_nonlinear_app():
     if run:
         try:
             with st.spinner("Временные слои, Picard и независимые цепочки MC…"):
-                result = compare_nonlinear(
+                comparisons = compare_nonlinear_methods(
                     make_nonlinear_problem(n, alpha),
                     dt,
                     final,
@@ -167,16 +330,32 @@ def render_nonlinear_app():
                     repeats,
                     lod_settings,
                     mc_settings,
+                    variants,
                 )
+            result = comparisons[variants[0]]
+            st.session_state["nl_comparisons"] = comparisons
             st.session_state["nl_result"] = result
             st.session_state["nl_settings"] = settings
             st.session_state.pop("nl_archive", None)
         except (ValueError, RuntimeError) as exc:
             st.error(str(exc))
     comparison_tab, iterations_tab, research_tab = st.tabs(
-        ["Сравнение", "Итерации", "Исследование 1/5/10%"]
+        ["Сравнение", "Итерации", "Исследование 1/5/10%"],
+        key="nonlinear_sections",
+        on_change="rerun",
     )
     result = st.session_state.get("nl_result")
+    comparisons = st.session_state.get("nl_comparisons", {})
+    if comparisons:
+        shown = st.selectbox(
+            "Вариант на графиках и в архиве",
+            list(comparisons),
+            format_func=NONLINEAR_MC_METHODS.get,
+            key="nl_shown_method",
+        )
+        result = comparisons[shown]
+        if st.session_state.get("nl_archive_method") != shown:
+            st.session_state.pop("nl_archive", None)
     with comparison_tab:
         if result is not None:
             if st.session_state["nl_settings"] != settings:
@@ -189,22 +368,42 @@ def render_nonlinear_app():
                 rmse="RMSE",
                 relative_error_pct="Отн. ошибка, %",
             )
+            metrics = result.metrics
+            if comparisons:
+                metrics = [
+                    {
+                        **next(iter(comparisons.values())).metrics[0],
+                        "method": "Picard + ЛОМ",
+                    }
+                ]
+                metrics.extend(
+                    {**item.metrics[1], "method": NONLINEAR_MC_METHODS[key]}
+                    for key, item in comparisons.items()
+                )
             st.dataframe(
-                pd.DataFrame(result.metrics)[list(labels)].rename(columns=labels),
+                pd.DataFrame(metrics)[list(labels)].rename(columns=labels),
                 hide_index=True,
                 width="stretch",
             )
             for calculation in [result.deterministic, *result.stochastic]:
                 if not calculation.completed:
                     st.warning(
-                        f"{calculation.method}, seed={calculation.settings.seed}: {calculation.reason}"
+                        f"{calculation.method}, seed={calculation.settings.seed}: "
+                        + readable_status(
+                            dict(
+                                status="solver_failed",
+                                reason=failure_message(calculation),
+                            )
+                        )
                     )
             st.plotly_chart(time_figure(result), width="stretch")
             st.plotly_chart(
                 field_figure(result, st.toggle("Показать ошибку", key="nl_error")),
                 width="stretch",
             )
-            with st.expander("Статистика полных цепочек MC"):
+            with st.expander(
+                "Статистика полных цепочек MC", key="nonlinear_ui_expander_208"
+            ):
                 st.dataframe(
                     pd.DataFrame([result.metrics[1]])[
                         [
@@ -221,12 +420,16 @@ def render_nonlinear_app():
                 )
             if st.button("Подготовить архив", key="nl_export"):
                 st.session_state["nl_archive"] = comparison_archive(result)
+                st.session_state["nl_archive_method"] = result.stochastic[
+                    0
+                ].settings.mc_variant
             if "nl_archive" in st.session_state:
                 st.download_button(
                     "Скачать ZIP",
                     st.session_state["nl_archive"],
                     "nonlinear.zip",
                     "application/zip",
+                    on_click="ignore",
                 )
     with iterations_tab:
         if result is not None:
@@ -242,7 +445,11 @@ def render_nonlinear_app():
             key="nl_budgets",
         )
         target_settings = {**settings, "budgets": budgets}
-        if st.button("Проверить 1/5/10%", key="nl_targets_run", disabled=not budgets):
+        if st.button(
+            "Проверить 1/5/10%",
+            key="nl_targets_run",
+            disabled=not budgets or not variants,
+        ):
             try:
                 with st.spinner("Подбор бюджета и независимая проверка…"):
                     rows, evidence = nonlinear_targets(
@@ -255,6 +462,7 @@ def render_nonlinear_app():
                         seed,
                         settings=mc_settings,
                         deterministic=lod_settings,
+                        variants=variants,
                     )
                 st.session_state["nl_targets"] = (target_settings, rows, evidence)
             except (ValueError, RuntimeError) as exc:
@@ -263,7 +471,6 @@ def render_nonlinear_app():
         if saved is not None:
             if saved[0] != target_settings:
                 st.info("Показано исследование с прежними настройками.")
-            table = pd.DataFrame(saved[1])
             pilots = pd.DataFrame(
                 [
                     {**metric, "N": item["settings"]["walks"]}
@@ -286,27 +493,22 @@ def render_nonlinear_app():
                 ),
                 width="stretch",
             )
-            st.dataframe(
-                table.pivot(
-                    index="target_pct", columns="method", values="seconds"
-                ).rename_axis("Точность, %"),
-                width="stretch",
-            )
-            st.dataframe(
-                table[
-                    ["target_pct", "method", "status", "relative_error_pct", "walks"]
-                ],
-                hide_index=True,
+            render_accuracy_results(
+                saved[1],
+                {"picard": "Picard + ЛОМ", **NONLINEAR_MC_METHODS},
+                key="nl_study_results",
             )
             st.download_button(
                 "Скачать таблицу",
                 csv_bytes(saved[1]),
                 "nonlinear-targets.csv",
                 "text/csv",
+                on_click="ignore",
             )
             st.download_button(
                 "Скачать проверку бюджетов",
                 json_bytes(dict(settings=saved[0], evidence=saved[2])),
                 "nonlinear-targets.json",
                 "application/json",
+                on_click="ignore",
             )

@@ -1,0 +1,1394 @@
+[
+  {
+    "old": {
+      "case": "S01",
+      "method": "mc",
+      "target_pct": 10.0,
+      "parameters": {
+        "walks": 64
+      },
+      "status": "confirmed",
+      "seconds": 5.1530100136005786e-05,
+      "error_pct": 6.277297486692383,
+      "speedup": 2.694006795687434,
+      "repeat_win": true,
+      "median_seconds": 4.991649893781869e-05,
+      "error_ci": [
+        5.109426116049741,
+        7.514205919139054
+      ],
+      "rms_pct": 7.650394448812447,
+      "external_seconds": 8.543412008293671e-05,
+      "speed_ci": [
+        2.5788908709415,
+        2.8040602871951017
+      ]
+    },
+    "current": {
+      "method": "mc",
+      "target_pct": 10.0,
+      "seconds": 0.0001613125998119358,
+      "validation_seconds": 0.0001613125998119358,
+      "relative_error_pct": 2.8904143151556583,
+      "calibration_error_pct": 3.212161340009416,
+      "budget": 256,
+      "interrupted_budget": null,
+      "budget_kind": "walks_per_start",
+      "calibration_target_pct": 5.0,
+      "selection_policy": "stable_pilot_adaptive_retry_v4",
+      "accuracy_metric": "mean_run_relative_l1_v1",
+      "status": "Достигнута",
+      "status_code": "confirmed",
+      "validation_attempts": 1,
+      "calibration_margin_relaxed": false,
+      "attempts": [
+        {
+          "budget": 64,
+          "budget_index": 0,
+          "phase": "calibration",
+          "relative_error_pct": 6.5816317180339805,
+          "seconds": 5.0254099915036934e-05,
+          "status": "completed",
+          "elapsed_seconds": 0.001014041999951587
+        },
+        {
+          "budget": 128,
+          "budget_index": 1,
+          "phase": "calibration",
+          "relative_error_pct": 4.390266171697048,
+          "seconds": 8.780839998507872e-05,
+          "status": "completed",
+          "elapsed_seconds": 0.0013526250004360918
+        },
+        {
+          "budget": 128,
+          "budget_index": 1,
+          "phase": "calibration_2",
+          "relative_error_pct": 5.821724454596813,
+          "seconds": 8.357099977729376e-05,
+          "status": "completed",
+          "elapsed_seconds": 0.0012826659985876177
+        },
+        {
+          "budget": 128,
+          "budget_index": 1,
+          "phase": "calibration_3",
+          "relative_error_pct": 3.76446069915269,
+          "seconds": 8.2016700253007e-05,
+          "status": "completed",
+          "elapsed_seconds": 0.0012587919991347007
+        },
+        {
+          "budget": 256,
+          "budget_index": 2,
+          "phase": "calibration",
+          "relative_error_pct": 3.212161340009416,
+          "seconds": 0.00015977089988155057,
+          "status": "completed",
+          "elapsed_seconds": 0.0020493749998422572
+        },
+        {
+          "budget": 256,
+          "budget_index": 2,
+          "phase": "calibration_2",
+          "relative_error_pct": 2.8186922356375304,
+          "seconds": 0.00015999179995560553,
+          "status": "completed",
+          "elapsed_seconds": 0.0021777909987577004
+        },
+        {
+          "budget": 256,
+          "budget_index": 2,
+          "phase": "calibration_3",
+          "relative_error_pct": 2.9143089721660416,
+          "seconds": 0.0001515164000011282,
+          "status": "completed",
+          "elapsed_seconds": 0.0019894999986718176
+        },
+        {
+          "budget": 256,
+          "budget_index": 2,
+          "phase": "validation",
+          "relative_error_pct": 2.8904143151556583,
+          "seconds": 0.0001613125998119358,
+          "status": "completed",
+          "elapsed_seconds": 0.0020987919997423887
+        },
+        {
+          "budget": 512,
+          "budget_index": 3,
+          "phase": "calibration",
+          "relative_error_pct": 2.2806504219768797,
+          "seconds": 0.0003043084001546958,
+          "status": "completed",
+          "elapsed_seconds": 0.003520333000778919
+        },
+        {
+          "budget": 512,
+          "budget_index": 3,
+          "phase": "calibration_2",
+          "relative_error_pct": 1.265290951250836,
+          "seconds": 0.0003063581001697457,
+          "status": "completed",
+          "elapsed_seconds": 0.0035412079996604007
+        },
+        {
+          "budget": 512,
+          "budget_index": 3,
+          "phase": "calibration_3",
+          "relative_error_pct": 2.4252510952751307,
+          "seconds": 0.0003047623997190385,
+          "status": "completed",
+          "elapsed_seconds": 0.003510374999677879
+        },
+        {
+          "budget": 512,
+          "budget_index": 3,
+          "phase": "validation",
+          "relative_error_pct": 1.555800354170478,
+          "seconds": 0.000303183400137641,
+          "status": "completed",
+          "elapsed_seconds": 0.003501125000184402
+        },
+        {
+          "budget": 1024,
+          "budget_index": 4,
+          "phase": "calibration",
+          "relative_error_pct": 2.026308273836206,
+          "seconds": 0.0005913709999731509,
+          "status": "completed",
+          "elapsed_seconds": 0.00645970900040993
+        },
+        {
+          "budget": 2048,
+          "budget_index": 5,
+          "phase": "calibration",
+          "relative_error_pct": 1.384239004403986,
+          "seconds": 0.0011942374003410805,
+          "status": "completed",
+          "elapsed_seconds": 0.012570167000376387
+        },
+        {
+          "budget": 4096,
+          "budget_index": 6,
+          "phase": "calibration",
+          "relative_error_pct": 0.8183650422383991,
+          "seconds": 0.002367420900009165,
+          "status": "completed",
+          "elapsed_seconds": 0.02442029200028628
+        },
+        {
+          "budget": 4096,
+          "budget_index": 6,
+          "phase": "calibration_2",
+          "relative_error_pct": 1.380860133115516,
+          "seconds": 0.002392000199688482,
+          "status": "completed",
+          "elapsed_seconds": 0.024642250000397325
+        },
+        {
+          "budget": 4096,
+          "budget_index": 6,
+          "phase": "calibration_3",
+          "relative_error_pct": 1.20123907671814,
+          "seconds": 0.0023669249996601137,
+          "status": "completed",
+          "elapsed_seconds": 0.024639332999868202
+        }
+      ],
+      "calibration_seconds": 0.1144284579968371,
+      "total_validation_seconds": 0.005599916999926791,
+      "search_seconds": 0.12002837499676389,
+      "name": "Монте-Карло"
+    },
+    "baseline": {
+      "method": "lod_serial",
+      "target_pct": 10.0,
+      "seconds": 0.00014175819978845539,
+      "validation_seconds": 0.00014175819978845539,
+      "relative_error_pct": 9.700864404821857,
+      "calibration_error_pct": 9.700864404821857,
+      "budget": 0.1,
+      "interrupted_budget": null,
+      "budget_kind": "relative_residual_tolerance",
+      "calibration_target_pct": 10.0,
+      "selection_policy": "stable_pilot_adaptive_retry_v4",
+      "accuracy_metric": "mean_run_relative_l1_v1",
+      "status": "Достигнута",
+      "status_code": "confirmed",
+      "validation_attempts": 1,
+      "calibration_margin_relaxed": false,
+      "attempts": [
+        {
+          "budget": 0.1,
+          "budget_index": 0,
+          "phase": "calibration",
+          "relative_error_pct": 9.700864404821857,
+          "seconds": 0.0001662499998928979,
+          "status": "completed",
+          "elapsed_seconds": 0.000273374998869258
+        },
+        {
+          "budget": 0.1,
+          "budget_index": 0,
+          "phase": "validation",
+          "relative_error_pct": 9.700864404821857,
+          "seconds": 0.00014175819978845539,
+          "status": "completed",
+          "elapsed_seconds": 0.0019569169999158476
+        },
+        {
+          "budget": 0.05,
+          "budget_index": 1,
+          "phase": "calibration",
+          "relative_error_pct": 4.611765739547664,
+          "seconds": 0.0001502920003986219,
+          "status": "completed",
+          "elapsed_seconds": 0.0002012920012930408
+        },
+        {
+          "budget": 0.05,
+          "budget_index": 1,
+          "phase": "validation",
+          "relative_error_pct": 4.611765739547664,
+          "seconds": 0.0001568793000842561,
+          "status": "completed",
+          "elapsed_seconds": 0.0019642919996840646
+        },
+        {
+          "budget": 0.01,
+          "budget_index": 2,
+          "phase": "calibration",
+          "relative_error_pct": 0.6794376474872337,
+          "seconds": 0.0002446669986966299,
+          "status": "completed",
+          "elapsed_seconds": 0.0002987079988088226
+        },
+        {
+          "budget": 0.01,
+          "budget_index": 2,
+          "phase": "validation",
+          "relative_error_pct": 0.6794376474872337,
+          "seconds": 0.00023722069981886308,
+          "status": "completed",
+          "elapsed_seconds": 0.0027728340010071406
+        }
+      ],
+      "calibration_seconds": 0.0007733749989711214,
+      "total_validation_seconds": 0.006694043000607053,
+      "search_seconds": 0.007467417999578174,
+      "name": "ЛОМ"
+    },
+    "scenario": "D06"
+  },
+  {
+    "old": {
+      "case": "S01",
+      "method": "reuse",
+      "target_pct": 10.0,
+      "parameters": {
+        "walks": 64
+      },
+      "status": "confirmed",
+      "seconds": 5.654503998812288e-05,
+      "error_pct": 7.877281699581095,
+      "speedup": 2.4550772265438807,
+      "repeat_win": true,
+      "median_seconds": 5.47915005881805e-05,
+      "error_ci": [
+        6.222792535242235,
+        9.619676217944209
+      ],
+      "rms_pct": 10.058980827051178,
+      "external_seconds": 9.721083995827939e-05,
+      "speed_ci": [
+        2.3164437994736775,
+        2.597828774297776
+      ]
+    },
+    "current": {
+      "method": "reuse",
+      "target_pct": 10.0,
+      "seconds": 0.00016686250019120051,
+      "validation_seconds": 0.00016686250019120051,
+      "relative_error_pct": 2.8904143151556583,
+      "calibration_error_pct": 3.212161340009416,
+      "budget": 256,
+      "interrupted_budget": null,
+      "budget_kind": "walks_per_start",
+      "calibration_target_pct": 5.0,
+      "selection_policy": "stable_pilot_adaptive_retry_v4",
+      "accuracy_metric": "mean_run_relative_l1_v1",
+      "status": "Достигнута",
+      "status_code": "confirmed",
+      "validation_attempts": 1,
+      "calibration_margin_relaxed": false,
+      "attempts": [
+        {
+          "budget": 64,
+          "budget_index": 0,
+          "phase": "calibration",
+          "relative_error_pct": 6.5816317180339805,
+          "seconds": 4.977489970769966e-05,
+          "status": "completed",
+          "elapsed_seconds": 0.001012500000797445
+        },
+        {
+          "budget": 128,
+          "budget_index": 1,
+          "phase": "calibration",
+          "relative_error_pct": 4.390266171697048,
+          "seconds": 8.676659981574631e-05,
+          "status": "completed",
+          "elapsed_seconds": 0.001340416998573346
+        },
+        {
+          "budget": 128,
+          "budget_index": 1,
+          "phase": "calibration_2",
+          "relative_error_pct": 5.821724454596813,
+          "seconds": 9.24706999285263e-05,
+          "status": "completed",
+          "elapsed_seconds": 0.0013889999991079094
+        },
+        {
+          "budget": 128,
+          "budget_index": 1,
+          "phase": "calibration_3",
+          "relative_error_pct": 3.76446069915269,
+          "seconds": 8.628330015199026e-05,
+          "status": "completed",
+          "elapsed_seconds": 0.0013230420008767396
+        },
+        {
+          "budget": 256,
+          "budget_index": 2,
+          "phase": "calibration",
+          "relative_error_pct": 3.212161340009416,
+          "seconds": 0.000163791900013166,
+          "status": "completed",
+          "elapsed_seconds": 0.0020994170008634683
+        },
+        {
+          "budget": 256,
+          "budget_index": 2,
+          "phase": "calibration_2",
+          "relative_error_pct": 2.8186922356375304,
+          "seconds": 0.0001622916999622248,
+          "status": "completed",
+          "elapsed_seconds": 0.0020763749998877756
+        },
+        {
+          "budget": 256,
+          "budget_index": 2,
+          "phase": "calibration_3",
+          "relative_error_pct": 2.9143089721660416,
+          "seconds": 0.0001625834998776554,
+          "status": "completed",
+          "elapsed_seconds": 0.0020831250003539026
+        },
+        {
+          "budget": 256,
+          "budget_index": 2,
+          "phase": "validation",
+          "relative_error_pct": 2.8904143151556583,
+          "seconds": 0.00016686250019120051,
+          "status": "completed",
+          "elapsed_seconds": 0.0021385410000220872
+        },
+        {
+          "budget": 512,
+          "budget_index": 3,
+          "phase": "calibration",
+          "relative_error_pct": 2.2806504219768797,
+          "seconds": 0.0003143292000459041,
+          "status": "completed",
+          "elapsed_seconds": 0.0035922500010201475
+        },
+        {
+          "budget": 512,
+          "budget_index": 3,
+          "phase": "calibration_2",
+          "relative_error_pct": 1.265290951250836,
+          "seconds": 0.0003170500000123866,
+          "status": "completed",
+          "elapsed_seconds": 0.0036159999999654246
+        },
+        {
+          "budget": 512,
+          "budget_index": 3,
+          "phase": "calibration_3",
+          "relative_error_pct": 2.4252510952751307,
+          "seconds": 0.0003171292002662085,
+          "status": "completed",
+          "elapsed_seconds": 0.003624500001023989
+        },
+        {
+          "budget": 512,
+          "budget_index": 3,
+          "phase": "validation",
+          "relative_error_pct": 1.555800354170478,
+          "seconds": 0.0003167166003549937,
+          "status": "completed",
+          "elapsed_seconds": 0.0036197499994159443
+        },
+        {
+          "budget": 1024,
+          "budget_index": 4,
+          "phase": "calibration",
+          "relative_error_pct": 2.026308273836206,
+          "seconds": 0.0006022665998898447,
+          "status": "completed",
+          "elapsed_seconds": 0.006558708999364171
+        },
+        {
+          "budget": 2048,
+          "budget_index": 5,
+          "phase": "calibration",
+          "relative_error_pct": 1.384239004403986,
+          "seconds": 0.0012019624997265054,
+          "status": "completed",
+          "elapsed_seconds": 0.01254141699973843
+        },
+        {
+          "budget": 4096,
+          "budget_index": 6,
+          "phase": "calibration",
+          "relative_error_pct": 0.8183650422383991,
+          "seconds": 0.0023955457001648027,
+          "status": "completed",
+          "elapsed_seconds": 0.02518462499938323
+        },
+        {
+          "budget": 4096,
+          "budget_index": 6,
+          "phase": "calibration_2",
+          "relative_error_pct": 1.380860133115516,
+          "seconds": 0.0024677042001712834,
+          "status": "completed",
+          "elapsed_seconds": 0.02577045799989719
+        },
+        {
+          "budget": 4096,
+          "budget_index": 6,
+          "phase": "calibration_3",
+          "relative_error_pct": 1.20123907671814,
+          "seconds": 0.0025184750997141237,
+          "status": "completed",
+          "elapsed_seconds": 0.025924875000782777
+        }
+      ],
+      "calibration_seconds": 0.11813671000163595,
+      "total_validation_seconds": 0.005758290999438032,
+      "search_seconds": 0.12389500100107398,
+      "name": "MК хвосты путей"
+    },
+    "baseline": {
+      "method": "lod_serial",
+      "target_pct": 10.0,
+      "seconds": 0.00014175819978845539,
+      "validation_seconds": 0.00014175819978845539,
+      "relative_error_pct": 9.700864404821857,
+      "calibration_error_pct": 9.700864404821857,
+      "budget": 0.1,
+      "interrupted_budget": null,
+      "budget_kind": "relative_residual_tolerance",
+      "calibration_target_pct": 10.0,
+      "selection_policy": "stable_pilot_adaptive_retry_v4",
+      "accuracy_metric": "mean_run_relative_l1_v1",
+      "status": "Достигнута",
+      "status_code": "confirmed",
+      "validation_attempts": 1,
+      "calibration_margin_relaxed": false,
+      "attempts": [
+        {
+          "budget": 0.1,
+          "budget_index": 0,
+          "phase": "calibration",
+          "relative_error_pct": 9.700864404821857,
+          "seconds": 0.0001662499998928979,
+          "status": "completed",
+          "elapsed_seconds": 0.000273374998869258
+        },
+        {
+          "budget": 0.1,
+          "budget_index": 0,
+          "phase": "validation",
+          "relative_error_pct": 9.700864404821857,
+          "seconds": 0.00014175819978845539,
+          "status": "completed",
+          "elapsed_seconds": 0.0019569169999158476
+        },
+        {
+          "budget": 0.05,
+          "budget_index": 1,
+          "phase": "calibration",
+          "relative_error_pct": 4.611765739547664,
+          "seconds": 0.0001502920003986219,
+          "status": "completed",
+          "elapsed_seconds": 0.0002012920012930408
+        },
+        {
+          "budget": 0.05,
+          "budget_index": 1,
+          "phase": "validation",
+          "relative_error_pct": 4.611765739547664,
+          "seconds": 0.0001568793000842561,
+          "status": "completed",
+          "elapsed_seconds": 0.0019642919996840646
+        },
+        {
+          "budget": 0.01,
+          "budget_index": 2,
+          "phase": "calibration",
+          "relative_error_pct": 0.6794376474872337,
+          "seconds": 0.0002446669986966299,
+          "status": "completed",
+          "elapsed_seconds": 0.0002987079988088226
+        },
+        {
+          "budget": 0.01,
+          "budget_index": 2,
+          "phase": "validation",
+          "relative_error_pct": 0.6794376474872337,
+          "seconds": 0.00023722069981886308,
+          "status": "completed",
+          "elapsed_seconds": 0.0027728340010071406
+        }
+      ],
+      "calibration_seconds": 0.0007733749989711214,
+      "total_validation_seconds": 0.006694043000607053,
+      "search_seconds": 0.007467417999578174,
+      "name": "ЛОМ"
+    },
+    "scenario": "D06"
+  },
+  {
+    "old": {
+      "case": "S02",
+      "method": "wos",
+      "target_pct": 5.0,
+      "parameters": {
+        "walks": 1024
+      },
+      "status": "confirmed",
+      "seconds": 0.0033277608597563815,
+      "error_pct": 3.529080677261454,
+      "speedup": 1.3441956283314704,
+      "repeat_win": true,
+      "median_seconds": 0.003289979499641049,
+      "error_ci": [
+        2.847702642395429,
+        4.28083188151125
+      ],
+      "rms_pct": 4.380346815026582,
+      "external_seconds": 0.003399404080118984,
+      "speed_ci": [
+        1.3225596800852126,
+        1.3661366464189786
+      ]
+    },
+    "current": {
+      "method": "wos",
+      "target_pct": 5.0,
+      "seconds": 0.013753816599455604,
+      "validation_seconds": 0.013753816599455604,
+      "relative_error_pct": 1.236690240673994,
+      "calibration_error_pct": 1.6589997279488913,
+      "budget": 4096,
+      "interrupted_budget": null,
+      "budget_kind": "walks_per_start",
+      "calibration_target_pct": 2.5,
+      "selection_policy": "stable_pilot_adaptive_retry_v4",
+      "accuracy_metric": "mean_run_relative_l1_v1",
+      "status": "Достигнута",
+      "status_code": "confirmed",
+      "validation_attempts": 1,
+      "calibration_margin_relaxed": false,
+      "attempts": [
+        {
+          "budget": 64,
+          "budget_index": 0,
+          "phase": "calibration",
+          "relative_error_pct": 17.55345927519805,
+          "seconds": 0.000246987600257853,
+          "status": "completed",
+          "elapsed_seconds": 0.013208333000875427
+        },
+        {
+          "budget": 128,
+          "budget_index": 1,
+          "phase": "calibration",
+          "relative_error_pct": 8.945294769221347,
+          "seconds": 0.0004393250001157867,
+          "status": "completed",
+          "elapsed_seconds": 0.004957000001013512
+        },
+        {
+          "budget": 256,
+          "budget_index": 2,
+          "phase": "calibration",
+          "relative_error_pct": 6.982665025662291,
+          "seconds": 0.0009220168996762368,
+          "status": "completed",
+          "elapsed_seconds": 0.00997454100070172
+        },
+        {
+          "budget": 512,
+          "budget_index": 3,
+          "phase": "calibration",
+          "relative_error_pct": 5.554009540834952,
+          "seconds": 0.001832025300063833,
+          "status": "completed",
+          "elapsed_seconds": 0.01909587500085763
+        },
+        {
+          "budget": 1024,
+          "budget_index": 4,
+          "phase": "calibration",
+          "relative_error_pct": 3.049785016717185,
+          "seconds": 0.0036610374998417685,
+          "status": "completed",
+          "elapsed_seconds": 0.0379187920007098
+        },
+        {
+          "budget": 1024,
+          "budget_index": 4,
+          "phase": "calibration_2",
+          "relative_error_pct": 4.611487025124755,
+          "seconds": 0.003517462399940996,
+          "status": "completed",
+          "elapsed_seconds": 0.0363431669993588
+        },
+        {
+          "budget": 1024,
+          "budget_index": 4,
+          "phase": "calibration_3",
+          "relative_error_pct": 4.365990484684853,
+          "seconds": 0.003768641599890543,
+          "status": "completed",
+          "elapsed_seconds": 0.03881929199997103
+        },
+        {
+          "budget": 1024,
+          "budget_index": 4,
+          "phase": "validation",
+          "relative_error_pct": 3.026811609076222,
+          "seconds": 0.0035941873997217045,
+          "status": "completed",
+          "elapsed_seconds": 0.037398832999315346
+        },
+        {
+          "budget": 2048,
+          "budget_index": 5,
+          "phase": "calibration",
+          "relative_error_pct": 1.221551697797213,
+          "seconds": 0.007090579099894967,
+          "status": "completed",
+          "elapsed_seconds": 0.07234249999964959
+        },
+        {
+          "budget": 2048,
+          "budget_index": 5,
+          "phase": "calibration_2",
+          "relative_error_pct": 2.5179143488495455,
+          "seconds": 0.007076687599692377,
+          "status": "completed",
+          "elapsed_seconds": 0.07212829200034321
+        },
+        {
+          "budget": 2048,
+          "budget_index": 5,
+          "phase": "calibration_3",
+          "relative_error_pct": 1.5623321025652175,
+          "seconds": 0.007317566699930467,
+          "status": "completed",
+          "elapsed_seconds": 0.07481558300059987
+        },
+        {
+          "budget": 4096,
+          "budget_index": 6,
+          "phase": "calibration",
+          "relative_error_pct": 1.5405712227715156,
+          "seconds": 0.014447929200468935,
+          "status": "completed",
+          "elapsed_seconds": 0.14623324999956822
+        },
+        {
+          "budget": 4096,
+          "budget_index": 6,
+          "phase": "calibration_2",
+          "relative_error_pct": 1.5551550783375192,
+          "seconds": 0.013940733200433897,
+          "status": "completed",
+          "elapsed_seconds": 0.14130925000063144
+        },
+        {
+          "budget": 4096,
+          "budget_index": 6,
+          "phase": "calibration_3",
+          "relative_error_pct": 1.6589997279488913,
+          "seconds": 0.014315600100235314,
+          "status": "completed",
+          "elapsed_seconds": 0.1450796659992193
+        },
+        {
+          "budget": 4096,
+          "budget_index": 6,
+          "phase": "validation",
+          "relative_error_pct": 1.236690240673994,
+          "seconds": 0.013753816599455604,
+          "status": "completed",
+          "elapsed_seconds": 0.1394950419999077
+        }
+      ],
+      "calibration_seconds": 0.8122255410034995,
+      "total_validation_seconds": 0.17689387499922304,
+      "search_seconds": 0.9891194160027226,
+      "name": "WoS · 1-й род"
+    },
+    "baseline": {
+      "method": "lod_serial",
+      "target_pct": 5.0,
+      "seconds": 0.004171654099627631,
+      "validation_seconds": 0.004171654099627631,
+      "relative_error_pct": 4.877476490875651,
+      "calibration_error_pct": 4.877476490875651,
+      "budget": 0.05,
+      "interrupted_budget": null,
+      "budget_kind": "relative_residual_tolerance",
+      "calibration_target_pct": 5.0,
+      "selection_policy": "stable_pilot_adaptive_retry_v4",
+      "accuracy_metric": "mean_run_relative_l1_v1",
+      "status": "Достигнута",
+      "status_code": "confirmed",
+      "validation_attempts": 1,
+      "calibration_margin_relaxed": false,
+      "attempts": [
+        {
+          "budget": 0.1,
+          "budget_index": 0,
+          "phase": "calibration",
+          "relative_error_pct": 9.554386011417833,
+          "seconds": 0.0033751250011846423,
+          "status": "completed",
+          "elapsed_seconds": 0.003509000000121887
+        },
+        {
+          "budget": 0.1,
+          "budget_index": 0,
+          "phase": "validation",
+          "relative_error_pct": 9.554386011417833,
+          "seconds": 0.0033763332998205443,
+          "status": "completed",
+          "elapsed_seconds": 0.034702124999967054
+        },
+        {
+          "budget": 0.05,
+          "budget_index": 1,
+          "phase": "calibration",
+          "relative_error_pct": 4.877476490875651,
+          "seconds": 0.004116792000786518,
+          "status": "completed",
+          "elapsed_seconds": 0.004197500000373111
+        },
+        {
+          "budget": 0.05,
+          "budget_index": 1,
+          "phase": "validation",
+          "relative_error_pct": 4.877476490875651,
+          "seconds": 0.004171654099627631,
+          "status": "completed",
+          "elapsed_seconds": 0.042465666998396046
+        },
+        {
+          "budget": 0.01,
+          "budget_index": 2,
+          "phase": "calibration",
+          "relative_error_pct": 0.941391659253398,
+          "seconds": 0.006461083999965922,
+          "status": "completed",
+          "elapsed_seconds": 0.006540416999996523
+        },
+        {
+          "budget": 0.01,
+          "budget_index": 2,
+          "phase": "validation",
+          "relative_error_pct": 0.941391659253398,
+          "seconds": 0.006451379399914003,
+          "status": "completed",
+          "elapsed_seconds": 0.06537904100150627
+        }
+      ],
+      "calibration_seconds": 0.014246917000491521,
+      "total_validation_seconds": 0.14254683299986937,
+      "search_seconds": 0.1567937500003609,
+      "name": "ЛОМ"
+    },
+    "scenario": "D01"
+  },
+  {
+    "old": {
+      "case": "S02",
+      "method": "wos",
+      "target_pct": 10.0,
+      "parameters": {
+        "walks": 1024
+      },
+      "status": "confirmed",
+      "seconds": 0.0033277608597563815,
+      "error_pct": 3.529080677261454,
+      "speedup": 1.0629452201862082,
+      "repeat_win": true,
+      "median_seconds": 0.003289979499641049,
+      "error_ci": [
+        2.847702642395429,
+        4.28083188151125
+      ],
+      "rms_pct": 4.380346815026582,
+      "external_seconds": 0.003399404080118984,
+      "speed_ci": [
+        1.0455320159829404,
+        1.0812370332176027
+      ]
+    },
+    "current": {
+      "method": "wos",
+      "target_pct": 10.0,
+      "seconds": 0.0035941873997217045,
+      "validation_seconds": 0.0035941873997217045,
+      "relative_error_pct": 3.026811609076222,
+      "calibration_error_pct": 4.611487025124755,
+      "budget": 1024,
+      "interrupted_budget": null,
+      "budget_kind": "walks_per_start",
+      "calibration_target_pct": 5.0,
+      "selection_policy": "stable_pilot_adaptive_retry_v4",
+      "accuracy_metric": "mean_run_relative_l1_v1",
+      "status": "Достигнута",
+      "status_code": "confirmed",
+      "validation_attempts": 1,
+      "calibration_margin_relaxed": false,
+      "attempts": [
+        {
+          "budget": 64,
+          "budget_index": 0,
+          "phase": "calibration",
+          "relative_error_pct": 17.55345927519805,
+          "seconds": 0.000246987600257853,
+          "status": "completed",
+          "elapsed_seconds": 0.013208333000875427
+        },
+        {
+          "budget": 128,
+          "budget_index": 1,
+          "phase": "calibration",
+          "relative_error_pct": 8.945294769221347,
+          "seconds": 0.0004393250001157867,
+          "status": "completed",
+          "elapsed_seconds": 0.004957000001013512
+        },
+        {
+          "budget": 256,
+          "budget_index": 2,
+          "phase": "calibration",
+          "relative_error_pct": 6.982665025662291,
+          "seconds": 0.0009220168996762368,
+          "status": "completed",
+          "elapsed_seconds": 0.00997454100070172
+        },
+        {
+          "budget": 512,
+          "budget_index": 3,
+          "phase": "calibration",
+          "relative_error_pct": 5.554009540834952,
+          "seconds": 0.001832025300063833,
+          "status": "completed",
+          "elapsed_seconds": 0.01909587500085763
+        },
+        {
+          "budget": 1024,
+          "budget_index": 4,
+          "phase": "calibration",
+          "relative_error_pct": 3.049785016717185,
+          "seconds": 0.0036610374998417685,
+          "status": "completed",
+          "elapsed_seconds": 0.0379187920007098
+        },
+        {
+          "budget": 1024,
+          "budget_index": 4,
+          "phase": "calibration_2",
+          "relative_error_pct": 4.611487025124755,
+          "seconds": 0.003517462399940996,
+          "status": "completed",
+          "elapsed_seconds": 0.0363431669993588
+        },
+        {
+          "budget": 1024,
+          "budget_index": 4,
+          "phase": "calibration_3",
+          "relative_error_pct": 4.365990484684853,
+          "seconds": 0.003768641599890543,
+          "status": "completed",
+          "elapsed_seconds": 0.03881929199997103
+        },
+        {
+          "budget": 1024,
+          "budget_index": 4,
+          "phase": "validation",
+          "relative_error_pct": 3.026811609076222,
+          "seconds": 0.0035941873997217045,
+          "status": "completed",
+          "elapsed_seconds": 0.037398832999315346
+        },
+        {
+          "budget": 2048,
+          "budget_index": 5,
+          "phase": "calibration",
+          "relative_error_pct": 1.221551697797213,
+          "seconds": 0.007090579099894967,
+          "status": "completed",
+          "elapsed_seconds": 0.07234249999964959
+        },
+        {
+          "budget": 2048,
+          "budget_index": 5,
+          "phase": "calibration_2",
+          "relative_error_pct": 2.5179143488495455,
+          "seconds": 0.007076687599692377,
+          "status": "completed",
+          "elapsed_seconds": 0.07212829200034321
+        },
+        {
+          "budget": 2048,
+          "budget_index": 5,
+          "phase": "calibration_3",
+          "relative_error_pct": 1.5623321025652175,
+          "seconds": 0.007317566699930467,
+          "status": "completed",
+          "elapsed_seconds": 0.07481558300059987
+        },
+        {
+          "budget": 4096,
+          "budget_index": 6,
+          "phase": "calibration",
+          "relative_error_pct": 1.5405712227715156,
+          "seconds": 0.014447929200468935,
+          "status": "completed",
+          "elapsed_seconds": 0.14623324999956822
+        },
+        {
+          "budget": 4096,
+          "budget_index": 6,
+          "phase": "calibration_2",
+          "relative_error_pct": 1.5551550783375192,
+          "seconds": 0.013940733200433897,
+          "status": "completed",
+          "elapsed_seconds": 0.14130925000063144
+        },
+        {
+          "budget": 4096,
+          "budget_index": 6,
+          "phase": "calibration_3",
+          "relative_error_pct": 1.6589997279488913,
+          "seconds": 0.014315600100235314,
+          "status": "completed",
+          "elapsed_seconds": 0.1450796659992193
+        },
+        {
+          "budget": 4096,
+          "budget_index": 6,
+          "phase": "validation",
+          "relative_error_pct": 1.236690240673994,
+          "seconds": 0.013753816599455604,
+          "status": "completed",
+          "elapsed_seconds": 0.1394950419999077
+        }
+      ],
+      "calibration_seconds": 0.8122255410034995,
+      "total_validation_seconds": 0.17689387499922304,
+      "search_seconds": 0.9891194160027226,
+      "name": "WoS · 1-й род"
+    },
+    "baseline": {
+      "method": "lod_serial",
+      "target_pct": 10.0,
+      "seconds": 0.0033763332998205443,
+      "validation_seconds": 0.0033763332998205443,
+      "relative_error_pct": 9.554386011417833,
+      "calibration_error_pct": 9.554386011417833,
+      "budget": 0.1,
+      "interrupted_budget": null,
+      "budget_kind": "relative_residual_tolerance",
+      "calibration_target_pct": 10.0,
+      "selection_policy": "stable_pilot_adaptive_retry_v4",
+      "accuracy_metric": "mean_run_relative_l1_v1",
+      "status": "Достигнута",
+      "status_code": "confirmed",
+      "validation_attempts": 1,
+      "calibration_margin_relaxed": false,
+      "attempts": [
+        {
+          "budget": 0.1,
+          "budget_index": 0,
+          "phase": "calibration",
+          "relative_error_pct": 9.554386011417833,
+          "seconds": 0.0033751250011846423,
+          "status": "completed",
+          "elapsed_seconds": 0.003509000000121887
+        },
+        {
+          "budget": 0.1,
+          "budget_index": 0,
+          "phase": "validation",
+          "relative_error_pct": 9.554386011417833,
+          "seconds": 0.0033763332998205443,
+          "status": "completed",
+          "elapsed_seconds": 0.034702124999967054
+        },
+        {
+          "budget": 0.05,
+          "budget_index": 1,
+          "phase": "calibration",
+          "relative_error_pct": 4.877476490875651,
+          "seconds": 0.004116792000786518,
+          "status": "completed",
+          "elapsed_seconds": 0.004197500000373111
+        },
+        {
+          "budget": 0.05,
+          "budget_index": 1,
+          "phase": "validation",
+          "relative_error_pct": 4.877476490875651,
+          "seconds": 0.004171654099627631,
+          "status": "completed",
+          "elapsed_seconds": 0.042465666998396046
+        },
+        {
+          "budget": 0.01,
+          "budget_index": 2,
+          "phase": "calibration",
+          "relative_error_pct": 0.941391659253398,
+          "seconds": 0.006461083999965922,
+          "status": "completed",
+          "elapsed_seconds": 0.006540416999996523
+        },
+        {
+          "budget": 0.01,
+          "budget_index": 2,
+          "phase": "validation",
+          "relative_error_pct": 0.941391659253398,
+          "seconds": 0.006451379399914003,
+          "status": "completed",
+          "elapsed_seconds": 0.06537904100150627
+        }
+      ],
+      "calibration_seconds": 0.014246917000491521,
+      "total_validation_seconds": 0.14254683299986937,
+      "search_seconds": 0.1567937500003609,
+      "name": "ЛОМ"
+    },
+    "scenario": "D01"
+  },
+  {
+    "old": {
+      "case": "S04",
+      "method": "wos",
+      "target_pct": 10.0,
+      "parameters": {
+        "walks": 1024
+      },
+      "status": "confirmed",
+      "seconds": 0.0034000116601237097,
+      "error_pct": 4.747966280780141,
+      "speedup": 1.2828345476476468,
+      "repeat_win": true,
+      "median_seconds": 0.00332816699938121,
+      "error_ci": [
+        3.8541903103190345,
+        5.626045967854651
+      ],
+      "rms_pct": 5.7013174781927205,
+      "external_seconds": 0.00348447002012108,
+      "speed_ci": [
+        1.2557034918907286,
+        1.3103031467504158
+      ]
+    },
+    "current": {
+      "method": "wos",
+      "target_pct": 10.0,
+      "seconds": 0.006802875099856465,
+      "validation_seconds": 0.006802875099856465,
+      "relative_error_pct": 3.669435896845587,
+      "calibration_error_pct": 4.446331457339319,
+      "budget": 2048,
+      "interrupted_budget": null,
+      "budget_kind": "walks_per_start",
+      "calibration_target_pct": 5.0,
+      "selection_policy": "stable_pilot_adaptive_retry_v4",
+      "accuracy_metric": "mean_run_relative_l1_v1",
+      "status": "Достигнута",
+      "status_code": "confirmed",
+      "validation_attempts": 1,
+      "calibration_margin_relaxed": false,
+      "attempts": [
+        {
+          "budget": 64,
+          "budget_index": 0,
+          "phase": "calibration",
+          "relative_error_pct": 22.50000000000001,
+          "seconds": 0.0002325541998288827,
+          "status": "completed",
+          "elapsed_seconds": 0.002987166000821162
+        },
+        {
+          "budget": 128,
+          "budget_index": 1,
+          "phase": "calibration",
+          "relative_error_pct": 8.737763431055795,
+          "seconds": 0.0004431707000549068,
+          "status": "completed",
+          "elapsed_seconds": 0.005152084000656032
+        },
+        {
+          "budget": 256,
+          "budget_index": 2,
+          "phase": "calibration",
+          "relative_error_pct": 10.468750000000005,
+          "seconds": 0.0008320248998643365,
+          "status": "completed",
+          "elapsed_seconds": 0.008916708000469953
+        },
+        {
+          "budget": 512,
+          "budget_index": 3,
+          "phase": "calibration",
+          "relative_error_pct": 3.919273255983653,
+          "seconds": 0.0016940083001827587,
+          "status": "completed",
+          "elapsed_seconds": 0.017940708999958588
+        },
+        {
+          "budget": 512,
+          "budget_index": 3,
+          "phase": "calibration_2",
+          "relative_error_pct": 6.9793405333010865,
+          "seconds": 0.0016892667001229711,
+          "status": "completed",
+          "elapsed_seconds": 0.01772641699972155
+        },
+        {
+          "budget": 512,
+          "budget_index": 3,
+          "phase": "calibration_3",
+          "relative_error_pct": 6.235458987628758,
+          "seconds": 0.00167198740036838,
+          "status": "completed",
+          "elapsed_seconds": 0.0177073750001
+        },
+        {
+          "budget": 1024,
+          "budget_index": 4,
+          "phase": "calibration",
+          "relative_error_pct": 6.6527746614288175,
+          "seconds": 0.003242258299906098,
+          "status": "completed",
+          "elapsed_seconds": 0.03329837499950372
+        },
+        {
+          "budget": 2048,
+          "budget_index": 5,
+          "phase": "calibration",
+          "relative_error_pct": 4.446331457339319,
+          "seconds": 0.0066226836002897475,
+          "status": "completed",
+          "elapsed_seconds": 0.06734949999918172
+        },
+        {
+          "budget": 2048,
+          "budget_index": 5,
+          "phase": "calibration_2",
+          "relative_error_pct": 3.261884755128784,
+          "seconds": 0.006550833199980843,
+          "status": "completed",
+          "elapsed_seconds": 0.06636337500094669
+        },
+        {
+          "budget": 2048,
+          "budget_index": 5,
+          "phase": "calibration_3",
+          "relative_error_pct": 1.9116221312948114,
+          "seconds": 0.0066350416003842835,
+          "status": "completed",
+          "elapsed_seconds": 0.06717987499905576
+        },
+        {
+          "budget": 2048,
+          "budget_index": 5,
+          "phase": "validation",
+          "relative_error_pct": 3.669435896845587,
+          "seconds": 0.006802875099856465,
+          "status": "completed",
+          "elapsed_seconds": 0.06922945800033631
+        },
+        {
+          "budget": 4096,
+          "budget_index": 6,
+          "phase": "calibration",
+          "relative_error_pct": 2.1448380300863876,
+          "seconds": 0.013140037499761092,
+          "status": "completed",
+          "elapsed_seconds": 0.13265970800057403
+        },
+        {
+          "budget": 4096,
+          "budget_index": 6,
+          "phase": "calibration_2",
+          "relative_error_pct": 2.700133321629967,
+          "seconds": 0.012903595899661013,
+          "status": "completed",
+          "elapsed_seconds": 0.13048962499851768
+        },
+        {
+          "budget": 4096,
+          "budget_index": 6,
+          "phase": "calibration_3",
+          "relative_error_pct": 2.1493936407388134,
+          "seconds": 0.012967479200051457,
+          "status": "completed",
+          "elapsed_seconds": 0.1308716249986901
+        },
+        {
+          "budget": 4096,
+          "budget_index": 6,
+          "phase": "validation",
+          "relative_error_pct": 1.8749888813305078,
+          "seconds": 0.012970074899931206,
+          "status": "completed",
+          "elapsed_seconds": 0.13112908299990522
+        }
+      ],
+      "calibration_seconds": 0.698642541998197,
+      "total_validation_seconds": 0.20035854100024153,
+      "search_seconds": 0.8990010829984385,
+      "name": "WoS · 1-й род"
+    },
+    "baseline": {
+      "method": "lod_serial",
+      "target_pct": 10.0,
+      "seconds": 0.00535728319955524,
+      "validation_seconds": 0.00535728319955524,
+      "relative_error_pct": 5.409707049117628,
+      "calibration_error_pct": 5.409707049117628,
+      "budget": 0.001,
+      "interrupted_budget": null,
+      "budget_kind": "relative_residual_tolerance",
+      "calibration_target_pct": 10.0,
+      "selection_policy": "stable_pilot_adaptive_retry_v4",
+      "accuracy_metric": "mean_run_relative_l1_v1",
+      "status": "Достигнута",
+      "status_code": "confirmed",
+      "validation_attempts": 1,
+      "calibration_margin_relaxed": false,
+      "attempts": [
+        {
+          "budget": 0.1,
+          "budget_index": 0,
+          "phase": "calibration",
+          "relative_error_pct": 75.0543161259964,
+          "seconds": 0.0011091670003224863,
+          "status": "completed",
+          "elapsed_seconds": 0.0012477910004236037
+        },
+        {
+          "budget": 0.05,
+          "budget_index": 1,
+          "phase": "calibration",
+          "relative_error_pct": 55.63303473935503,
+          "seconds": 0.0016626249998807907,
+          "status": "completed",
+          "elapsed_seconds": 0.0017733749991748482
+        },
+        {
+          "budget": 0.01,
+          "budget_index": 2,
+          "phase": "calibration",
+          "relative_error_pct": 22.738773923308216,
+          "seconds": 0.003127207999568782,
+          "status": "completed",
+          "elapsed_seconds": 0.003272083999036113
+        },
+        {
+          "budget": 0.005,
+          "budget_index": 3,
+          "phase": "calibration",
+          "relative_error_pct": 15.509732176760437,
+          "seconds": 0.0033929999990505166,
+          "status": "completed",
+          "elapsed_seconds": 0.0035127499995724065
+        },
+        {
+          "budget": 0.001,
+          "budget_index": 4,
+          "phase": "calibration",
+          "relative_error_pct": 5.409707049117628,
+          "seconds": 0.004892290999123361,
+          "status": "completed",
+          "elapsed_seconds": 0.00500054199983424
+        },
+        {
+          "budget": 0.001,
+          "budget_index": 4,
+          "phase": "validation",
+          "relative_error_pct": 5.409707049117628,
+          "seconds": 0.00535728319955524,
+          "status": "completed",
+          "elapsed_seconds": 0.05503112500082352
+        },
+        {
+          "budget": 0.0005,
+          "budget_index": 5,
+          "phase": "calibration",
+          "relative_error_pct": 3.351363225076014,
+          "seconds": 0.006211457999597769,
+          "status": "completed",
+          "elapsed_seconds": 0.0062989170000946615
+        },
+        {
+          "budget": 0.0005,
+          "budget_index": 5,
+          "phase": "validation",
+          "relative_error_pct": 3.351363225076014,
+          "seconds": 0.005810466799630376,
+          "status": "completed",
+          "elapsed_seconds": 0.05911658300101408
+        },
+        {
+          "budget": 0.0001,
+          "budget_index": 6,
+          "phase": "calibration",
+          "relative_error_pct": 0.9650337077472102,
+          "seconds": 0.007982666998941568,
+          "status": "completed",
+          "elapsed_seconds": 0.008155415998771787
+        },
+        {
+          "budget": 0.0001,
+          "budget_index": 6,
+          "phase": "validation",
+          "relative_error_pct": 0.9650337077472102,
+          "seconds": 0.007961987500129908,
+          "status": "completed",
+          "elapsed_seconds": 0.0809858329994313
+        }
+      ],
+      "calibration_seconds": 0.02926087499690766,
+      "total_validation_seconds": 0.1951335410012689,
+      "search_seconds": 0.22439441599817656,
+      "name": "ЛОМ"
+    },
+    "scenario": "D04"
+  }
+]

@@ -167,7 +167,10 @@ def test_research_uses_full_solves_and_independent_validation():
     assert study["settings"]["T"] == 0.03 and study["settings"]["point_yx"] == [3, 4]
     for row in study["rows"]:
         if row["status"] == "reached":
-            assert row["calibration_error_pct"] <= row["target_pct"]
+            assert row["calibration_error_pct"] <= row["calibration_target_pct"]
+            if row["calibration_margin_relaxed"]:
+                assert row["budget"] == 256
+                assert row["calibration_target_pct"] == row["target_pct"]
             assert row["validation_error_pct"] <= row["target_pct"]
             times = [
                 r["seconds"]
@@ -220,7 +223,14 @@ def test_ui_mc_and_research_work_without_grid_calculation():
     app.select_slider(key="heat_study_walks").set_value(64)
     app.button(key="heat_study_run").click().run()
     assert not app.exception
-    assert len(app.session_state["heat_mc_study"][0]["rows"]) == 6
+    assert len(app.session_state["heat_mc_study"][0]["rows"]) == 9
+    assert {r.method for r in app.session_state["heat_mc_results"]} == {
+        "mc",
+        "mc_control",
+    }
+    assert len(app.session_state["heat_mc_comparison"]) == 3
+    app.selectbox(key="heat_mc_details").set_value("mc_control").run()
+    assert not app.exception and not app.error
     app.session_state["heat_mc_study"][0]["settings"].pop("validation_policy")
     app.run()
     assert "heat_mc_study" not in app.session_state
@@ -239,7 +249,7 @@ def test_research_reports_transition_failure_without_publishing_times():
     )
 
 
-def test_failed_final_validation_never_restarts_budget_search(monkeypatch):
+def test_failed_validation_retries_larger_budget(monkeypatch):
     from types import SimpleNamespace
 
     import pdelab.heat_mc_study as module
@@ -255,9 +265,8 @@ def test_failed_final_validation_never_restarts_budget_search(monkeypatch):
 
     def estimate(*args, walks, **kwargs):
         budgets.append(walks)
-        # Calibration passes all targets; final validation fails all targets.
-        # Larger budgets would pass if incorrectly revisited after validation.
-        value = (1.005 if len(budgets) <= 2 else 1.12) if walks == 64 else 1.0
+        # Three pilot batches pass; validation fails at 64 and passes at 128.
+        value = (1.005 if len(budgets) <= 6 else 1.12) if walks == 64 else 1.0
         return SimpleNamespace(
             values=np.array([value]),
             seconds=0.01,
@@ -270,11 +279,46 @@ def test_failed_final_validation_never_restarts_budget_search(monkeypatch):
     monkeypatch.setattr(module, "solve_heat_mc", estimate)
     study = module.heat_mc_study(p, dt=0.01, T=0.02, repeats=2, max_walks=256)
     rows = [row for row in study["rows"] if row["method"] == "mc"]
-    assert budgets == [64] * 4
+    assert budgets == [64] * 8 + [128] * 8
     assert len(rows) == 3
-    assert all(
-        row["status"] == "not_confirmed" and row["seconds"] is None for row in rows
-    )
-    assert all(row["budget"] == 64 for row in rows)
-    assert all(row["calibration_error_pct"] == pytest.approx(0.5) for row in rows)
-    assert all(row["validation_error_pct"] == pytest.approx(12) for row in rows)
+    assert all(row["status"] == "reached" and row["seconds"] == 0.01 for row in rows)
+    assert all(row["budget"] == 128 for row in rows)
+    assert all(row["validation_attempts"] == 2 for row in rows)
+    assert all(row["calibration_error_pct"] == 0 for row in rows)
+    assert all(row["validation_error_pct"] == 0 for row in rows)
+
+
+@pytest.mark.parametrize("point", [(0, 4), (8, 4), (4, 0), (4, 8)])
+def test_decay_boundary_has_exact_zero_and_undefined_relative_error(point):
+    problem = make_heat_problem("decay", 8)
+    assert problem.evaluate(problem.exact, 0.02)[point] == 0.0
+    assert problem.initial[point] == 0.0
+    with pytest.raises(ValueError, match="нулевом эталоне"):
+        heat_mc_study(problem, T=0.02, point=point, repeats=2, max_walks=64)
+
+
+@pytest.mark.parametrize(
+    "methods,x,allowed", [(["lod"], 32, True), (["mc"], 0, True), (["mc"], 32, False)]
+)
+def test_heat_study_limit_applies_only_to_interior_mc(monkeypatch, methods, x, allowed):
+    import pdelab.heat_mc_ui as module
+
+    calls = []
+
+    def study(*args, **kwargs):
+        calls.append(kwargs["methods"])
+        raise RuntimeError("Исследование запущено")
+
+    monkeypatch.setattr(module, "heat_mc_study", study)
+    app = AppTest.from_string(
+        "from pdelab.heat_ui import HeatSettings\n"
+        "from pdelab.heat_mc_ui import render_heat_mc_study\n"
+        "render_heat_mc_study(HeatSettings('manufactured', 64, 1., .01, 1., 1e-8))"
+    ).run()
+    app.multiselect(key="heat_study_methods").set_value(methods)
+    app.slider(key="heat_study_x").set_value(x)
+    app.button(key="heat_study_run").click().run()
+    assert not app.exception
+    assert bool(calls) == allowed
+    expected = "Исследование запущено" if allowed else "50 млн"
+    assert any(expected in item.value for item in app.error)

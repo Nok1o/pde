@@ -13,6 +13,15 @@ from .boundary_solvers import select_boundary_points, solve_boundary, warmup_bou
 from .boundary_solvers3d import solve_boundary3d, warmup_boundary3d
 from .problem3d import DIRECT_MAX_N
 from .research import LOD_SEARCH_TOLERANCES, TARGETS_PCT
+from .study_policy import (
+    ACCURACY_DESCRIPTION,
+    ACCURACY_METRIC,
+    SELECTION_POLICY,
+    mean_relative_error,
+    phase_seed_index,
+    render_accuracy_results,
+    search_budgets,
+)
 
 
 def boundary_accuracy_study(
@@ -23,7 +32,7 @@ def boundary_accuracy_study(
     tolerances=LOD_SEARCH_TOLERANCES,
     seconds_per_method=60.0,
 ):
-    """Select on pilot RMSE; confirm once on independent whole runs, never retune."""
+    """Select on stable pilot batches; retry unconfirmed targets at larger budgets."""
     if isinstance(repeats, bool) or int(repeats) != repeats or repeats < 2:
         raise ValueError("Нужно минимум два независимых повтора")
     if not np.isfinite(seconds_per_method) or seconds_per_method <= 0:
@@ -105,9 +114,7 @@ def boundary_accuracy_study(
                 return None, reason
             values.append(value)
             times.append(elapsed)
-        error = float(
-            100 * np.sqrt(np.mean((np.array(values) - target) ** 2)) / abs(target)
-        )
+        error = mean_relative_error(values, target)
         return dict(error=error, seconds=float(np.mean(times))), "ok"
 
     for method in methods:
@@ -117,6 +124,8 @@ def boundary_accuracy_study(
                     method=method,
                     target_pct=t,
                     status="zero_reference",
+                    selection_policy=SELECTION_POLICY,
+                    accuracy_metric=ACCURACY_METRIC,
                     seconds=None,
                     relative_error_pct=None,
                     budget=None,
@@ -124,48 +133,35 @@ def boundary_accuracy_study(
                 for t in TARGETS_PCT
             )
             continue
-        # Separate deadlines: calibration must not consume the confirmation allowance.
-        deadline = perf_counter() + seconds_per_method
-        candidates = []
-        failure = "not_reached"
-        for index, budget in enumerate(
-            tolerances if method == "lod_serial" else budgets
-        ):
-            measurement, reason = measure(method, budget, index, 0, deadline)
-            if measurement is not None:
-                candidates.append((index, budget, measurement))
-            else:
-                failure = reason
-            if reason == "timeout":
-                break
-        confirmations = {}
-        deadline = perf_counter() + seconds_per_method
-        for target_pct in TARGETS_PCT:
-            eligible = [c for c in candidates if c[2]["error"] <= target_pct]
-            if eligible:
-                index, budget, _ = min(eligible, key=lambda c: c[2]["seconds"])
-                if index not in confirmations:
-                    confirmations[index] = measure(method, budget, index, 1, deadline)
-                confirmed, reason = confirmations[index]
-                passed = confirmed is not None and confirmed["error"] <= target_pct
-                status = (
-                    "confirmed"
-                    if passed
-                    else "validation_failed" if confirmed else reason
-                )
-            else:
-                confirmed, budget, passed, status = None, None, False, failure
-            rows.append(
-                dict(
-                    method=method,
-                    target_pct=target_pct,
-                    status=status,
-                    seconds=confirmed["seconds"] if passed else None,
-                    relative_error_pct=confirmed["error"] if confirmed else None,
-                    budget=budget,
-                )
+
+        def series(budget, index, phase, deadline):
+            measurement, reason = measure(
+                method, budget, index, phase_seed_index(phase), deadline
             )
+            if measurement is None:
+                if reason == "timeout":
+                    raise TimeoutError("Лимит времени")
+                raise RuntimeError(reason)
+            return dict(
+                relative_error_pct=measurement["error"], seconds=measurement["seconds"]
+            )
+
+        method_rows = search_budgets(
+            method,
+            tolerances if method == "lod_serial" else budgets,
+            series,
+            seconds_per_method,
+            fastest=True,
+            clock=perf_counter,
+        )
+        for row in method_rows:
+            row["status_detail"] = row["status"]
+            row["status"] = row["status_code"]
+        rows.extend(method_rows)
     return dict(
+        selection_policy=SELECTION_POLICY,
+        accuracy_metric=ACCURACY_METRIC,
+        accuracy=ACCURACY_DESCRIPTION,
         config=asdict(config),
         repeats=repeats,
         budgets=list(budgets),
@@ -242,10 +238,7 @@ def render_boundary_research(config, methods, key):
     result = saved[1]
     rows = pd.DataFrame(result["rows"])
     rows["Метод"] = rows.method.map(METHODS_BOUNDARY)
-    table = rows.pivot(
-        index="target_pct", columns="Метод", values="seconds"
-    ).reset_index()
-    st.dataframe(table.rename(columns={"target_pct": "Точность, %"}), hide_index=True)
+    render_accuracy_results(result["rows"], METHODS_BOUNDARY, key=key + "_results")
     st.plotly_chart(
         px.scatter(
             rows,
@@ -256,20 +249,22 @@ def render_boundary_research(config, methods, key):
         ),
         key=key + "_plot",
     )
-    with st.expander("Статусы и параметры"):
+    with st.expander("Статусы и параметры", key="boundary_research_expander_227"):
         st.dataframe(rows, hide_index=True)
         st.caption(
-            "Ошибка — RMS отдельных независимых запусков; пустое время означает отсутствие подтверждённого результата. Нулевой эталон не допускает процентной ошибки."
+            "Ошибка — среднее относительных ошибок отдельных независимых запусков; время выводится только при подтверждённой точности. Нулевой эталон не допускает процентной ошибки."
         )
     st.download_button(
         "Скачать исследование CSV",
         rows_csv(result["rows"]),
         "accuracy.csv",
         key=key + "_csv",
+        on_click="ignore",
     )
     st.download_button(
         "Скачать полные серии JSON",
         json.dumps(result, ensure_ascii=False, allow_nan=False),
         "accuracy.json",
         key=key + "_json",
+        on_click="ignore",
     )

@@ -119,7 +119,7 @@ def test_pure_neumann_default_and_selected_methods_validation():
     for methods in ([], ["unknown"], ["mc", "mc"]):
         with pytest.raises(ValueError, match="Выберите"):
             benchmark_boundary3d(config, methods=methods)
-    with pytest.raises(ValueError, match="чистого Неймана"):
+    with pytest.raises(ValueError, match="условий только 2-го рода"):
         benchmark_boundary3d(config, methods=["mc"])
 
 
@@ -162,7 +162,7 @@ def _mixed_app():
         Path(__file__).parents[1] / "app.py", default_timeout=60
     ).run()
     app.radio(key="dimension").set_value("3D").run()
-    app.radio(key="cube_boundary_mode").set_value("Смешанные I / II / III").run()
+    app.radio(key="cube_boundary_mode").set_value("Смешанные: 1, 2, 3 рода").run()
     app.select_slider(key="bc3d_n").set_value(8).run()
     app.select_slider(key="bc3d_walks").set_value(64)
     return app

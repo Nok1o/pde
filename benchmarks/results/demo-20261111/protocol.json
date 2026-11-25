@@ -1,0 +1,210 @@
+{
+  "revision": "7cca8deaa0d559ee160765789b2527c6c3fe9190",
+  "platform": "macOS-26.7.2-arm64-arm-64bit-Mach-O",
+  "python": "3.15.2",
+  "source_sha256": {
+    "pdelab/__init__.py": "a0e232b45ef26e1ad05463f2bdd8eab86fccc05021835770c5097db6064fda4e",
+    "pdelab/__main__.py": "6d8b7d7846a845059d7a3107143f11131f63c5511d669b44085b15ec5e3d2279",
+    "pdelab/boundary.py": "ab7c341d4d7dbeac5336c8e71736c40695e590192241cf7d1e15626baa1476e8",
+    "pdelab/boundary3d.py": "81c3769148433ed3317b306f3094292ceadd3b4530b61818f0f8a6194cfe26f5",
+    "pdelab/boundary_cli.py": "605a45d375caa1c901134ba1045b205cfb5a9cdb5d4ce52e1d422493d3b03ff3",
+    "pdelab/boundary_cli3d.py": "a560370899615c4475230ccf5c177cf96f785d1f773cc7530b61202cc375b433",
+    "pdelab/boundary_experiment.py": "7390063ac65bc4fa75db3ea53565931175bb1b44496604abd184ef95f51710d2",
+    "pdelab/boundary_experiment3d.py": "97d563a7ba77d52d0469eecb0419603c458c70283a41c0a4a65dd630bd2e288c",
+    "pdelab/boundary_research.py": "c2515ef91f58552d29fd69ca5510b3aaafb27de94d1b4ac16d899384f689e4c6",
+    "pdelab/boundary_solvers.py": "6ba5655646b28eff71a0b3c3aa7cf1b574506c1c88b338efa26f528b94eba20d",
+    "pdelab/boundary_solvers3d.py": "195db0def4a99e17b6d23506468ea4efefadd97781b06e5106a18e3e397bf89f",
+    "pdelab/boundary_ui.py": "aee7471b0edcfb728e67e27b0f1eeeb29e7476a2850c017dea10f57f6ff68672",
+    "pdelab/boundary_ui3d.py": "30e7dc044e41c8db788ac2b455082e47bead67533ea528d2ddeb1a4cc70cd407",
+    "pdelab/boundary_views.py": "897e11cfbe5ac9082d63ade7632f4c96b1487a26493a3380b8f9fb6fea34b726",
+    "pdelab/boundary_views3d.py": "338f1f83228d95c7596180ad8d1496867b9122d3aa02c7ed2f171f9cfedca2d0",
+    "pdelab/boundary_workload3d.py": "7a406590ce00bc5b0394e883336fafc63d718ddd063e3e37fd61c646cc8cfc8d",
+    "pdelab/cli.py": "679f879e8f779d7ea62b7fbc18fef7f028363a1ee44c3934dabf18441109e707",
+    "pdelab/cli3d.py": "7c2bf02b86388aadab87c5aad8471ac9e3f3990a5fcb6353cc71e660b617ad91",
+    "pdelab/control.py": "0156ef092dfd987e48e7bde191bab213a734e1f9f9dd6008da4a13f4266972d4",
+    "pdelab/experiment.py": "3edd1e123d5a60cd8bf28966333ba249c800e6ee5dad33ce3d53390fde1eab0c",
+    "pdelab/experiment3d.py": "ba5cce0a05e0c574d54b1f9c6411040d0da6691b6b42d5c251bf89648f4b2386",
+    "pdelab/frozen_solvers.py": "1e65e027ad4d26859342803487b59c00899379e46d8e26cfb9c58d4dff89071e",
+    "pdelab/graded.py": "995ba17a81c60799412a867f8b0cc22af60e258e7a70ffb8f59460871076eef9",
+    "pdelab/heat.py": "d8ab0b596ce176c7680d4fd32bd2037757f1dbf9dcda336dd2336bbccbbd688e",
+    "pdelab/heat_mc.py": "2abf9590005e2541eec96daf90b6d531bc63f895f5b9dea29967d3de33712696",
+    "pdelab/heat_mc_study.py": "af4ce1238c0deb456b4a71700b51aa9a30bbe97630b029d9d617a0ee508a8825",
+    "pdelab/heat_mc_ui.py": "a83946b6511fee4128ce52ef19c04021ba77f3bb6f4114ca38013e24080c1eff",
+    "pdelab/heat_mc_views.py": "2349c2d71fa0a6a47318cfb4f7e8fb65a7a498349ad7f4d6b90ffaabca1d1bdf",
+    "pdelab/heat_study.py": "af4953a271297ebef240193af98c8b9c5a1c995d55997fb631f5ffa31035b282",
+    "pdelab/heat_ui.py": "4e1c1d7072aa68e8fab3e0ce82a63ba80cdbaeea90300a446110fa262db535e6",
+    "pdelab/heat_views.py": "90b8bef7af3dbdb5d6f9b3dcfa1d774b84f1c908ed1f2f47c9e3084401597d7b",
+    "pdelab/nonlinear.py": "60ea81a3c83d0f0855359b8ac92fb59b75b3932cd2f4fb85f9ac6c6e04410a76",
+    "pdelab/nonlinear_cli.py": "c6c9493ed55806413dc6f08fe3682d17d290213dd1c3cfc31dfbc54d820fcfcf",
+    "pdelab/nonlinear_io.py": "42c03c59e34dbda0552e266fac95afb710e4cc802a2f89c898c6be0cca9ff976",
+    "pdelab/nonlinear_study.py": "8aad57e838dba7c976b27781debeda2c633aa5f15516cfc9f9a1a362476cd122",
+    "pdelab/nonlinear_ui.py": "23f4595f51f28d815104814ae1f2e6f936d9afe3b457ca0636b1a025cbedb0eb",
+    "pdelab/operator.py": "b44c6332eb91c428c4e6627612b323e9313a0c1f61513df2de6774eb72f8f5c9",
+    "pdelab/problem.py": "016f3b26062a81be3b6c9be3de490f133ca20f9f37cb1585b2d46a2b1641db3e",
+    "pdelab/problem3d.py": "48d1a488d526842839f3ab35ffe34bc245d04d925cb0a52e24fcc070a644c996",
+    "pdelab/problem_info.py": "41f2c84ffef8bfc217550eedff017cec75a0c0d7adb2dd3567cb1f4784614c44",
+    "pdelab/reference.py": "13121360b11b660e8e2bd5f18b1c21a7b9655dffb1106d114206e29d7ad7471a",
+    "pdelab/research.py": "ccac41e98c8c5d57ab15bd2b129d290e1f703ae8216df24d1467d3b1a4b5ddbc",
+    "pdelab/research3d.py": "91cf61f794517ef9b30aec61fe520da659fb025eef6585c23b7c8364c4c3b12f",
+    "pdelab/research_ui.py": "02015be9489fe0b55670528080e7e2870264974221f73ef005cc20388742895c",
+    "pdelab/solvers.py": "e9804009afff7587b983c94a74c5f7eef76c77793679efa221ea73e7c987f229",
+    "pdelab/solvers3d.py": "ecdec6d7312e07c706a5b202522fd7f1f6bec6a81cde48909bd234587920af01",
+    "pdelab/stationary_extensions.py": "722164dcebfd8a6c8216d350cd329c89468867d886f255d482476af88d93b575",
+    "pdelab/study_policy.py": "574efe61979df31ed053dff60401132049200dcd0579a36d24bfcb21de96a32c",
+    "pdelab/ui3d.py": "6aa82a1381080a8c0776e1cb760d61bf2aa254ee3732c89cb6e712ce65dc9ee2",
+    "pdelab/ui_state.py": "518018ff8adc55292bf19645f9865f22863842441b01d37901c8b609d6c8d48a",
+    "pdelab/views.py": "cf63b765044ae46764145497f8770da2652d4105e1c4529631b2fe89dc17061d",
+    "pdelab/views3d.py": "4ecbe99c5707621945ff0f24a6b9d6a5528ce9516e3f73022acc156240ff4bd9",
+    "pdelab/workload3d.py": "cee75af394624ae762451f8d9acd5da0d60e83e52bbaa81bb19994bbedfce479",
+    "pdelab/wos.py": "5ac192e539b3710fc90feb723dcddef8cd47ec3204ea796a1497590c1259fae0",
+    "app.py": "a36d8b998b5fd438b23fdac5fcfb845edc9941712b258867e00860c8f71adc3e",
+    "/Users/mogilinns/BMSTU/1sem/pde/benchmarks/demo_scenarios.py": "83e130e960d0ef795e60fed10ea89524d0c523bd9a5b47e4417ec33185537db0"
+  },
+  "cases": [
+    {
+      "id": "D01",
+      "family": "2d",
+      "problem": "sine",
+      "n": 64,
+      "point": [
+        32,
+        32
+      ],
+      "coarse_n": 16
+    },
+    {
+      "id": "D02",
+      "family": "2d",
+      "problem": "sine",
+      "n": 48,
+      "point": [
+        24,
+        24
+      ],
+      "coarse_n": 12
+    },
+    {
+      "id": "D03",
+      "family": "2d",
+      "problem": "polynomial",
+      "n": 64,
+      "point": [
+        16,
+        21
+      ],
+      "coarse_n": 16
+    },
+    {
+      "id": "D04",
+      "family": "2d",
+      "problem": "hot_top",
+      "n": 64,
+      "point": [
+        32,
+        32
+      ],
+      "coarse_n": 16
+    },
+    {
+      "id": "D05",
+      "family": "2d",
+      "problem": "sine",
+      "n": 64,
+      "point": [
+        1,
+        24
+      ],
+      "coarse_n": 16
+    },
+    {
+      "id": "D06",
+      "family": "2d",
+      "problem": "sine",
+      "n": 16,
+      "point": [
+        8,
+        8
+      ],
+      "coarse_n": 4
+    },
+    {
+      "id": "D07",
+      "family": "3d",
+      "problem": "sine",
+      "n": 8,
+      "point": [
+        4,
+        4,
+        4
+      ]
+    },
+    {
+      "id": "D08",
+      "family": "3d",
+      "problem": "sine",
+      "n": 16,
+      "point": [
+        8,
+        8,
+        8
+      ]
+    },
+    {
+      "id": "D09",
+      "family": "mixed3d",
+      "problem": "smooth",
+      "n": 16,
+      "point": [
+        8,
+        8,
+        8
+      ],
+      "kinds": [
+        "robin",
+        "dirichlet",
+        "dirichlet",
+        "dirichlet",
+        "dirichlet",
+        "dirichlet"
+      ]
+    },
+    {
+      "id": "D10",
+      "family": "mixed3d",
+      "problem": "polynomial",
+      "n": 16,
+      "point": [
+        4,
+        6,
+        8
+      ],
+      "kinds": [
+        "neumann",
+        "dirichlet",
+        "dirichlet",
+        "dirichlet",
+        "dirichlet",
+        "robin"
+      ]
+    },
+    {
+      "id": "D11",
+      "family": "heat",
+      "problem": "decay",
+      "n": 16,
+      "point": [
+        8,
+        8
+      ],
+      "dt": 0.001,
+      "T": 0.01
+    }
+  ],
+  "repeats": 10,
+  "seed": 42,
+  "maximum_walks": 4096,
+  "seconds_per_phase": 30,
+  "selection_policy": "stable_pilot_adaptive_retry_v4",
+  "accuracy_metric": "mean_run_relative_l1_v1",
+  "scope": "All previously winning scenario families, current UI study functions; no global optimum claim"
+}

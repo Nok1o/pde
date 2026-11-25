@@ -24,7 +24,7 @@ def heat_profile(result, point=None):
             x=result.times, y=values, name="Точное решение", line=dict(dash="dash")
         )
     figure.update_layout(
-        title=f"Профиль во времени: x={x/result.problem.n:g}, y={y/result.problem.n:g}",
+        title=f"Профиль во времени: x={x / result.problem.n:g}, z={y / result.problem.n:g}",
         xaxis_title="Физическое время t",
         yaxis_title="u(t)",
     )
@@ -50,7 +50,7 @@ def heat_slice(result, index, error=False):
     figure.update_layout(
         title=f"{'Ошибка' if error else 'Поле'}, t={result.times[index]:.8g}",
         xaxis_title="x",
-        yaxis_title="y",
+        yaxis_title="z",
         yaxis=dict(scaleanchor="x"),
     )
     return figure

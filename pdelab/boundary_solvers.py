@@ -13,7 +13,7 @@ METHODS_BOUNDARY = {
     "lod_serial": "ЛОМ",
     "mc": "Монте-Карло",
     "graded": "MC · сгущённая сетка",
-    "wos": "WoS · Дирихле",
+    "wos": "WoS · 1-й род",
 }
 
 
@@ -321,7 +321,7 @@ def solve_boundary(
         operator.check_compatibility()
         if method == "mc" and operator.pure_neumann:
             raise ValueError(
-                "MC для чистого Неймана пока не поддерживается: нет поглощения. Используйте ЛОМ или прямой решатель с нулевым средним."
+                "MC для условий только 2-го рода пока не поддерживается: нет поглощения. Используйте ЛОМ или прямой решатель с нулевым средним."
             )
         result = (
             _lod(operator, tol, max_iter, record)
@@ -360,7 +360,7 @@ def trace_boundary_walk(problem, point=None, seed=2026, max_steps=None):
     operator = BoundaryOperator(problem)
     operator.check_compatibility()
     if operator.pure_neumann:
-        raise ValueError("Для чистого Неймана поглощающей траектории нет")
+        raise ValueError("Для условий только 2-го рода поглощающей траектории нет")
     y, x = select_boundary_points(problem.n, point=point)[0]
     seed = _integer(seed, "seed", 0)
     if seed >= 2**32:

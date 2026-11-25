@@ -15,6 +15,12 @@ from .experiment import Config
 from .problem import make_problem, reference_solution, select_points
 from .reference import choose_reference
 from .solvers import METHODS, solve, warmup
+from .study_policy import (
+    accuracy_metadata,
+    mean_relative_error,
+    phase_seed_index,
+    search_budgets,
+)
 
 TARGETS_PCT = (1.0, 5.0, 10.0)
 LOD_SEARCH_TOLERANCES = (
@@ -64,16 +70,9 @@ def _walk_budgets(max_walks, batches):
 
 def _trial_seed(seed, budget_index, phase, repeat_index):
     """Подбор и проверка используют разные воспроизводимые серии путей."""
-    phase_index = 0 if phase == "calibration" else 1
+    phase_index = phase_seed_index(phase)
     sequence = np.random.SeedSequence([seed, budget_index, phase_index, repeat_index])
     return int(sequence.generate_state(1)[0])
-
-
-def _relative_rmse(values, reference):
-    """Ошибка отдельных запусков, без взаимного сокращения ошибок их среднего."""
-    reference = np.asarray(reference)
-    relative_errors = (np.asarray(values) - reference) / np.sqrt(np.mean(reference**2))
-    return float(100 * np.sqrt(np.mean(relative_errors**2)))
 
 
 def _measure_budget(
@@ -94,7 +93,7 @@ def _measure_budget(
     repeats = 1 if is_lod and phase == "calibration" else study.settings.repeats
     values = []
     times = []
-    phase_label = "подбор" if phase == "calibration" else "проверка"
+    phase_label = "проверка" if phase == "validation" else "подбор"
     budget_label = f"tol={budget:g}" if is_lod else f"N={budget}"
 
     for repeat_index in range(repeats):
@@ -140,7 +139,9 @@ def _measure_budget(
                 ),
                 "value": np.asarray(value).tolist(),
                 "reference_value": study.reference_value,
-                "relative_error_pct": _relative_rmse([value], study.reference_value),
+                "relative_error_pct": mean_relative_error(
+                    [value], study.reference_value
+                ),
                 "preparation_seconds": result.extras.get("preparation_seconds", 0.0),
                 "path_seconds": result.extras.get("path_seconds", result.elapsed),
                 "seconds": result.elapsed,
@@ -166,7 +167,7 @@ def _measure_budget(
         )
 
     return {
-        "relative_error_pct": _relative_rmse(values, study.reference_value),
+        "relative_error_pct": mean_relative_error(values, study.reference_value),
         "seconds": float(np.mean(times)),
     }
 
@@ -176,7 +177,7 @@ def accuracy_study(settings: StudySettings, progress=None):
 
     В таблицу попадает среднее время одного подтверждающего запуска. Подготовка
     слоёв включена в solve.elapsed. Поиск бюджета, эталон и прогрев не включены.
-    Порог проверяется по относительной RMSE отдельных запусков, а не их среднего.
+    Порог проверяется по среднему модулю относительной ошибки отдельных запусков.
     Это эмпирическая точность на сериях, не вероятностная гарантия.
     """
     config = settings.config
@@ -217,101 +218,41 @@ def accuracy_study(settings: StudySettings, progress=None):
             "Эталон в этой точке равен нулю: относительная точность не определена. Выберите другую точку или задачу."
         )
     study = StudyResult(settings, reference.kind, reference.label, reference_value)
-    study.rows = [
-        {
-            "target_pct": target,
-            "method": method,
-            "name": name,
-            "seconds": None,
-            "relative_error_pct": None,
-            "calibration_error_pct": None,
-            "budget": None,
-            "budget_kind": (
-                "relative_residual_tolerance"
-                if method == "lod_serial"
-                else "walks_per_start"
-            ),
-            "status": "Не достигнута в пределах поиска",
-        }
-        for target in TARGETS_PCT
-        for method, name in METHODS.items()
-    ]
-
     if progress:
         progress(0.0, "Подготовка решателей…")
     warmup()
     started_at = perf_counter()
     walk_budgets = _walk_budgets(settings.max_walks, config.batches)
-
     for method_index, method in enumerate(METHODS):
-        pending = [row for row in study.rows if row["method"] == method]
         budgets = LOD_SEARCH_TOLERANCES if method == "lod_serial" else walk_budgets
-        deadline = perf_counter() + settings.seconds_per_method
-        try:
-            for budget_index, budget in enumerate(budgets):
-                fraction = (method_index + budget_index / len(budgets)) / len(METHODS)
 
-                def report(label):
-                    if progress:
-                        progress(fraction, label)
+        def measure(budget, budget_index, phase, deadline):
+            def report(label):
+                if progress:
+                    progress(method_index / len(METHODS), label)
 
-                calibration = _measure_budget(
-                    study,
-                    problem,
-                    points,
-                    method,
-                    budget,
-                    budget_index,
-                    "calibration",
-                    deadline,
-                    report,
-                    grid_reference[tuple(points.T)],
-                )
-                for row in pending:
-                    row.update(
-                        budget=budget,
-                        calibration_error_pct=calibration["relative_error_pct"],
-                        relative_error_pct=None,
-                    )
-                candidates = [
-                    row
-                    for row in pending
-                    if calibration["relative_error_pct"] <= row["target_pct"]
-                ]
-                if not candidates:
-                    continue
+            return _measure_budget(
+                study,
+                problem,
+                points,
+                method,
+                budget,
+                budget_index,
+                phase,
+                deadline,
+                report,
+                grid_reference[tuple(points.T)],
+            )
 
-                validation = _measure_budget(
-                    study,
-                    problem,
-                    points,
-                    method,
-                    budget,
-                    budget_index,
-                    "validation",
-                    deadline,
-                    report,
-                    grid_reference[tuple(points.T)],
-                )
-                for row in candidates:
-                    row["relative_error_pct"] = validation["relative_error_pct"]
-                    pending.remove(row)
-                    if validation["relative_error_pct"] <= row["target_pct"]:
-                        row.update(
-                            seconds=validation["seconds"],
-                            relative_error_pct=validation["relative_error_pct"],
-                            calibration_error_pct=calibration["relative_error_pct"],
-                            budget=budget,
-                            status="Достигнута",
-                        )
-                if not pending:
-                    break
-        except (TimeoutError, RuntimeError) as exc:
-            for row in pending:
-                row["status"] = str(exc)
+        rows = search_budgets(
+            method, budgets, measure, settings.seconds_per_method, clock=perf_counter
+        )
+        for row in rows:
+            row["name"] = METHODS[method]
+        study.rows.extend(rows)
         if progress:
             progress((method_index + 1) / len(METHODS), f"{METHODS[method]}: готово")
-
+    study.rows.sort(key=lambda row: row["target_pct"])
     study.search_seconds = perf_counter() - started_at
     return study
 
@@ -362,9 +303,9 @@ def export_study(study, folder):
         "reference_label": study.reference_label,
         "reference_value": study.reference_value,
         "search_seconds": study.search_seconds,
-        "accuracy": "100 * RMS(u_run - reference) / RMS(reference), across runs and queried points; independent validation",
+        **accuracy_metadata(study.rows),
         "timing": "Mean solver time of validation runs; search, reference and JIT excluded; all layer preparation included",
-        "selection": "First budget passing calibration; validation never changes the selected budget; empirical estimate",
+        "seconds_per_phase": study.settings.seconds_per_method,
     }
     (folder / "settings.json").write_text(
         json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8"

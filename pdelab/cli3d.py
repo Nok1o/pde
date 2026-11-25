@@ -25,6 +25,9 @@ def main(argv=None):
     parser.add_argument("--tol", type=float, default=1e-7)
     parser.add_argument("--max-iter", type=int, default=20000)
     parser.add_argument(
+        "--coarse-n", type=int, help="Интервалов контрольной сетки: 4–16, не больше n"
+    )
+    parser.add_argument(
         "--methods", choices=METHODS_3D, nargs="+", default=list(METHODS_3D)
     )
     parser.add_argument("--repeats", type=int, default=5)

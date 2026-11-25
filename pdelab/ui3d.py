@@ -3,14 +3,14 @@
 import io
 import json
 import zipfile
-from dataclasses import asdict
+from dataclasses import asdict, replace
 
 import numpy as np
 import pandas as pd
 import streamlit as st
 
 from .experiment3d import Config3D, experiment_payload3d, rows_csv, run_experiment3d
-from .problem3d import PRESETS_3D, workspace_bytes
+from .problem3d import DIRECT_MAX_N, PRESETS_3D, workspace_bytes
 from .research3d import (
     StudySettings3D,
     accuracy_study3d,
@@ -18,10 +18,25 @@ from .research3d import (
     timing_rows3d,
 )
 from .solvers3d import METHODS_3D
+from .study_policy import render_accuracy_results
+from .ui_state import select_section
 from .views3d import residual_figure3d, slice_figure3d
 from .workload3d import interactive_mc_limit_message
 
 GRIDS = [8, 12, 16, 24, 32, 48, 64]
+
+
+def _control_grid(n, key):
+    maximum = min(n, DIRECT_MAX_N)
+    if st.session_state.get(key, 4) > maximum:
+        st.session_state[key] = maximum
+    return st.number_input(
+        "Интервалов контрольной сетки",
+        min_value=4,
+        max_value=maximum,
+        value=max(4, n // 4),
+        key=key,
+    )
 
 
 def _point_controls(n, prefix):
@@ -52,26 +67,31 @@ def _point_controls(n, prefix):
 
 
 def _problem_info(kind):
-    with st.expander("Формулы и описание", expanded=True):
+    with st.expander("Формулы и описание", expanded=False, key="cube_formulas"):
         st.latex(
-            r"u_{xx}+u_{yy}+u_{zz}=f,\quad (x,y,z)\in(0,1)^3,\qquad u|_{\partial\Omega}=g"
+            r"u_{xx}+u_{yy}+u_{zz}=f_{\Delta},\quad (x,y,z)\in(0,1)^3,\qquad u|_{\partial\Omega}=\mu"
         )
+        st.latex(r"\Delta u+f=0,\qquad f_{\Delta}=-f")
         if kind == "sine":
             st.latex(
-                r"u_*=\sin(\pi x)\sin(\pi y)\sin(\pi z),\qquad f=-3\pi^2u_*,\qquad g=0"
+                r"u_*=\sin(\pi x)\sin(\pi y)\sin(\pi z),\qquad f_{\Delta}=-3\pi^2u_*,\qquad \mu=0"
             )
             st.write(
                 "Синус: проверка источника и уменьшения погрешности при уточнении сетки."
             )
         elif kind == "affine":
-            st.latex(r"u_*=1+2x+3y+5z,\qquad f=0,\qquad g=u_*|_{\partial\Omega}")
+            st.latex(
+                r"u_*=1+2x+3y+5z,\qquad f_{\Delta}=0,\qquad \mu=u_*|_{\partial\Omega}"
+            )
             st.write(
                 "Линейное поле: разные коэффициенты по осям помогают обнаружить перестановку координат."
             )
         else:
-            st.latex(r"u_*=7,\qquad f=0,\qquad g=7")
+            st.latex(r"u_*=7,\qquad f_{\Delta}=0,\qquad \mu=7")
             st.write("Константа: контрольный пример без случайного разброса MC.")
-        st.latex(r"u_{ijk}=\frac{1}{6}\sum_{\text{6 соседей}}u-\frac{h^2f_{ijk}}{6}")
+        st.latex(
+            r"y_{ijk}=\frac{1}{6}\sum_{\text{6 соседей}}y-\frac{h^2f_{\Delta,ijk}}{6}"
+        )
 
 
 def _research_tab(config):
@@ -88,35 +108,76 @@ def _research_tab(config):
             value=5,
             key="study3d_repeats",
         )
-    with st.expander("Точка и лимиты"):
+    mode = st.selectbox(
+        "Область исследования",
+        ["point", "patch", "slice", "field"],
+        format_func={
+            "point": "Одна точка",
+            "patch": "Участок 3 × 3 × 3",
+            "slice": "Срез",
+            "field": "Всё поле",
+        }.get,
+        key="study3d_mode",
+    )
+    point, plane, index = None, "xy", None
+    if mode == "point":
         point = _point_controls(n, "study3d_point")
+    elif mode == "slice":
+        plane = st.selectbox(
+            "Плоскость расчёта", ["xy", "xz", "yz"], key="study3d_plane"
+        )
+        index = st.slider("Узел среза", 0, n, n // 2, key=f"study3d_index_{n}")
+    with st.expander("Лимиты", key="cube_research_limits"):
         maximum = st.select_slider(
-            "Максимум путей",
+            "Максимум путей на точку",
             options=[64, 256, 1024, 4096, 16384, 65536, 262144],
             value=16384,
             key="study3d_walks",
         )
         seconds = st.number_input(
-            "Лимит поиска на метод, с",
+            "Лимит каждой фазы на метод, с",
             min_value=1.0,
             max_value=1800.0,
             value=60.0,
             key="study3d_seconds",
             help="Проверяется между запусками. Начатый запуск завершается полностью.",
         )
+    methods = st.multiselect(
+        "Методы исследования",
+        list(METHODS_3D),
+        default=list(METHODS_3D),
+        format_func=METHODS_3D.get,
+        key="study3d_methods",
+    )
+    coarse_n = _control_grid(n, "study3d_coarse") if "mc_control" in methods else None
     settings = StudySettings3D(
         Config3D(
             problem=config.problem,
             n=n,
+            mode=mode,
             point=point,
+            plane=plane,
+            index=index,
             seed=config.seed,
             max_iter=config.max_iter,
+            coarse_n=coarse_n,
         ),
         int(repeats),
         maximum,
         seconds,
+        methods=tuple(methods),
     )
-    if st.button("Запустить исследование", key="study3d_run", type="primary"):
+    limit_message = interactive_mc_limit_message(
+        replace(settings.config, walks=maximum), methods
+    )
+    if limit_message:
+        st.error(limit_message)
+    if st.button(
+        "Запустить исследование",
+        key="study3d_run",
+        type="primary",
+        disabled=not methods or limit_message is not None,
+    ):
         progress = st.progress(0.0)
         try:
             st.session_state["study3d_result"] = accuracy_study3d(
@@ -132,16 +193,17 @@ def _research_tab(config):
     if asdict(study.settings) != asdict(settings):
         st.info("Настройки изменены. Запустите исследование заново.")
     table = timing_rows3d(study)
-    st.dataframe(pd.DataFrame(table), hide_index=True, width="stretch")
+    render_accuracy_results(study.rows, key="study3d_results")
     st.download_button(
         "Скачать таблицу CSV",
         rows_csv(table).encode("utf-8-sig"),
         "3d-timings.csv",
         "text/csv",
+        on_click="ignore",
     )
-    with st.expander("Детали исследования"):
+    with st.expander("Детали исследования", key="cube_research_raw_details"):
         st.write(
-            "Бюджет фиксируется после подбора и проверяется новой серией. Прочерк означает недостигнутую точность; проверка не запускает повторный подбор."
+            "MC проходит три предварительные серии с двукратным запасом по ошибке и проверку на новых данных. При неудаче число путей увеличивается в пределах заданных лимитов. Все попытки сохраняются в экспорте."
         )
         st.dataframe(pd.DataFrame(study.rows), hide_index=True, width="stretch")
         payload = {
@@ -154,6 +216,7 @@ def _research_tab(config):
             json.dumps(payload, ensure_ascii=False, indent=2),
             "3d-study.json",
             "application/json",
+            on_click="ignore",
         )
 
 
@@ -228,13 +291,14 @@ def render_3d_app():
             format_func=METHODS_3D.get,
             key="cube_methods",
         )
+        coarse_n = _control_grid(n, "cube_coarse") if "mc_control" in methods else None
         walks = st.select_slider(
             "Путей на точку",
             options=[64, 256, 1024, 2048, 4096, 16384, 65536],
             value=2048,
             key="cube_walks",
         )
-        with st.expander("Точность и воспроизводимость"):
+        with st.expander("Точность и воспроизводимость", key="cube_solver_controls"):
             tol = st.select_slider(
                 "Относительный допуск ЛОМ",
                 options=[1e-2, 1e-4, 1e-6, 1e-7, 1e-8],
@@ -244,13 +308,17 @@ def render_3d_app():
             seed = st.number_input(
                 "Seed", min_value=0, max_value=2**32 - 1, value=42, key="cube_seed"
             )
-        config = Config3D(problem, n, mode, point, plane, index, walks, seed, tol)
+        config = Config3D(
+            problem, n, mode, point, plane, index, walks, seed, tol, coarse_n=coarse_n
+        )
         limit_message = interactive_mc_limit_message(config, methods)
         if limit_message:
             st.error(limit_message)
         run = st.button(
             "Рассчитать",
             key="cube_run",
+            on_click=select_section,
+            args=("cube_sections", "Результат"),
             type="primary",
             disabled=not methods or limit_message is not None,
         )
@@ -263,7 +331,9 @@ def render_3d_app():
         except (ValueError, RuntimeError) as exc:
             st.error(str(exc))
     overview, slices, research, download = st.tabs(
-        ["Результат", "Срезы", "Исследование", "Сохранить"]
+        ["Результат", "Срезы", "Исследование", "Сохранить"],
+        key="cube_sections",
+        on_change="rerun",
     )
     with research:
         _research_tab(config)
@@ -347,4 +417,5 @@ def render_3d_app():
                 st.session_state["cube_archive"],
                 "pde-3d.zip",
                 "application/zip",
+                on_click="ignore",
             )

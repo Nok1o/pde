@@ -46,7 +46,7 @@ class BoundaryCondition:
         value = _field(self.value, shape, "Граничные данные")
         kappa = _field(self.kappa, shape, "κ")
         if np.any(kappa < 0) or (self.kind != "robin" and np.any(kappa != 0)):
-            raise ValueError("κ ≥ 0 задаётся только для условия Робина")
+            raise ValueError("κ ≥ 0 задаётся только для условия 3-го рода")
         return BoundaryCondition(self.kind, value, kappa)
 
     @classmethod
@@ -184,7 +184,7 @@ class BoundaryOperator:
                     atol=1e-12,
                 ):
                     raise ValueError(
-                        "На ребре или в углу заданы несовместимые значения Дирихле"
+                        "На ребре или в углу заданы несовместимые значения для условий 1-го рода"
                     )
                 values[indices] = condition.value
                 fixed[indices] = True
@@ -249,7 +249,7 @@ class BoundaryOperator:
         scale = float(np.sum(np.abs(terms)))
         if abs(imbalance) > 1e-12 * scale:
             raise ValueError(
-                "Несовместимая задача Неймана: дискретный баланс источника и "
+                "Несовместимая задача с условиями 2-го рода: дискретный баланс источника и "
                 f"внешних производных нарушен (разность {imbalance:.6g})."
             )
 

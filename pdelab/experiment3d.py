@@ -33,6 +33,7 @@ class Config3D:
     seed: int = 42
     tol: float = 1e-7
     max_iter: int = 20000
+    coarse_n: int | None = None
 
 
 @dataclass
@@ -85,6 +86,9 @@ def metrics3d(result, points, reference, grid_reference=None):
         "relative_residual": result.relative_residual,
         "tau": result.extras.get("tau"),
         "converged": result.converged,
+        "coarse_n": result.extras.get("coarse_n"),
+        "preparation_seconds": result.extras.get("preparation_seconds"),
+        "path_seconds": result.extras.get("path_seconds"),
     }
 
 
@@ -96,7 +100,7 @@ def run_experiment3d(config=None, methods=None):
         or len(set(methods)) != len(methods)
         or any(method not in METHODS_3D for method in methods)
     ):
-        raise ValueError("Выберите ЛОМ и/или обычный MC для 3D")
+        raise ValueError("Выберите различные доступные методы 3D")
     memory = workspace_bytes(config.n)
     problem = make_problem3d(config.problem, config.n)
     points = select_points3d(
@@ -114,6 +118,7 @@ def run_experiment3d(config=None, methods=None):
             seed=config.seed,
             tol=config.tol,
             max_iter=config.max_iter,
+            coarse_n=config.coarse_n if method == "mc_control" else None,
         )
         if not result.converged:
             raise RuntimeError(

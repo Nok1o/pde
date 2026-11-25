@@ -21,7 +21,7 @@ METHODS = {
     "mc_control": "MC с контрольным приближением",
     "reuse": "MК хвосты путей",
     "layers": "MК слои от границы",
-    "wos": "WoS · Дирихле",
+    "wos": "WoS · 1-й род",
     "graded": "MC · сгущённая сетка",
 }
 LOD_STOPPING_RULE = "relative_rhs_inf_v1"

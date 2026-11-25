@@ -164,7 +164,81 @@ def _walks(probabilities, reward, boundary, walks, seed, max_steps):
     return values, errors, steps, paths, True
 
 
-def solve_frozen_mc(operator, walks=1024, seed=42, max_steps=100000, control=None):
+@njit(cache=True, nogil=True)
+def _walks_reuse(probabilities, reward, boundary, walks, seed, max_steps):
+    """First-hit suffix per target and independent path; killing pays zero."""
+    np.random.seed(seed)
+    n = boundary.shape[0] - 1
+    means = np.zeros_like(boundary)
+    m2 = np.zeros_like(boundary)
+    counts = np.zeros(boundary.shape, dtype=np.int64)
+    stamps = np.zeros(boundary.shape, dtype=np.int64)
+    prefix = np.zeros_like(boundary)
+    visited = np.empty(((n - 1) ** 2, 2), dtype=np.int64)
+    steps = 0
+    paths = 0
+    for start_y in range(1, n):
+        for start_x in range(1, n):
+            for _ in range(walks):
+                paths += 1
+                y, x = start_y, start_x
+                payoff = 0.0
+                length = 0
+                size = 0
+                while 0 < x < n and 0 < y < n:
+                    if length == max_steps:
+                        return means, m2, steps + length, paths, False
+                    if stamps[y, x] != paths:
+                        stamps[y, x] = paths
+                        prefix[y, x] = payoff
+                        visited[size, 0] = y
+                        visited[size, 1] = x
+                        size += 1
+                    payoff += reward[y - 1, x - 1]
+                    length += 1
+                    draw = np.random.random()
+                    cumulative = 0.0
+                    direction = 4
+                    for candidate in range(4):
+                        cumulative += probabilities[y - 1, x - 1, candidate]
+                        if draw < cumulative:
+                            direction = candidate
+                            break
+                    if direction == 4:
+                        break
+                    if direction == 0:
+                        y += 1
+                    elif direction == 1:
+                        y -= 1
+                    elif direction == 2:
+                        x += 1
+                    else:
+                        x -= 1
+                else:
+                    payoff += boundary[y, x]
+                steps += length
+                for j in range(size):
+                    y, x = visited[j]
+                    sample = payoff - prefix[y, x]
+                    counts[y, x] += 1
+                    difference = sample - means[y, x]
+                    means[y, x] += difference / counts[y, x]
+                    m2[y, x] += difference * (sample - means[y, x])
+    errors = np.zeros_like(boundary)
+    for y in range(1, n):
+        for x in range(1, n):
+            count = counts[y, x]
+            errors[y, x] = np.sqrt(max(0.0, m2[y, x]) / (count * (count - 1)))
+    means[0, :] = boundary[0, :]
+    means[-1, :] = boundary[-1, :]
+    means[:, 0] = boundary[:, 0]
+    means[:, -1] = boundary[:, -1]
+    return means, errors, steps, paths, True
+
+
+def solve_frozen_mc(
+    operator, walks=1024, seed=42, max_steps=100000, control=None, reuse=False
+):
     for name, value, minimum, maximum in (
         ("walks", walks, 2, 2**31 - 1),
         ("seed", seed, 0, 2**32 - 1),
@@ -185,7 +259,8 @@ def solve_frozen_mc(operator, walks=1024, seed=42, max_steps=100000, control=Non
         reward = (operator.b[1:-1, 1:-1] - operator.apply(base)) / operator.diagonal
         boundary = np.zeros_like(boundary)
     with NUMBA_LOCK:
-        values, errors, steps, paths, completed = _walks(
+        kernel = _walks_reuse if reuse else _walks
+        values, errors, steps, paths, completed = kernel(
             probabilities, reward, boundary, int(walks), int(seed), int(max_steps)
         )
     if not completed:
@@ -210,4 +285,5 @@ def warmup_frozen():
         operator = FrozenOperator.from_nodes(np.ones((5, 5)), 1, 0, sigma=2)
         solve_frozen_lod(operator, max_iter=1)
         solve_frozen_mc(operator, walks=2)
+        solve_frozen_mc(operator, walks=2, reuse=True)
         _warmed = True

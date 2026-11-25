@@ -32,7 +32,7 @@ def test_csv_exports_disable_windows_translation(tmp_path, monkeypatch):
     )
     export_study3d(study, tmp_path)
     for name, expected in (
-        ("metrics", 4),
+        ("metrics", len(experiment.metrics)),
         ("timings", 3),
         ("thresholds", 3),
         ("trials", len(study.trials)),
@@ -83,3 +83,26 @@ def test_ui_blocks_expensive_mc_before_solver_launch():
     assert "cube_result" not in app.session_state
     app.multiselect(key="cube_methods").set_value(["lod_serial"]).run()
     assert not app.button(key="cube_run").disabled
+
+
+def test_ui_blocks_expensive_3d_study_but_allows_lom_and_boundary_slice():
+    app = AppTest.from_file(
+        str(Path(__file__).parents[1] / "app.py"), default_timeout=60
+    ).run()
+    app.radio(key="dimension").set_value("3D").run()
+    app.select_slider(key="study3d_grid").set_value(64)
+    app.selectbox(key="study3d_mode").set_value("field")
+    app.select_slider(key="study3d_walks").set_value(64)
+    app.multiselect(key="study3d_methods").set_value(["mc"])
+    app.run()
+    assert not app.exception
+    assert app.button(key="study3d_run").disabled
+    assert any("Слишком большой" in item.value for item in app.error)
+    assert "study3d_result" not in app.session_state
+    app.multiselect(key="study3d_methods").set_value(["lod_serial"]).run()
+    assert not app.button(key="study3d_run").disabled
+    app.multiselect(key="study3d_methods").set_value(["mc"])
+    app.selectbox(key="study3d_mode").set_value("slice").run()
+    app.slider(key="study3d_index_64").set_value(0).run()
+    assert not app.exception
+    assert not app.button(key="study3d_run").disabled

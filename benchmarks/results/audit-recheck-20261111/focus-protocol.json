@@ -1,0 +1,15 @@
+{
+  "revision": "47ced68a77b4cff2f45e9c63f353e00fb235b262",
+  "source_sha256": {
+    "pdelab/research.py": "ccac41e98c8c5d57ab15bd2b129d290e1f703ae8216df24d1467d3b1a4b5ddbc",
+    "pdelab/study_policy.py": "fc90d0d465774c462fd05f1c9b5e486d86ee5ae4c9817b2ac0cd96fdea087bf9",
+    "pdelab/solvers.py": "35e5b08206f81eb6b2f12754cce4f57e3455b6f2d246a803362bf6402f0ac569",
+    "pdelab/control.py": "0156ef092dfd987e48e7bde191bab213a734e1f9f9dd6008da4a13f4266972d4"
+  },
+  "repeats": 5,
+  "seed": 42,
+  "max_walks": 16384,
+  "seconds_per_phase": 600,
+  "source_unchanged_during_run": true,
+  "selection_policy": "stable_pilot_adaptive_retry_v4"
+}

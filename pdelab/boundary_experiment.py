@@ -120,11 +120,11 @@ def selected_boundary_methods(operator, methods=None):
     ):
         raise ValueError("Выберите ЛОМ и/или обычный MC")
     if operator.pure_neumann and any(m != "lod_serial" for m in methods):
-        raise ValueError("MC для чистого Неймана пока не поддерживается")
+        raise ValueError("MC для условий только 2-го рода пока не поддерживается")
     if "wos" in methods and any(
         c.kind != "dirichlet" for c in operator.problem.sides.values()
     ):
-        raise ValueError("WoS требует Дирихле на всех сторонах/гранях")
+        raise ValueError("WoS требует условий 1-го рода на всех сторонах/гранях")
     return methods
 
 
@@ -191,7 +191,7 @@ def boundary_payload(experiment):
             for side, c in experiment.problem.sides.items()
         },
         "normal_convention": "outward derivative du/dn; physical flux q=-du/dn for k=1",
-        "corner_rule": "Dirichlet takes precedence; intersecting Dirichlet values must agree; otherwise all incident fluxes contribute",
+        "corner_rule": "First-kind conditions take precedence; intersecting first-kind values must agree; otherwise all incident fluxes contribute",
         "normalization": "volume_weighted_zero_mean" if pure_neumann else None,
         "mc_pure_neumann_supported": False,
         "scheme": "nodal_half_cell_finite_volume_k1_v1",

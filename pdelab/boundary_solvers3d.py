@@ -247,7 +247,7 @@ def solve_boundary3d(
         operator.check_compatibility()
         if operator.pure_neumann and method == "mc":
             raise ValueError(
-                "MC для чистого Неймана пока не поддерживается: нет поглощения"
+                "MC для условий только 2-го рода пока не поддерживается: нет поглощения"
             )
         if all(c.kind == "dirichlet" for c in problem.faces.values()):
             legacy = Problem3D(
@@ -297,7 +297,7 @@ def trace_boundary_walk3d(problem, point=None, seed=2026, max_steps=20000):
     operator = BoundaryOperator3D(problem)
     operator.check_compatibility()
     if operator.pure_neumann:
-        raise ValueError("Для чистого Неймана поглощающей траектории нет")
+        raise ValueError("Для условий только 2-го рода поглощающей траектории нет")
     if (
         isinstance(max_steps, (bool, np.bool_))
         or not np.isfinite(max_steps)

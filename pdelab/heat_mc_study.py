@@ -10,11 +10,19 @@ import numba
 import numpy as np
 
 from .heat import solve_heat
-from .heat_mc import _settings, _warmup, solve_heat_mc
+from .heat_mc import HEAT_MC_METHODS, _settings, _warmup, solve_heat_mc, validate_coarse
 from .problem import validate_points
-from .research import TARGETS_PCT, _walk_budgets
+from .research import _walk_budgets
+from .study_policy import (
+    ACCURACY_DESCRIPTION,
+    ACCURACY_METRIC,
+    SELECTION_POLICY,
+    mean_relative_error,
+    phase_seed_index,
+    search_budgets,
+)
 
-VALIDATION_POLICY = "one_final_check_per_target_v1"
+VALIDATION_POLICY = SELECTION_POLICY
 
 
 def heat_mc_study(
@@ -27,7 +35,19 @@ def heat_mc_study(
     seed=42,
     seconds_per_method=60,
     max_transitions=1_000_000,
+    *,
+    methods=("lod", "mc"),
+    coarse_n=None,
 ):
+    if (
+        not methods
+        or len(set(methods)) != len(methods)
+        or any(m not in ("lod", *HEAT_MC_METHODS) for m in methods)
+    ):
+        raise ValueError("Выберите различные методы теплопроводности")
+    if "mc_control" in methods:
+        coarse_n = max(4, problem.n // 4) if coarse_n is None else coarse_n
+        validate_coarse(problem.n, coarse_n)
     if (
         isinstance(repeats, bool)
         or not np.isfinite(repeats)
@@ -59,6 +79,8 @@ def heat_mc_study(
     if reference == 0:
         raise ValueError("При нулевом эталоне относительная ошибка не определена")
     settings = dict(
+        methods=list(methods),
+        coarse_n=coarse_n,
         problem=problem.name,
         n=problem.n,
         a2=problem.a2,
@@ -69,6 +91,7 @@ def heat_mc_study(
         max_walks=int(max_walks),
         seed=seed,
         seconds_per_method=seconds_per_method,
+        seconds_per_phase=seconds_per_method,
         max_transitions=max_transitions,
         python=platform.python_version(),
         platform=platform.platform(),
@@ -78,23 +101,22 @@ def heat_mc_study(
         reference_kind="analytic" if problem.exact else "discrete",
         grid_reference=float(grid.fields[-1, y, x]),
         validation_policy=VALIDATION_POLICY,
+        accuracy_metric=ACCURACY_METRIC,
+        accuracy=ACCURACY_DESCRIPTION,
         timing="Full solve to T including all known-data preparation; JIT/reference excluded.",
     )
     trials, rows = [], []
     _warmup()
     solve_heat(problem, dt, min(dt, T), tol=1e-2)
     started = perf_counter()
-    for method_index, method in enumerate(("lod", "mc")):
-        deadline = perf_counter() + seconds_per_method
+    for method_index, method in enumerate(methods):
         budgets = (
             (1e-2, 1e-4, 1e-6, 1e-8, 1e-10)
             if method == "lod"
             else _walk_budgets(int(max_walks), 1)
         )
-        pending = set(TARGETS_PCT)
-        status = "budget_exhausted"
 
-        def series(budget, budget_index, phase):
+        def series(budget, budget_index, phase, deadline):
             values, times = [], []
             for repeat in range(int(repeats)):
                 if perf_counter() >= deadline:
@@ -105,12 +127,12 @@ def heat_mc_study(
                             seed,
                             method_index,
                             budget_index,
-                            0 if phase == "calibration" else 1,
+                            phase_seed_index(phase),
                             repeat,
                         ]
                     ).generate_state(1)[0]
                 )
-                if method == "mc":
+                if method != "lod":
                     result = solve_heat_mc(
                         problem,
                         dt,
@@ -119,6 +141,8 @@ def heat_mc_study(
                         walks=budget,
                         seed=trial_seed,
                         max_transitions=max_transitions,
+                        method=method,
+                        coarse_n=coarse_n if method == "mc_control" else None,
                     )
                     value = float(result.values[0])
                     preparation = result.preparation_seconds
@@ -138,7 +162,7 @@ def heat_mc_study(
                         budget=float(budget),
                         phase=phase,
                         repeat=repeat,
-                        seed=trial_seed if method == "mc" else None,
+                        seed=trial_seed if method != "lod" else None,
                         value=value,
                         seconds=result.seconds,
                         preparation_seconds=preparation,
@@ -146,56 +170,22 @@ def heat_mc_study(
                         memory_bytes=memory,
                     )
                 )
-            error = (
-                100
-                * float(np.sqrt(np.mean((np.array(values) - reference) ** 2)))
-                / abs(reference)
-            )
-            return error, float(np.mean(times))
+            error = mean_relative_error(values, reference)
+            return dict(relative_error_pct=error, seconds=float(np.mean(times)))
 
-        for budget_index, budget in enumerate(budgets):
-            try:
-                calibration, _ = series(budget, budget_index, "calibration")
-                candidates = [target for target in pending if calibration <= target]
-                if not candidates:
-                    continue
-                validation, seconds = series(budget, budget_index, "validation")
-                # Calibration fixes the budget; validation never sends a target
-                # back into the search, even if its final check fails.
-                for target in candidates:
-                    confirmed = validation <= target
-                    rows.append(
-                        dict(
-                            method=method,
-                            target_pct=target,
-                            seconds=seconds if confirmed else None,
-                            budget=float(budget),
-                            calibration_error_pct=calibration,
-                            validation_error_pct=validation,
-                            status="reached" if confirmed else "not_confirmed",
-                        )
-                    )
-                    pending.remove(target)
-                if not pending:
-                    break
-            except TimeoutError:
-                status = "time_limit"
-                break
-            except RuntimeError as exc:
-                status = "solver_failed: " + str(exc)
-                break
-        for target in pending:
-            rows.append(
-                dict(
-                    method=method,
-                    target_pct=target,
-                    seconds=None,
-                    budget=None,
-                    calibration_error_pct=None,
-                    validation_error_pct=None,
-                    status=status,
-                )
-            )
+        method_rows = search_budgets(
+            method, budgets, series, seconds_per_method, clock=perf_counter
+        )
+        for row in method_rows:
+            row["status_detail"] = row["status"]
+            row["status"] = {
+                "confirmed": "reached",
+                "validation_failed": "not_confirmed",
+                "timeout": "time_limit",
+                "not_reached": "budget_exhausted",
+            }.get(row["status_code"], row["status_code"])
+            row["validation_error_pct"] = row["relative_error_pct"]
+        rows.extend(method_rows)
     return dict(
         settings=settings,
         rows=sorted(rows, key=lambda r: (r["target_pct"], r["method"])),
