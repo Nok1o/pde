@@ -15,7 +15,7 @@ from time import perf_counter
 import numpy as np
 
 from .boundary3d import FACES
-from .heat3d_picard_mc import MC_METHODS
+from .heat3d_picard_mc import CONTROL_MC_METHODS, GROUPED_MC_METHODS, MC_METHODS
 from .heat3d_problem import make_heat_problem3d
 from .problem3d import select_points3d
 from .study_protocol import (
@@ -30,7 +30,9 @@ METHOD_NAMES = {
     "lod": METHOD_NAME,
     "block": "Пикар + матричная прогонка (3D)",
     "mc": "Пикар + обычный MC (3D)",
+    "mc_grouped": "Пикар + групповой MC (3D)",
     "mc_control": "Пикар + грубая сетка и MC-поправка (3D)",
+    "mc_control_grouped": "Пикар + грубая сетка и групповая MC-поправка (3D)",
 }
 BLOCK_DIAGNOSTICS = (
     "assembly_seconds",
@@ -69,7 +71,7 @@ STATUS_LABELS = {
 }
 APPLICABILITY = (
     "Нелинейная нестационарная теплопроводность в 3D, условия 1 или 3 рода на каждой грани. "
-    "Обычный MC и MC с грубой сеткой вычисляют полное поле на каждой итерации Пикара."
+    "Все варианты MC вычисляют полное поле на каждой итерации Пикара."
 )
 
 
@@ -312,6 +314,8 @@ def _reproduction(
             parts += ["--seed", str(settings.seed)]
         elif walk_budgets:
             parts += ["--walk-budgets", *(str(v) for v in walk_budgets)]
+    if any(m in GROUPED_MC_METHODS for m in config.methods):
+        parts += ["--batch-size", str(settings.batch_size)]
     if command == "study":
         parts += [
             "--repeats",
@@ -357,7 +361,7 @@ def compare_heat3d(config=HeatConfig3D(), settings=None, progress=None):
             record.update(
                 walks_per_free_node=settings.walks,
                 seed=settings.seed,
-                coarse_n=settings.coarse_n if method == "mc_control" else None,
+                coarse_n=settings.coarse_n if method in CONTROL_MC_METHODS else None,
             )
         records.append(record)
         if result.values is not None:
@@ -442,11 +446,19 @@ def _study_diagnostics(study, method, diagnostics, settings):
         trial.update(diagnostic)
     for collection in ("rows", "trials", "series"):
         for row in study[collection]:
-            row.update(method=method, method_name=METHOD_NAMES[method])
+            row.update(
+                method=method,
+                method_name=METHOD_NAMES[method],
+                batch_size=(
+                    settings.batch_size if method in GROUPED_MC_METHODS else None
+                ),
+            )
             if method in MC_METHODS:
                 row.update(
                     budget_kind="walks_per_free_node_per_solve",
-                    coarse_n=settings.coarse_n if method == "mc_control" else None,
+                    coarse_n=(
+                        settings.coarse_n if method in CONTROL_MC_METHODS else None
+                    ),
                     tolerance=settings.tolerance,
                     change_tolerance=settings.change_tolerance,
                 )

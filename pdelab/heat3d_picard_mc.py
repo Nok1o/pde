@@ -7,7 +7,9 @@ import numpy as np
 from .heat3d_control import _controlled_estimate
 from .heat3d_mc import solve_frozen_mc3d
 
-MC_METHODS = ("mc", "mc_control")
+MC_METHODS = ("mc", "mc_grouped", "mc_control", "mc_control_grouped")
+CONTROL_MC_METHODS = ("mc_control", "mc_control_grouped")
+GROUPED_MC_METHODS = ("mc_grouped", "mc_control_grouped")
 
 
 class PicardSampler3D:
@@ -56,7 +58,9 @@ class PicardSampler3D:
             max_transitions=remaining_moves,
             max_workspace_bytes=settings.max_workspace_bytes,
         )
-        if result.method == "mc_control":
+        if result.batch_size is not None:
+            options["batch_size"] = result.batch_size
+        if result.method in CONTROL_MC_METHODS:
             sampled = _controlled_estimate(
                 self.problem,
                 previous,

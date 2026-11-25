@@ -58,7 +58,16 @@ def main(argv=None):
         "--walks", type=int, default=4096, help="Путей на свободный узел за оценку MC"
     )
     parser.add_argument(
-        "--coarse-n", type=int, default=4, help="Интервалы грубой сетки для mc_control"
+        "--coarse-n",
+        type=int,
+        default=4,
+        help="Интервалы грубой сетки для MC с поправкой",
+    )
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=128,
+        help="Размер группы частиц для групповых MC",
     )
     parser.add_argument("--max-path-steps", type=int, default=1_000_000)
     parser.add_argument("--max-walks", type=int, default=8_000_000)
@@ -128,6 +137,7 @@ def main(argv=None):
         walks=args.walks,
         seed=args.seed,
         coarse_n=args.coarse_n,
+        batch_size=args.batch_size,
         max_walks=args.max_walks,
         max_transitions=args.max_transitions,
         max_path_steps=args.max_path_steps,
