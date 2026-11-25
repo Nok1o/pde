@@ -60,7 +60,7 @@ def test_two_method_cli_run_exports_results_and_separate_newton_diagnostic(tmp_p
         )
         == 0
     )
-    payload = json.loads((tmp_path / "result.json").read_text())
+    payload = json.loads((tmp_path / "result.json").read_text(encoding="utf-8"))
     assert payload["metadata"]["methods"] == ["block", "lod"]
     assert payload["metadata"]["configuration"]["methods"] == ["block", "lod"]
     assert payload["metadata"]["method"] == "multiple"
@@ -92,7 +92,7 @@ def test_two_method_cli_run_exports_results_and_separate_newton_diagnostic(tmp_p
         "block",
         "lod",
     ]
-    assert "block" in (tmp_path / "table.csv").read_text()
+    assert "block" in (tmp_path / "table.csv").read_text(encoding="utf-8")
     with zipfile.ZipFile(tmp_path / "heat3d.zip") as archive:
         assert json.loads(archive.read("result.json")) == payload
 
@@ -131,7 +131,7 @@ def test_block_cap_refusal_is_exported_without_replacing_successful_lod(tmp_path
             ]
         )
     assert exc.value.code == 2
-    result = json.loads((tmp_path / "result.json").read_text())
+    result = json.loads((tmp_path / "result.json").read_text(encoding="utf-8"))
     assert [row["status"] for row in result["rows"]] == ["completed", "unsupported"]
     assert "16" in result["rows"][1]["reason"]
     with np.load(tmp_path / "query-values.npz", allow_pickle=False) as arrays:
@@ -161,7 +161,7 @@ def test_two_method_study_exports_method_tags_and_exact_protocol(tmp_path):
         )
         == 0
     )
-    result = json.loads((tmp_path / "result.json").read_text())
+    result = json.loads((tmp_path / "result.json").read_text(encoding="utf-8"))
     assert result["protocol"] == PROTOCOL_ID
     assert result["accuracy_metric"] == METRIC_ID
     assert len(result["rows"]) == 6
@@ -179,7 +179,7 @@ def test_two_method_study_exports_method_tags_and_exact_protocol(tmp_path):
         sum(row["seconds"] for row in result["trials"])
     )
     assert not (tmp_path / "query-values.npz").exists()
-    assert "method" in (tmp_path / "trials.csv").read_text()
+    assert "method" in (tmp_path / "trials.csv").read_text(encoding="utf-8")
 
 
 def test_each_method_finishes_pilots_before_final_and_never_retunes(monkeypatch):
