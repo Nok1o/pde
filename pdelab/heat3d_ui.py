@@ -289,6 +289,19 @@ def render_heat3d_app():
             )
             if row["status"] != "completed":
                 st.warning(row["reason"])
+                if "failed_candidate" in result["arrays"]:
+                    with st.expander(
+                        "Последнее приближение при остановке", key="h3_failed"
+                    ):
+                        st.caption(
+                            f"Кандидат слоя t={row['diagnostic_time']:g}; это не решение в T."
+                        )
+                        points = result["arrays"]["points_zyx"]
+                        diagnostic = pd.DataFrame(points, columns=["z", "y", "x"])
+                        diagnostic["Последнее приближение"] = result["arrays"][
+                            "failed_candidate"
+                        ][tuple(points.T)]
+                        st.dataframe(diagnostic, hide_index=True, width="stretch")
             st.dataframe(
                 pd.DataFrame(
                     [

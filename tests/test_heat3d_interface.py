@@ -106,7 +106,29 @@ def test_failed_run_exports_status_and_actual_cost_without_target_values(tmp_pat
     assert row["seconds"] > 0 and row["outer_iterations"] == 1
     with np.load(tmp_path / "query-values.npz", allow_pickle=False) as arrays:
         assert "lod" not in arrays
+        assert arrays["failed_candidate"].shape == (5, 5, 5)
+    assert row["diagnostic_time"] == 0.01 and row["diagnostic_field_available"]
     assert payload["history"]
+
+
+def test_repeated_exports_remove_only_obsolete_managed_artifacts(tmp_path):
+    user_file = tmp_path / "notes.txt"
+    user_file.write_text("keep")
+    assert main(["run", "--n", "4", "--T", "0", "--out", str(tmp_path)]) == 0
+    assert (tmp_path / "query-values.npz").exists()
+    assert (
+        main(
+            ["study", "--n", "6", "--T", "0", "--repeats", "2", "--out", str(tmp_path)]
+        )
+        == 0
+    )
+    assert not (tmp_path / "query-values.npz").exists()
+    assert not (tmp_path / "history.csv").exists()
+    assert (tmp_path / "trials.csv").exists()
+    assert main(["run", "--n", "4", "--T", "0", "--out", str(tmp_path)]) == 0
+    assert not (tmp_path / "trials.csv").exists()
+    assert not (tmp_path / "series.csv").exists()
+    assert user_file.read_text() == "keep"
 
 
 def test_cli_study_matches_service_and_exports_separate_final_trials(tmp_path):

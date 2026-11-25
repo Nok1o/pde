@@ -4,6 +4,7 @@ from dataclasses import replace
 
 import numpy as np
 import pytest
+from scipy.integrate import solve_ivp
 
 from pdelab.heat3d_contract import LinearResult3D
 from pdelab.heat3d_operator import freeze_heat3d
@@ -88,6 +89,49 @@ def test_spatial_order_with_small_fixed_time_step():
     assert 3.7 < errors[1] / errors[2] < 4.5
 
 
+def test_nonlinear_temporal_order_against_independent_semidiscrete_ode():
+    n = 6
+    problem = make_heat_problem3d(n=n, alpha=0.5)
+    interior = np.s_[1:-1, 1:-1, 1:-1]
+
+    def rhs(t, unknowns):
+        # Exact data are used only on the prescribed boundary; overwrite the interior.
+        values = problem.evaluate(problem.exact, t)
+        values[interior] = unknowns.reshape((n - 1,) * 3)
+        conductivity = 1 + 0.5 * values**2
+        derivative = problem.evaluate(problem.source, t)[interior].copy()
+        for axis in range(3):
+            for sign in (-1, 1):
+                neighbor = [slice(1, -1)] * 3
+                neighbor[axis] = slice(None, -2) if sign < 0 else slice(2, None)
+                neighbor = tuple(neighbor)
+                derivative += (
+                    0.5
+                    * n**2
+                    * (conductivity[interior] + conductivity[neighbor])
+                    * (values[neighbor] - values[interior])
+                )
+        return derivative.ravel()
+
+    reference = solve_ivp(
+        rhs,
+        (0, 0.04),
+        problem.initial_values()[interior].ravel(),
+        method="DOP853",
+        rtol=2e-12,
+        atol=1e-13,
+    )
+    assert reference.success
+    points = np.array(list(np.ndindex((n - 1,) * 3))) + 1
+    errors = []
+    for dt in (0.01, 0.005, 0.0025):
+        result = solve_heat3d(problem, points, dt=dt, T=0.04, settings=STRICT)
+        assert result.status == "completed"
+        errors.append(np.max(abs(result.values - reference.y[:, -1])))
+    assert 1.9 < errors[0] / errors[1] < 2.2
+    assert 1.9 < errors[1] / errors[2] < 2.2
+
+
 def test_previous_layer_is_computed_and_exact_is_not_read():
     problem = make_heat_problem3d(n=4)
     previous_fields, iterates = {}, {}
@@ -165,6 +209,9 @@ def test_iteration_limit_does_not_publish_candidate_at_target_time(settings, sta
     assert result.values is None and result.completed_until == 0
     assert result.physical_steps == 0 and result.outer_iterations == 1
     assert not result.history[-1]["accepted"]
+    assert result.diagnostic_time == 0.01
+    assert result.diagnostic_field.shape == (9, 9, 9)
+    assert np.isfinite(result.diagnostic_field).all()
 
 
 def test_failure_after_accepted_layer_preserves_its_time_and_work():
@@ -232,6 +279,45 @@ def test_soft_time_limit_between_layers(monkeypatch):
     assert result.status == "time_limit" and result.values is None
     assert result.physical_steps == 0 and result.completed_until == 0
     assert result.seconds >= result.preparation_seconds > 0
+
+
+@pytest.mark.parametrize(
+    "n,dt,T,budget",
+    [(64, 0.01, 0.0, 3 * 1024**2), (4, 1 / 8192, 1.0, 45000)],
+)
+def test_initial_and_time_buffers_are_budgeted_before_allocation(
+    monkeypatch, n, dt, T, budget
+):
+    import pdelab.heat3d_solver as module
+
+    problem = make_heat_problem3d(n=n)
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("Memory refusal must precede warmup and time-grid allocation")
+
+    monkeypatch.setattr(module, "warmup_lines3d", forbidden)
+    monkeypatch.setattr(module, "time_grid", forbidden)
+    result = solve_heat3d(
+        problem, dt=dt, T=T, settings=replace(STRICT, max_workspace_bytes=budget)
+    )
+    assert result.status == "memory_limit"
+    assert result.workspace_bytes > budget and result.physical_steps == 0
+    assert result.diagnostic_field is None
+
+
+def test_history_memory_limit_is_checked_inside_a_long_layer():
+    def unconverged(operator, initial, **kwargs):
+        return LinearResult3D(initial + 1, "completed", "test", 0, iterations=1)
+
+    result = solve_heat3d(
+        make_heat_problem3d(n=4, alpha=0),
+        backend=unconverged,
+        settings=replace(STRICT, max_outer=10000, max_workspace_bytes=50000),
+    )
+    assert result.status == "memory_limit"
+    assert result.values is None and result.diagnostic_field is not None
+    assert 1 < result.outer_iterations < 50
+    assert not result.history[-1]["accepted"]
 
 
 @pytest.mark.parametrize(

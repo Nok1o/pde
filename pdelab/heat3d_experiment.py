@@ -139,7 +139,7 @@ def _record(result, exact):
     record = {
         field.name: getattr(result, field.name)
         for field in fields(result)
-        if field.name not in ("values", "points_zyx", "history")
+        if field.name not in ("values", "points_zyx", "history", "diagnostic_field")
     }
     record.update(
         method_name=(
@@ -152,6 +152,7 @@ def _record(result, exact):
         accuracy_metric=METRIC_ID,
         walks_applicable=False,
         error_reason="" if result.status == "completed" else "Расчёт не достиг T",
+        diagnostic_field_available=result.diagnostic_field is not None,
     )
     if result.status == "completed":
         record.update(error_metrics(result.values, exact))
@@ -246,6 +247,8 @@ def compare_heat3d(config=HeatConfig3D(), settings=None, progress=None):
     arrays = {"points_zyx": points, "analytic": exact}
     if result.values is not None:
         arrays["lod"] = result.values
+    if result.diagnostic_field is not None:
+        arrays["failed_candidate"] = result.diagnostic_field
     histories = [{"method": "lod", **row} for row in result.history]
     reference_seconds = 0.0
     if config.newton:
@@ -268,6 +271,8 @@ def compare_heat3d(config=HeatConfig3D(), settings=None, progress=None):
             )
             reference_seconds = grid.seconds
             grid_diagnostic = _record(grid, exact)
+            if grid.diagnostic_field is not None:
+                arrays["newton_failed_candidate"] = grid.diagnostic_field
             histories += [{"method": "newton", **row} for row in grid.history]
             if grid.values is not None:
                 arrays["newton"] = grid.values
@@ -433,8 +438,13 @@ def result_archive(result):
 
 
 def export_result(result, folder):
+    files = result_files(result)
     folder = Path(folder)
     folder.mkdir(parents=True, exist_ok=True)
-    for name, content in result_files(result).items():
+    # Only remove this exporter's obsolete optional artifacts, not user files.
+    for name in ("history.csv", "trials.csv", "series.csv", "query-values.npz"):
+        if name not in files:
+            (folder / name).unlink(missing_ok=True)
+    for name, content in files.items():
         (folder / name).write_bytes(content)
     (folder / "heat3d.zip").write_bytes(result_archive(result))

@@ -91,22 +91,37 @@ def _history_bytes(history):
 
 def _workspace_estimate(n, method, points, initial_only=False):
     # Explicit numerical-buffer estimate; this is not a measured process RSS.
-    buffers = (1 if initial_only else 40) * (n + 1) ** 3 * 8
+    # Initial data evaluation also creates several complete temporary fields.
+    buffers = 40 * (n + 1) ** 3 * 8
     if method == "newton" and not initial_only:
         # Conservative dense-fill storage allowance for the small sparse LU.
         buffers += 16 * (n - 1) ** 6
-    return buffers + points.nbytes + len(points) * 8
+    return buffers + 2 * points.nbytes + len(points) * 8
+
+
+def _time_grid_bytes(dt, T):
+    """Bound the shared time_grid arrays before allocating them (same limits)."""
+    if not np.isfinite(dt) or dt <= 0 or not np.isfinite(T) or T < 0:
+        raise ValueError("Требуются конечные dt>0 и T≥0")
+    ratio = T / dt
+    if not np.isfinite(ratio) or ratio > 10000:
+        raise ValueError("Не более 10000 временных шагов за один расчёт")
+    count = int(np.ceil(ratio))
+    # Include arange/multiply/append temporaries, not just the two returned arrays.
+    return (3 * count + 4 if count else 1) * np.dtype(float).itemsize
 
 
 @dataclass
 class _Layer:
-    values: np.ndarray
+    values: np.ndarray | None
     status: str = "outer_limit"
     reason: str = "Лимит внешних итераций"
     history: list = field(default_factory=list)
     outer_iterations: int = 0
     inner_iterations: int = 0
     preparation_seconds: float = 0.0
+    history_budget: int = 0
+    history_storage: int = 0
 
 
 @contextmanager
@@ -131,6 +146,14 @@ def _record(layer, *, outer, residual, scale, change=None, linear=None, accepted
         reason="completed" if accepted else layer.reason,
     )
     layer.history.append(row)
+    # Include room for layer/t/dt added when collecting the complete run history.
+    layer.history_storage += (
+        getsizeof(row) + sum(getsizeof(value) for value in row.values()) + 128
+    )
+    if layer.history_storage + getsizeof(layer.history) > layer.history_budget:
+        layer.status = "memory_limit"
+        layer.reason = "Лимит памяти диагностической истории"
+        row.update(accepted=False, reason=layer.reason)
     return row
 
 
@@ -178,12 +201,12 @@ def _picard_layer(
             1 - settings.relaxation
         ) * values + settings.relaxation * linear.values
         candidate[fixed] = boundary[fixed]
+        layer.values = candidate
         change = _change(candidate, values)
         candidate_operator = freeze(candidate)
         residual = _relative(
             (candidate_operator.apply(candidate) - candidate_operator.rhs)[free], scale
         )
-        layer.values = candidate
         passed = (
             linear.status == "completed"
             and residual <= settings.tolerance
@@ -198,6 +221,8 @@ def _picard_layer(
             linear=linear.relative_residual,
             accepted=passed,
         )
+        if layer.status == "memory_limit":
+            return layer
         if linear.status != "completed":
             layer.status, layer.reason = linear.status, linear.reason
             row["reason"] = linear.reason
@@ -241,6 +266,7 @@ def _newton_layer(problem, previous, t, dt, settings, deadline, layer):
         for _ in range(24):
             candidate = values.copy()
             candidate[1:-1, 1:-1, 1:-1] += factor * correction
+            layer.values = candidate
             try:
                 next_residual = newton_residual3d(candidate, *args)
                 next_relative = _relative(next_residual, scale)
@@ -275,6 +301,8 @@ def _newton_layer(problem, previous, t, dt, settings, deadline, layer):
             accepted=passed,
         )
         row["relaxation"] = factor
+        if layer.status == "memory_limit":
+            return layer
         layer.values = candidate
         if passed:
             layer.status, layer.reason = "completed", "Невязка независимого Ньютона"
@@ -310,17 +338,18 @@ def solve_heat3d(
     points = validate_points3d(
         problem.n, [(problem.n // 2,) * 3] if points_zyx is None else points_zyx
     )
-    times, steps = time_grid(dt, T)
+    time_storage = _time_grid_bytes(dt, T)
     unsupported = any(face.kind != 1 for face in problem.faces.values()) or (
         method == "newton" and problem.n > DIRECT_MAX_N
     )
-    storage = _workspace_estimate(
-        problem.n, method, points, initial_only=not len(steps)
+    storage = (
+        _workspace_estimate(problem.n, method, points, initial_only=T == 0)
+        + time_storage
     )
     if (
         method == "lod"
         and backend is solve_lines3d
-        and len(steps)
+        and T > 0
         and not unsupported
         and storage <= settings.max_workspace_bytes
     ):
@@ -359,8 +388,9 @@ def solve_heat3d(
     if storage > settings.max_workspace_bytes:
         return finish("memory_limit", "Оценка рабочих буферов превышает лимит памяти")
     try:
-        previous = problem.initial_values()
-        result.preparation_seconds = perf_counter() - started
+        with _preparing(result):
+            times, steps = time_grid(dt, T)
+            previous = problem.initial_values()
         history_storage = 0
         for index, step in enumerate(steps, 1):
             if perf_counter() >= deadline:
@@ -377,7 +407,13 @@ def solve_heat3d(
                 settings,
                 deadline,
             )
-            layer = _Layer(previous)
+            layer = _Layer(
+                None,
+                history_budget=settings.max_workspace_bytes
+                - storage
+                - history_storage
+                - getsizeof(result.history),
+            )
             try:
                 if method == "lod":
                     _picard_layer(*args, operator_factory, backend, layer)
@@ -408,16 +444,23 @@ def solve_heat3d(
                 dict(layer=index, t=float(times[index]), dt=float(step), **row)
                 for row in layer.history
             ]
-            history_storage += _history_bytes(records) - getsizeof(records)
+            history_storage += max(
+                _history_bytes(records) - getsizeof(records), layer.history_storage
+            )
             result.history.extend(records)
             result.workspace_bytes = (
                 storage + history_storage + getsizeof(result.history)
             )
             if layer.status != "completed":
+                result.diagnostic_field = layer.values
+                if layer.values is not None:
+                    result.diagnostic_time = float(times[index])
                 return finish(layer.status, f"Слой {index}: {layer.reason}")
             if result.workspace_bytes > settings.max_workspace_bytes:
                 result.history[-1]["accepted"] = False
                 result.history[-1]["reason"] = "Лимит памяти диагностической истории"
+                result.diagnostic_field = layer.values
+                result.diagnostic_time = float(times[index])
                 return finish(
                     "memory_limit", "Диагностическая история превысила лимит памяти"
                 )
