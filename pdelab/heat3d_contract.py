@@ -143,5 +143,8 @@ class HeatRunResult3D:
     interpolation_seconds: float = 0.0
     defect_seconds: float = 0.0
     batch_size: int | None = None  # only grouped MC, including failed/initial-only runs
+    conductivity_refresh_layers: int = 1
+    conductivity_reuses: int = 0  # lagged first updates, including failed attempts
+    conductivity_fallbacks: int = 0  # rejected lagged updates followed by a fresh one
     history_mode: str = "full"  # all outer records, or the latest record of each layer
     history_records_discarded: int = 0  # intermediate diagnostics removed, not work

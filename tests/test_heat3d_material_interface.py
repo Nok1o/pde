@@ -7,6 +7,7 @@ import pytest
 from pdelab.heat3d_cli import main
 from pdelab.heat3d_experiment import METHOD_NAMES, HeatConfig3D, study_heat3d
 from pdelab.heat3d_mc_cli import main as frozen_main
+from pdelab.heat3d_solver import HeatSettings3D
 
 
 def test_all_six_material_methods_enter_independent_accuracy_study():
@@ -20,7 +21,15 @@ def test_all_six_material_methods_enter_independent_accuracy_study():
         kinds=(3, 1, 1, 1, 1, 1),
         methods=tuple(METHOD_NAMES),
     )
-    result = study_heat3d(config, repeats=2, budgets=[0.001], walk_budgets=[1024])
+    settings = HeatSettings3D(
+        history_mode="layers",
+        conductivity_refresh_layers=4,
+        mc_tolerance=0.2,
+        mc_change_tolerance=0.1,
+    )
+    result = study_heat3d(
+        config, settings, repeats=2, budgets=[0.001], walk_budgets=[1024]
+    )
     assert result["metadata"]["configuration"]["capacity_gamma"] == 0.4
     assert result["metadata"]["configuration"]["reaction_sigma"] == 0.25
     assert len(result["rows"]) == 18
@@ -39,6 +48,23 @@ def test_all_six_material_methods_enter_independent_accuracy_study():
             row["status"] in {"confirmed", "not_reached", "validation_failed"}
             for row in rows
         )
+    for collection in ("rows", "series"):
+        for row in result[collection]:
+            assert row["history_mode"] == "layers"
+            assert row["conductivity_refresh_layers"] == 4
+            matching = [
+                trial
+                for trial in result["trials"]
+                if (trial["method"], trial["phase"], trial["candidate"])
+                == (row["method"], row["phase"], row["candidate"])
+            ]
+            for key in (
+                "conductivity_reuses",
+                "conductivity_fallbacks",
+                "history_records_discarded",
+            ):
+                assert row[key] == sum(trial[key] for trial in matching)
+            assert row["conductivity_reuses"] == len(matching)
 
 
 @pytest.mark.parametrize("method", ["mc", "mc_control_grouped"])

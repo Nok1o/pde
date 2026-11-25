@@ -265,6 +265,8 @@ def test_ui_runs_comparison_and_study_and_preserves_saved_parameters(monkeypatch
     monkeypatch.setattr(ui, "compare_heat3d", comparison)
     monkeypatch.setattr(ui, "study_heat3d", study)
     app = AppTest.from_function(heat_ui_app, default_timeout=60).run()
+    app.select_slider(key="h3_tol").set_value(1e-6)
+    app.select_slider(key="h3_change").set_value(1e-6)
     app.select_slider(key="h3_n").set_value(4)
     app.number_input(key="h3_T").set_value(0.0)
     app.selectbox(key="h3_mode").set_value("slice").run()
@@ -273,14 +275,17 @@ def test_ui_runs_comparison_and_study_and_preserves_saved_parameters(monkeypatch
     assert app.session_state["h3_sections"] == "Сравнение"
     saved = app.session_state["h3_comparison"]
     assert saved["metadata"]["configuration"]["n"] == 4
+    assert saved["metadata"]["solver_settings"]["tolerance"] == 1e-6
+    assert saved["metadata"]["solver_settings"]["change_tolerance"] == 1e-6
     app.selectbox(key="h3_view").set_value("Абсолютная ошибка").run()
     assert calls == ["run"]
     app.number_input(key="h3_repeats").set_value(2)
-    app.multiselect(key="h3_budgets").set_value([1e-3])
+    app.multiselect(key="h3_budgets").set_value([1e-3, 1e-6])
     app.button(key="h3_study_run").click().run()
     assert not app.exception and not app.error
     assert app.session_state["h3_sections"] == "Исследование 1/5/10%"
     saved_study = app.session_state["h3_study"]
+    assert saved_study["metadata"]["budgets"] == [1e-3, 1e-6]
     assert all(row["status"] == "confirmed" for row in saved_study["rows"])
     app.number_input(key="h3_alpha").set_value(1.0).run()
     assert not app.exception and calls == ["run", "study"]
