@@ -9,6 +9,7 @@ from streamlit.testing.v1 import AppTest
 
 from pdelab.cli3d import main
 from pdelab.experiment3d import Config3D, export3d, run_experiment3d
+from pdelab.solvers3d import METHODS_3D
 from pdelab.ui3d import _archive
 from pdelab.views3d import extract_slice, slice_figure3d
 
@@ -69,13 +70,7 @@ def test_cube_ui_runs_queries_switches_planes_and_invalidates_export():
     ).run()
     app.radio(key="dimension").set_value("3D").run()
     assert not app.exception
-    assert app.multiselect(key="cube_methods").value == [
-        "lod_serial",
-        "mc",
-        "mc_control",
-        "graded",
-        "wos",
-    ]
+    assert app.multiselect(key="cube_methods").value == list(METHODS_3D)
     app.select_slider(key="cube_n").set_value(8)
     app.select_slider(key="cube_walks").set_value(64)
     app.run()
@@ -118,7 +113,7 @@ def test_cube_ui_study_runs_without_main_calculation():
     app.button(key="study3d_run").click().run()
     assert not app.exception
     assert "cube_result" not in app.session_state
-    assert app.dataframe[0].value.shape == (3, 6)
+    assert app.dataframe[0].value.shape == (3, 1 + len(METHODS_3D))
     study = app.session_state["study3d_result"]
     assert study.settings.config.coarse_n == 5
     assert all(t["coarse_n"] == 5 for t in study.trials if t["method"] == "mc_control")

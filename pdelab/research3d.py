@@ -10,11 +10,13 @@ import numpy as np
 from .experiment3d import Config3D, comparison3d, rows_csv
 from .problem3d import make_problem3d, select_points3d
 from .solvers3d import METHODS_3D, solve3d, warmup3d
-from .study_policy import (
-    accuracy_metadata,
-    mean_relative_error,
-    phase_seed_index,
-    search_budgets,
+from .stationary_study3d import study_stationary3d
+from .study_protocol import (
+    ABSOLUTE_METRIC_ID,
+    METRIC_DESCRIPTION,
+    METRIC_ID,
+    PROTOCOL_ID,
+    error_metrics,
 )
 
 TARGETS_3D = (1.0, 5.0, 10.0)
@@ -36,6 +38,7 @@ class Study3D:
     reference_value: float | list[float]
     rows: list[dict] = field(default_factory=list)
     trials: list[dict] = field(default_factory=list)
+    series: list[dict] = field(default_factory=list)
 
 
 def _budgets3d(method, maximum):
@@ -45,69 +48,6 @@ def _budgets3d(method, maximum):
     while result[-1] < maximum:
         result.append(min(2 * result[-1], maximum))
     return result
-
-
-def _series3d(study, problem, points, method, budget, budget_index, phase, deadline):
-    config = study.settings.config
-    repeats = (
-        1
-        if method == "lod_serial" and phase == "calibration"
-        else int(study.settings.repeats)
-    )
-    values, times = [], []
-    for repeat in range(repeats):
-        if perf_counter() >= deadline:
-            raise TimeoutError("Лимит времени поиска")
-        seed = int(
-            np.random.SeedSequence(
-                [
-                    int(config.seed),
-                    int(method != "lod_serial"),
-                    budget_index,
-                    phase_seed_index(phase),
-                    repeat,
-                ]
-            ).generate_state(1)[0]
-        )
-        result = solve3d(
-            problem,
-            points,
-            method,
-            walks=int(budget) if method != "lod_serial" else 2,
-            tol=float(budget) if method == "lod_serial" else config.tol,
-            seed=seed,
-            max_iter=config.max_iter,
-            coarse_n=config.coarse_n if method == "mc_control" else None,
-        )
-        if not result.converged:
-            raise RuntimeError("ЛОМ не достиг допуска невязки")
-        value = result.values[tuple(points.T)]
-        if len(points) == 1:
-            value = float(value[0])
-        if not np.isfinite(value).all():
-            raise RuntimeError("Неконечная оценка решения")
-        values.append(value)
-        times.append(result.elapsed)
-        study.trials.append(
-            {
-                "method": method,
-                "phase": phase,
-                "repeat": repeat + 1,
-                "seed": seed,
-                "budget": budget,
-                "value": np.asarray(value).tolist(),
-                "reference_value": study.reference_value,
-                "seconds": result.elapsed,
-                "steps": result.steps,
-                "walks": result.walks,
-                "iterations": result.iterations,
-                "coarse_n": result.extras.get("coarse_n"),
-                "preparation_seconds": result.extras.get("preparation_seconds"),
-                "path_seconds": result.extras.get("path_seconds"),
-            }
-        )
-    error = mean_relative_error(values, study.reference_value)
-    return error, float(np.mean(times))
 
 
 def accuracy_study3d(settings, progress=None):
@@ -142,36 +82,33 @@ def accuracy_study3d(settings, progress=None):
     target_value = (
         float(reference_values[0]) if len(points) == 1 else reference_values.tolist()
     )
-    if not np.any(reference_values):
-        raise ValueError("Эталон равен нулю: относительная точность не определена")
     study = Study3D(settings, kind, target_value)
     warmup3d()
-    for method_index, method in enumerate(methods):
-
-        def measure(budget, budget_index, phase, deadline):
-            if progress:
-                label = "проверка" if phase == "validation" else "подбор"
-                progress(
-                    method_index / len(methods),
-                    f"{METHODS_3D[method]} · {label} · {budget:g}",
-                )
-            error, seconds = _series3d(
-                study, problem, points, method, budget, budget_index, phase, deadline
-            )
-            return dict(relative_error_pct=error, seconds=seconds)
-
-        rows = search_budgets(
-            method,
-            _budgets3d(method, settings.max_walks),
-            measure,
-            settings.seconds_per_method,
-            clock=perf_counter,
-        )
-        for row in rows:
-            row["name"] = METHODS_3D[method]
-        study.rows.extend(rows)
-        if progress:
-            progress((method_index + 1) / len(methods), f"{METHODS_3D[method]}: готово")
+    result = study_stationary3d(
+        problem,
+        points,
+        reference_values,
+        methods,
+        walk_budgets=_budgets3d("mc", int(settings.max_walks)),
+        tolerances=_budgets3d("lod_serial", settings.max_walks),
+        repeats=int(settings.repeats),
+        seed=int(config.seed),
+        batch_size=config.batch_size,
+        coarse_n=config.coarse_n,
+        max_iter=config.max_iter,
+        seconds_per_phase=settings.seconds_per_method,
+        solver=solve3d,
+        clock=perf_counter,
+        progress=progress,
+    )
+    study.rows = result["rows"]
+    study.trials = result["trials"]
+    study.series = result["series"]
+    for trial in study.trials:
+        trial["reference_value"] = target_value
+        # Keep the old scalar CSV field alongside the protocol's query vector.
+        if len(points) == 1 and trial["values"] is not None:
+            trial["value"] = trial["values"][0]
     return study
 
 
@@ -190,6 +127,23 @@ def timing_rows3d(study):
 
 
 def study_payload3d(study):
+    reference_info = error_metrics(study.reference_value, study.reference_value)
+    row = study.rows[0] if study.rows else {}
+    metric = row.get("accuracy_metric", "relative_rmse_v1")
+    protocol = row.get(
+        "protocol",
+        row.get("selection_policy", PROTOCOL_ID if metric == METRIC_ID else "legacy"),
+    )
+    descriptions = {
+        METRIC_ID: METRIC_DESCRIPTION,
+        "mean_run_relative_l1_v1": (
+            "100 * mean_runs(sum_points(abs(u_run-reference)) / "
+            "sum_points(abs(reference))); error of individual runs in the validation series"
+        ),
+        "relative_rmse_v1": (
+            "100 * RMS(u_run-reference) / RMS(reference); individual runs"
+        ),
+    }
     return {
         "settings": asdict(study.settings),
         "dimension": 3,
@@ -203,9 +157,19 @@ def study_payload3d(study):
         ).tolist(),
         "reference_kind": study.reference_kind,
         "reference_value": study.reference_value,
-        **accuracy_metadata(study.rows),
+        "protocol": protocol,
+        "selection": protocol,
+        "selection_policy": protocol,
+        "accuracy_metric": metric,
+        "accuracy": descriptions.get(metric, "Metric recorded in threshold rows"),
+        "absolute_metric": row.get(
+            "absolute_metric", ABSOLUTE_METRIC_ID if metric == METRIC_ID else None
+        ),
+        "calibration_fraction": row.get("calibration_fraction"),
+        "relative_applicable": reference_info["relative_applicable"],
+        "reference_norm": reference_info["reference_norm"],
         "seconds_per_phase": study.settings.seconds_per_method,
-        "timing": "Mean wall time of validation runs after warmup; search and reference excluded",
+        "timing": "Mean wall time of complete final runs after warmup; search and reference excluded",
     }
 
 
@@ -216,6 +180,7 @@ def export_study3d(study, folder):
         ("timings", timing_rows3d(study)),
         ("thresholds", study.rows),
         ("trials", study.trials),
+        ("series", study.series),
     ):
         (folder / f"{name}.csv").write_text(
             rows_csv(rows), encoding="utf-8-sig", newline=""

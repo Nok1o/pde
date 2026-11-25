@@ -23,7 +23,11 @@ from .boundary_experiment import (
     selected_boundary_methods,
     validate_boundary_budgets,
 )
-from .boundary_solvers3d import solve_boundary3d, warmup_boundary3d
+from .boundary_solvers3d import (
+    METHODS_BOUNDARY_3D,
+    solve_boundary3d,
+    warmup_boundary3d,
+)
 from .experiment3d import rows_csv
 from .problem3d import DIRECT_MAX_N
 from .views3d import PLANES, slice_figure3d
@@ -44,6 +48,7 @@ class BoundaryConfig3D(BoundaryConfig):
     data: tuple = (0.0,) * 6
     plane: str = "xy"
     index: int | None = None
+    batch_size: int = 128
 
 
 def problem_from_config3d(config):
@@ -87,7 +92,7 @@ def _prepare(config, methods, budgets=None, tolerances=None):
         )
     operator = BoundaryOperator3D(problem)
     operator.check_compatibility()
-    methods = selected_boundary_methods(operator, methods)
+    methods = selected_boundary_methods(operator, methods, names=METHODS_BOUNDARY_3D)
     if budgets is not None and tolerances is not None:
         validate_boundary_budgets(methods, budgets, tolerances)
     points = select_boundary_points3d(
@@ -113,6 +118,7 @@ def run_boundary_experiment3d(config=None, methods=None):
             tol=config.tol,
             max_iter=config.max_iter,
             max_steps=config.max_steps,
+            batch_size=config.batch_size,
         )
         if not result.converged:
             raise RuntimeError(
@@ -127,7 +133,10 @@ def run_boundary_experiment3d(config=None, methods=None):
         "grid" if problem.exact is None else "analytic",
         grid,
         results,
-        [boundary_metrics(r, points, reference, grid) for r in results.values()],
+        [
+            boundary_metrics(r, points, reference, grid, names=METHODS_BOUNDARY_3D)
+            for r in results.values()
+        ],
     )
 
 
@@ -219,8 +228,11 @@ def benchmark_boundary3d(
                     tol=budget if method == "lod_serial" else config.tol,
                     max_iter=config.max_iter,
                     max_steps=config.max_steps,
+                    batch_size=config.batch_size,
                 )
-                row = boundary_metrics(result, points, reference, grid)
+                row = boundary_metrics(
+                    result, points, reference, grid, names=METHODS_BOUNDARY_3D
+                )
                 row.update(
                     budget=budget,
                     repeat=repeat,

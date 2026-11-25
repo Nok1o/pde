@@ -1,0 +1,3 @@
+# Preserve the original CSV bytes (and hashes), including standard CRLF records.
+benchmarks/results/grouped-mc3d/**/*.csv -text whitespace=cr-at-eol linguist-generated=true
+benchmarks/results/grouped-mc3d/**/*.json -text linguist-generated=true

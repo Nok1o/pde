@@ -13,9 +13,12 @@ from .boundary3d import (
     select_boundary_points3d,
 )
 from .boundary_solvers import METHODS_BOUNDARY, _factor_lines
+from .grouped_solver3d import GROUPED_NAME, solve_grouped3d
 from .problem3d import Problem3D, validate_points3d
 from .solvers import NUMBA_LOCK, Result
 from .solvers3d import solve3d, splitting_parameter3d, warmup3d
+
+METHODS_BOUNDARY_3D = {**METHODS_BOUNDARY, "mc_grouped": GROUPED_NAME}
 
 
 def _factors(operator, tau, axis):
@@ -209,6 +212,7 @@ def solve_boundary3d(
     tol=1e-8,
     max_iter=20000,
     max_steps=None,
+    batch_size=128,
 ):
     if not isinstance(problem, BoundaryProblem3D):
         raise ValueError("Ожидается BoundaryProblem3D")
@@ -216,8 +220,8 @@ def solve_boundary3d(
         from .stationary_extensions import solve_extended
 
         return solve_extended(problem, points, method, walks, seed, max_steps)
-    if method not in METHODS_BOUNDARY:
-        raise ValueError("В 3D доступны только ЛОМ и обычный MC")
+    if method not in METHODS_BOUNDARY_3D:
+        raise ValueError("Неизвестный метод для стационарной задачи 3D")
     points = validate_points3d(problem.n, points)
     for name, value, minimum, maximum in (
         ("walks", walks, 2, 2**31 - 1),
@@ -241,6 +245,15 @@ def solve_boundary3d(
         or limit < 1
     ):
         raise ValueError("max_steps должно быть положительным целым")
+    if method == "mc_grouped":
+        return solve_grouped3d(
+            problem,
+            points,
+            walks=walks,
+            seed=seed,
+            max_steps=limit,
+            batch_size=batch_size,
+        )
     with NUMBA_LOCK:
         started = perf_counter()
         operator = BoundaryOperator3D(problem)
@@ -285,7 +298,7 @@ def warmup_boundary3d():
         if _warmed:
             return
         p = make_boundary_problem3d(n=4)
-        for method in METHODS_BOUNDARY:
+        for method in METHODS_BOUNDARY_3D:
             if method in ("wos", "graded"):
                 continue
             solve_boundary3d(p, [[2, 2, 2]], method, walks=4, max_iter=1)

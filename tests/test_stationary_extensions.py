@@ -76,8 +76,9 @@ def test_boundary_targets_use_fresh_validation_seeds(config):
     result = boundary_accuracy_study(
         config, ["lod_serial", "mc"], repeats=2, budgets=[64, 256], tolerances=[1e-8]
     )
-    pilot = {r["seed"] for r in result["trials"] if r["phase"] != 1}
-    validation = {r["seed"] for r in result["trials"] if r["phase"] == 1}
+    final_phase = "final" if isinstance(config, BoundaryConfig3D) else 1
+    pilot = {r["seed"] for r in result["trials"] if r["phase"] != final_phase}
+    validation = {r["seed"] for r in result["trials"] if r["phase"] == final_phase}
     assert pilot.isdisjoint(validation) and validation
     mc_trials = [r for r in result["trials"] if r["method"] == "mc"]
     assert len({r["seed"] for r in mc_trials}) == len(mc_trials)
