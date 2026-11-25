@@ -1,0 +1,134 @@
+{
+  "targets": {
+    "confirmed": 266,
+    "not_reached": 14,
+    "pilot_incomplete": 18,
+    "validation_incomplete": 2
+  },
+  "trials": {
+    "completed": 1315,
+    "outer_limit": 154,
+    "time_limit": 41
+  },
+  "solver_seconds": 562.3055519176414,
+  "stages": [
+    {
+      "stage": "core-n8",
+      "status": "measured",
+      "reason": "",
+      "jobs": 48,
+      "attempts": 550,
+      "completed": 475,
+      "solver_seconds": 22.15553279267624,
+      "source_commit": "0305ca8c48cf7c0ef4357e7ef0e1adef71e01388",
+      "failures": {
+        "outer_limit": 75
+      }
+    },
+    {
+      "stage": "groups-n8",
+      "status": "measured",
+      "reason": "",
+      "jobs": 20,
+      "attempts": 100,
+      "completed": 100,
+      "solver_seconds": 7.302778208031668,
+      "source_commit": "0305ca8c48cf7c0ef4357e7ef0e1adef71e01388",
+      "failures": {}
+    },
+    {
+      "stage": "history-n8",
+      "status": "measured",
+      "reason": "",
+      "jobs": 24,
+      "attempts": 120,
+      "completed": 120,
+      "solver_seconds": 7.656841366973822,
+      "source_commit": "0305ca8c48cf7c0ef4357e7ef0e1adef71e01388",
+      "failures": {}
+    },
+    {
+      "stage": "query-slice-n8",
+      "status": "measured",
+      "reason": "",
+      "jobs": 2,
+      "attempts": 10,
+      "completed": 10,
+      "solver_seconds": 0.5326110829773825,
+      "source_commit": "0305ca8c48cf7c0ef4357e7ef0e1adef71e01388",
+      "failures": {}
+    },
+    {
+      "stage": "sensitivity-n8",
+      "status": "measured",
+      "reason": "",
+      "jobs": 10,
+      "attempts": 50,
+      "completed": 50,
+      "solver_seconds": 1.8695941280457191,
+      "source_commit": "0305ca8c48cf7c0ef4357e7ef0e1adef71e01388",
+      "failures": {}
+    },
+    {
+      "stage": "conductivity-n8",
+      "status": "measured",
+      "reason": "",
+      "jobs": 36,
+      "attempts": 360,
+      "completed": 360,
+      "solver_seconds": 24.514306295866845,
+      "source_commit": "0305ca8c48cf7c0ef4357e7ef0e1adef71e01388",
+      "failures": {}
+    },
+    {
+      "stage": "core-n16",
+      "status": "measured",
+      "reason": "",
+      "jobs": 12,
+      "attempts": 120,
+      "completed": 80,
+      "solver_seconds": 81.54772421393136,
+      "source_commit": "0305ca8c48cf7c0ef4357e7ef0e1adef71e01388",
+      "failures": {
+        "outer_limit": 39,
+        "time_limit": 1
+      }
+    },
+    {
+      "stage": "history-n16",
+      "status": "measured",
+      "reason": "",
+      "jobs": 24,
+      "attempts": 120,
+      "completed": 40,
+      "solver_seconds": 362.1094258750236,
+      "source_commit": "0305ca8c48cf7c0ef4357e7ef0e1adef71e01388",
+      "failures": {
+        "outer_limit": 40,
+        "time_limit": 40
+      }
+    },
+    {
+      "stage": "coarse-n16",
+      "status": "measured",
+      "reason": "",
+      "jobs": 4,
+      "attempts": 40,
+      "completed": 40,
+      "solver_seconds": 15.659679291042266,
+      "source_commit": "0305ca8c48cf7c0ef4357e7ef0e1adef71e01388",
+      "failures": {}
+    },
+    {
+      "stage": "history-long",
+      "status": "measured",
+      "reason": "",
+      "jobs": 8,
+      "attempts": 40,
+      "completed": 40,
+      "solver_seconds": 38.95705866307253,
+      "source_commit": "0305ca8c48cf7c0ef4357e7ef0e1adef71e01388",
+      "failures": {}
+    }
+  ]
+}

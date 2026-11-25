@@ -1,0 +1,23 @@
+{
+  "timestamp": "2026-11-25T22:22:36.276751+00:00",
+  "source_commit": "0305ca8c48cf7c0ef4357e7ef0e1adef71e01388",
+  "core_n16": {
+    "jobs": 12,
+    "attempts": 120,
+    "seconds": 81.54772421393136,
+    "statuses": {
+      "completed": 80,
+      "outer_limit": 39,
+      "time_limit": 1
+    }
+  },
+  "small_solver_seconds": 64.03166387457168,
+  "threshold_seconds": 600,
+  "total_solver_seconds": 145.57938808850304,
+  "additional_stages_allowed": true,
+  "additional_stages": [
+    "history-n16",
+    "coarse-n16",
+    "history-long"
+  ]
+}

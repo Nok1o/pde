@@ -1,0 +1,8 @@
+﻿method,layer,t,dt,outer,linear_relative_residual,nonlinear_relative_residual,residual_scale,relative_change,accepted,walks,transitions,reason,lagged_conductivity,conductivity_reuses,conductivity_fallbacks,records_discarded,update_seed,completed_walks,coarse_iterations,relaxation
+lod,1,0.002,0.002,1,4.193240217930775e-12,3.0141801060314695e-05,18872.750441008004,0.0005333003825274902,False,0,0,Лимит внешних итераций,False,0,0,0,,,,
+block,1,0.002,0.002,1,1.060199651425886e-15,3.014180106050746e-05,18872.750441008004,0.000533300385538447,False,0,0,Лимит внешних итераций,False,0,0,0,,,,
+mc,1,0.002,0.002,1,,0.0004243502283143542,18872.750441008004,,False,1,1,update_max_walks,False,0,0,0,2544630856,1,,
+mc_control,1,0.002,0.002,1,,0.0004243502283143542,18872.750441008004,,False,1,1,update_max_walks,False,0,0,0,2544630856,1,2,
+mc_grouped,1,0.002,0.002,1,,0.0004243502283143542,18872.750441008004,,False,1,1,update_max_walks,False,0,0,0,2544630856,1,,
+mc_control_grouped,1,0.002,0.002,1,,0.0004243502283143542,18872.750441008004,,False,1,1,update_max_walks,False,0,0,0,2544630856,1,2,
+newton,1,0.002,0.002,1,1.1090230674107627e-15,3.6695017320560976e-07,18872.750441008004,0.0005485376126590812,False,0,0,Лимит внешних итераций,False,0,0,0,,,,1.0

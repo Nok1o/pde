@@ -1,0 +1,11 @@
+﻿stage,status,reason,jobs,attempts,completed,solver_seconds,source_commit,failures
+core-n8,measured,,48,550,475,22.15553279267624,0305ca8c48cf7c0ef4357e7ef0e1adef71e01388,"{""outer_limit"": 75}"
+groups-n8,measured,,20,100,100,7.302778208031668,0305ca8c48cf7c0ef4357e7ef0e1adef71e01388,{}
+history-n8,measured,,24,120,120,7.656841366973822,0305ca8c48cf7c0ef4357e7ef0e1adef71e01388,{}
+query-slice-n8,measured,,2,10,10,0.5326110829773825,0305ca8c48cf7c0ef4357e7ef0e1adef71e01388,{}
+sensitivity-n8,measured,,10,50,50,1.8695941280457191,0305ca8c48cf7c0ef4357e7ef0e1adef71e01388,{}
+conductivity-n8,measured,,36,360,360,24.514306295866845,0305ca8c48cf7c0ef4357e7ef0e1adef71e01388,{}
+core-n16,measured,,12,120,80,81.54772421393136,0305ca8c48cf7c0ef4357e7ef0e1adef71e01388,"{""outer_limit"": 39, ""time_limit"": 1}"
+history-n16,measured,,24,120,40,362.1094258750236,0305ca8c48cf7c0ef4357e7ef0e1adef71e01388,"{""outer_limit"": 40, ""time_limit"": 40}"
+coarse-n16,measured,,4,40,40,15.659679291042266,0305ca8c48cf7c0ef4357e7ef0e1adef71e01388,{}
+history-long,measured,,8,40,40,38.95705866307253,0305ca8c48cf7c0ef4357e7ef0e1adef71e01388,{}

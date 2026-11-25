@@ -1,0 +1,159 @@
+{
+  "description": "All six methods paired across full/layers; point/field at identical n=8, T and kind-1 boundaries",
+  "readiness": "Requires integrated #30/#33/#34, shared review and an exclusive timing window; see benchmarks/heat3d-final-plan.md",
+  "repeats": 5,
+  "seed": 31033,
+  "settings": {
+    "tolerance": 1e-06,
+    "change_tolerance": 1e-06,
+    "linear_tolerance": 1e-10,
+    "mc_tolerance": 0.2,
+    "mc_change_tolerance": 0.1,
+    "coarse_n": 4,
+    "batch_size": 128,
+    "history_mode": "full",
+    "max_outer": 8,
+    "max_inner": 20000,
+    "max_seconds": 5,
+    "max_walks": 24000000,
+    "max_transitions": 80000000,
+    "max_path_steps": 100000,
+    "max_workspace_bytes": 268435456,
+    "relaxation": 1.0,
+    "walks": 1024,
+    "conductivity_refresh_layers": 1
+  },
+  "configuration": {
+    "n": 8,
+    "alpha": 0.5,
+    "capacity_gamma": 0.5,
+    "reaction_sigma": 1.0,
+    "dt": 0.002,
+    "T": 0.008,
+    "mode": "point",
+    "newton": false,
+    "kinds": [
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+    ],
+    "betas": [
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "case": "polynomial"
+  },
+  "variants": [
+    {
+      "id": "lod-full",
+      "method": "lod",
+      "settings": {
+        "history_mode": "full"
+      }
+    },
+    {
+      "id": "lod-layers",
+      "method": "lod",
+      "settings": {
+        "history_mode": "layers"
+      }
+    },
+    {
+      "id": "block-full",
+      "method": "block",
+      "settings": {
+        "history_mode": "full"
+      }
+    },
+    {
+      "id": "block-layers",
+      "method": "block",
+      "settings": {
+        "history_mode": "layers"
+      }
+    },
+    {
+      "id": "mc-full",
+      "method": "mc",
+      "settings": {
+        "history_mode": "full"
+      }
+    },
+    {
+      "id": "mc-layers",
+      "method": "mc",
+      "settings": {
+        "history_mode": "layers"
+      }
+    },
+    {
+      "id": "mc_control-full",
+      "method": "mc_control",
+      "settings": {
+        "history_mode": "full"
+      }
+    },
+    {
+      "id": "mc_control-layers",
+      "method": "mc_control",
+      "settings": {
+        "history_mode": "layers"
+      }
+    },
+    {
+      "id": "mc_grouped-full",
+      "method": "mc_grouped",
+      "settings": {
+        "history_mode": "full"
+      }
+    },
+    {
+      "id": "mc_grouped-layers",
+      "method": "mc_grouped",
+      "settings": {
+        "history_mode": "layers"
+      }
+    },
+    {
+      "id": "mc_control_grouped-full",
+      "method": "mc_control_grouped",
+      "settings": {
+        "history_mode": "full"
+      }
+    },
+    {
+      "id": "mc_control_grouped-layers",
+      "method": "mc_control_grouped",
+      "settings": {
+        "history_mode": "layers"
+      }
+    }
+  ],
+  "cases": [
+    {
+      "id": "point-4-layers-kind1",
+      "configuration": {
+        "mode": "point",
+        "point": [
+          2,
+          4,
+          6
+        ]
+      }
+    },
+    {
+      "id": "field-4-layers-kind1",
+      "configuration": {
+        "mode": "field"
+      }
+    }
+  ],
+  "experiment": "fixed_budget"
+}

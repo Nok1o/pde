@@ -1,0 +1,1073 @@
+{
+  "purpose": "functional UI/CLI/export acceptance; not timing evidence",
+  "source_commit": "bc3782af9fba690a5e375045ae81cf7a66a3091f",
+  "python": "3.13.14 (main, Jul 23 2026, 14:48:16) [Clang 22.1.3 ]",
+  "scenarios": [
+    {
+      "scenario": "sine-run",
+      "cli_exit": 0,
+      "configuration": {
+        "case": "sine",
+        "n": 8,
+        "alpha": 0.5,
+        "dt": 0.002,
+        "T": 0.004,
+        "mode": "point",
+        "point": [
+          4,
+          4,
+          4
+        ],
+        "plane": "xy",
+        "index": null,
+        "newton": true,
+        "methods": [
+          "lod",
+          "block",
+          "mc",
+          "mc_control",
+          "mc_grouped",
+          "mc_control_grouped"
+        ],
+        "kinds": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "betas": [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "capacity_gamma": 0.5,
+        "reaction_sigma": 1.0
+      },
+      "solver_settings": {
+        "tolerance": 1e-06,
+        "change_tolerance": 1e-06,
+        "linear_tolerance": 1e-10,
+        "relaxation": 1.0,
+        "max_outer": 8,
+        "max_inner": 20000,
+        "max_seconds": 5.0,
+        "max_workspace_bytes": 268435456,
+        "walks": 1024,
+        "seed": 31037,
+        "coarse_n": 4,
+        "max_walks": 12000000,
+        "max_transitions": 40000000,
+        "max_path_steps": 100000,
+        "mc_tolerance": 0.2,
+        "mc_change_tolerance": 0.1,
+        "batch_size": 128,
+        "conductivity_refresh_layers": 1,
+        "history_mode": "full"
+      },
+      "statuses": [
+        {
+          "method": "lod",
+          "status": "completed",
+          "reason": "Расчёт завершён"
+        },
+        {
+          "method": "block",
+          "status": "completed",
+          "reason": "Расчёт завершён"
+        },
+        {
+          "method": "mc",
+          "status": "completed",
+          "reason": "Расчёт завершён"
+        },
+        {
+          "method": "mc_control",
+          "status": "completed",
+          "reason": "Расчёт завершён"
+        },
+        {
+          "method": "mc_grouped",
+          "status": "completed",
+          "reason": "Расчёт завершён"
+        },
+        {
+          "method": "mc_control_grouped",
+          "status": "completed",
+          "reason": "Расчёт завершён"
+        }
+      ],
+      "ui_cli_values_and_counters_match": true,
+      "csv_json_zip_match": true
+    },
+    {
+      "scenario": "sine-study",
+      "cli_exit": 2,
+      "configuration": {
+        "case": "sine",
+        "n": 8,
+        "alpha": 0.5,
+        "dt": 0.002,
+        "T": 0.004,
+        "mode": "point",
+        "point": [
+          4,
+          4,
+          4
+        ],
+        "plane": "xy",
+        "index": null,
+        "newton": false,
+        "methods": [
+          "lod",
+          "block",
+          "mc",
+          "mc_control",
+          "mc_grouped",
+          "mc_control_grouped"
+        ],
+        "kinds": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "betas": [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "capacity_gamma": 0.5,
+        "reaction_sigma": 1.0
+      },
+      "solver_settings": {
+        "tolerance": 1e-06,
+        "change_tolerance": 1e-06,
+        "linear_tolerance": 1e-10,
+        "relaxation": 1.0,
+        "max_outer": 8,
+        "max_inner": 20000,
+        "max_seconds": 5.0,
+        "max_workspace_bytes": 268435456,
+        "walks": 1024,
+        "seed": 31038,
+        "coarse_n": 4,
+        "max_walks": 12000000,
+        "max_transitions": 40000000,
+        "max_path_steps": 100000,
+        "mc_tolerance": 0.2,
+        "mc_change_tolerance": 0.1,
+        "batch_size": 128,
+        "conductivity_refresh_layers": 1,
+        "history_mode": "full"
+      },
+      "statuses": [
+        {
+          "method": "lod",
+          "status": "confirmed",
+          "reason": "Цель подтверждена полной независимой финальной серией"
+        },
+        {
+          "method": "lod",
+          "status": "confirmed",
+          "reason": "Цель подтверждена полной независимой финальной серией"
+        },
+        {
+          "method": "lod",
+          "status": "confirmed",
+          "reason": "Цель подтверждена полной независимой финальной серией"
+        },
+        {
+          "method": "block",
+          "status": "confirmed",
+          "reason": "Цель подтверждена полной независимой финальной серией"
+        },
+        {
+          "method": "block",
+          "status": "confirmed",
+          "reason": "Цель подтверждена полной независимой финальной серией"
+        },
+        {
+          "method": "block",
+          "status": "confirmed",
+          "reason": "Цель подтверждена полной независимой финальной серией"
+        },
+        {
+          "method": "mc",
+          "status": "not_reached",
+          "reason": "В заданных бюджетах не достигнут фиксированный запас точности"
+        },
+        {
+          "method": "mc",
+          "status": "confirmed",
+          "reason": "Цель подтверждена полной независимой финальной серией"
+        },
+        {
+          "method": "mc",
+          "status": "confirmed",
+          "reason": "Цель подтверждена полной независимой финальной серией"
+        },
+        {
+          "method": "mc_control",
+          "status": "confirmed",
+          "reason": "Цель подтверждена полной независимой финальной серией"
+        },
+        {
+          "method": "mc_control",
+          "status": "confirmed",
+          "reason": "Цель подтверждена полной независимой финальной серией"
+        },
+        {
+          "method": "mc_control",
+          "status": "confirmed",
+          "reason": "Цель подтверждена полной независимой финальной серией"
+        },
+        {
+          "method": "mc_grouped",
+          "status": "not_reached",
+          "reason": "В заданных бюджетах не достигнут фиксированный запас точности"
+        },
+        {
+          "method": "mc_grouped",
+          "status": "confirmed",
+          "reason": "Цель подтверждена полной независимой финальной серией"
+        },
+        {
+          "method": "mc_grouped",
+          "status": "confirmed",
+          "reason": "Цель подтверждена полной независимой финальной серией"
+        },
+        {
+          "method": "mc_control_grouped",
+          "status": "confirmed",
+          "reason": "Цель подтверждена полной независимой финальной серией"
+        },
+        {
+          "method": "mc_control_grouped",
+          "status": "confirmed",
+          "reason": "Цель подтверждена полной независимой финальной серией"
+        },
+        {
+          "method": "mc_control_grouped",
+          "status": "confirmed",
+          "reason": "Цель подтверждена полной независимой финальной серией"
+        }
+      ],
+      "ui_cli_values_and_counters_match": true,
+      "csv_json_zip_match": true
+    },
+    {
+      "scenario": "polynomial-one-kind3",
+      "cli_exit": 0,
+      "configuration": {
+        "case": "polynomial",
+        "n": 8,
+        "alpha": 0.5,
+        "dt": 0.002,
+        "T": 0.004,
+        "mode": "point",
+        "point": [
+          2,
+          4,
+          6
+        ],
+        "plane": "xy",
+        "index": null,
+        "newton": true,
+        "methods": [
+          "lod",
+          "block",
+          "mc",
+          "mc_control",
+          "mc_grouped",
+          "mc_control_grouped"
+        ],
+        "kinds": [
+          3,
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "betas": [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "capacity_gamma": 0.5,
+        "reaction_sigma": 1.0
+      },
+      "solver_settings": {
+        "tolerance": 1e-06,
+        "change_tolerance": 1e-06,
+        "linear_tolerance": 1e-10,
+        "relaxation": 1.0,
+        "max_outer": 8,
+        "max_inner": 20000,
+        "max_seconds": 5.0,
+        "max_workspace_bytes": 268435456,
+        "walks": 1024,
+        "seed": 31037,
+        "coarse_n": 4,
+        "max_walks": 12000000,
+        "max_transitions": 40000000,
+        "max_path_steps": 100000,
+        "mc_tolerance": 0.2,
+        "mc_change_tolerance": 0.1,
+        "batch_size": 128,
+        "conductivity_refresh_layers": 1,
+        "history_mode": "full"
+      },
+      "statuses": [
+        {
+          "method": "lod",
+          "status": "completed",
+          "reason": "Расчёт завершён"
+        },
+        {
+          "method": "block",
+          "status": "completed",
+          "reason": "Расчёт завершён"
+        },
+        {
+          "method": "mc",
+          "status": "completed",
+          "reason": "Расчёт завершён"
+        },
+        {
+          "method": "mc_control",
+          "status": "completed",
+          "reason": "Расчёт завершён"
+        },
+        {
+          "method": "mc_grouped",
+          "status": "completed",
+          "reason": "Расчёт завершён"
+        },
+        {
+          "method": "mc_control_grouped",
+          "status": "completed",
+          "reason": "Расчёт завершён"
+        }
+      ],
+      "ui_cli_values_and_counters_match": true,
+      "csv_json_zip_match": true
+    },
+    {
+      "scenario": "polynomial-all-kind3-full",
+      "cli_exit": 0,
+      "configuration": {
+        "case": "polynomial",
+        "n": 8,
+        "alpha": 0.5,
+        "dt": 0.002,
+        "T": 0.004,
+        "mode": "point",
+        "point": [
+          2,
+          4,
+          6
+        ],
+        "plane": "xy",
+        "index": null,
+        "newton": true,
+        "methods": [
+          "lod",
+          "block",
+          "mc",
+          "mc_control",
+          "mc_grouped",
+          "mc_control_grouped"
+        ],
+        "kinds": [
+          3,
+          3,
+          3,
+          3,
+          3,
+          3
+        ],
+        "betas": [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "capacity_gamma": 0.5,
+        "reaction_sigma": 1.0
+      },
+      "solver_settings": {
+        "tolerance": 1e-06,
+        "change_tolerance": 1e-06,
+        "linear_tolerance": 1e-10,
+        "relaxation": 1.0,
+        "max_outer": 8,
+        "max_inner": 20000,
+        "max_seconds": 5.0,
+        "max_workspace_bytes": 268435456,
+        "walks": 1024,
+        "seed": 31037,
+        "coarse_n": 4,
+        "max_walks": 12000000,
+        "max_transitions": 40000000,
+        "max_path_steps": 100000,
+        "mc_tolerance": 0.2,
+        "mc_change_tolerance": 0.1,
+        "batch_size": 128,
+        "conductivity_refresh_layers": 1,
+        "history_mode": "full"
+      },
+      "statuses": [
+        {
+          "method": "lod",
+          "status": "completed",
+          "reason": "Расчёт завершён"
+        },
+        {
+          "method": "block",
+          "status": "completed",
+          "reason": "Расчёт завершён"
+        },
+        {
+          "method": "mc",
+          "status": "completed",
+          "reason": "Расчёт завершён"
+        },
+        {
+          "method": "mc_control",
+          "status": "completed",
+          "reason": "Расчёт завершён"
+        },
+        {
+          "method": "mc_grouped",
+          "status": "completed",
+          "reason": "Расчёт завершён"
+        },
+        {
+          "method": "mc_control_grouped",
+          "status": "completed",
+          "reason": "Расчёт завершён"
+        }
+      ],
+      "ui_cli_values_and_counters_match": true,
+      "csv_json_zip_match": true
+    },
+    {
+      "scenario": "polynomial-all-kind3-layers",
+      "cli_exit": 0,
+      "configuration": {
+        "case": "polynomial",
+        "n": 8,
+        "alpha": 0.5,
+        "dt": 0.002,
+        "T": 0.004,
+        "mode": "point",
+        "point": [
+          2,
+          4,
+          6
+        ],
+        "plane": "xy",
+        "index": null,
+        "newton": true,
+        "methods": [
+          "lod",
+          "block",
+          "mc",
+          "mc_control",
+          "mc_grouped",
+          "mc_control_grouped"
+        ],
+        "kinds": [
+          3,
+          3,
+          3,
+          3,
+          3,
+          3
+        ],
+        "betas": [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "capacity_gamma": 0.5,
+        "reaction_sigma": 1.0
+      },
+      "solver_settings": {
+        "tolerance": 1e-06,
+        "change_tolerance": 1e-06,
+        "linear_tolerance": 1e-10,
+        "relaxation": 1.0,
+        "max_outer": 8,
+        "max_inner": 20000,
+        "max_seconds": 5.0,
+        "max_workspace_bytes": 268435456,
+        "walks": 1024,
+        "seed": 31037,
+        "coarse_n": 4,
+        "max_walks": 12000000,
+        "max_transitions": 40000000,
+        "max_path_steps": 100000,
+        "mc_tolerance": 0.2,
+        "mc_change_tolerance": 0.1,
+        "batch_size": 128,
+        "conductivity_refresh_layers": 1,
+        "history_mode": "layers"
+      },
+      "statuses": [
+        {
+          "method": "lod",
+          "status": "completed",
+          "reason": "Расчёт завершён"
+        },
+        {
+          "method": "block",
+          "status": "completed",
+          "reason": "Расчёт завершён"
+        },
+        {
+          "method": "mc",
+          "status": "completed",
+          "reason": "Расчёт завершён"
+        },
+        {
+          "method": "mc_control",
+          "status": "completed",
+          "reason": "Расчёт завершён"
+        },
+        {
+          "method": "mc_grouped",
+          "status": "completed",
+          "reason": "Расчёт завершён"
+        },
+        {
+          "method": "mc_control_grouped",
+          "status": "completed",
+          "reason": "Расчёт завершён"
+        }
+      ],
+      "ui_cli_values_and_counters_match": true,
+      "csv_json_zip_match": true
+    },
+    {
+      "scenario": "polynomial-refresh4",
+      "cli_exit": 0,
+      "configuration": {
+        "case": "polynomial",
+        "n": 8,
+        "alpha": 0.5,
+        "dt": 0.002,
+        "T": 0.004,
+        "mode": "point",
+        "point": [
+          2,
+          4,
+          6
+        ],
+        "plane": "xy",
+        "index": null,
+        "newton": true,
+        "methods": [
+          "lod",
+          "block",
+          "mc",
+          "mc_control",
+          "mc_grouped",
+          "mc_control_grouped"
+        ],
+        "kinds": [
+          3,
+          3,
+          3,
+          3,
+          3,
+          3
+        ],
+        "betas": [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "capacity_gamma": 0.5,
+        "reaction_sigma": 1.0
+      },
+      "solver_settings": {
+        "tolerance": 1e-06,
+        "change_tolerance": 1e-06,
+        "linear_tolerance": 1e-10,
+        "relaxation": 1.0,
+        "max_outer": 8,
+        "max_inner": 20000,
+        "max_seconds": 5.0,
+        "max_workspace_bytes": 268435456,
+        "walks": 1024,
+        "seed": 31037,
+        "coarse_n": 4,
+        "max_walks": 12000000,
+        "max_transitions": 40000000,
+        "max_path_steps": 100000,
+        "mc_tolerance": 0.2,
+        "mc_change_tolerance": 0.1,
+        "batch_size": 128,
+        "conductivity_refresh_layers": 4,
+        "history_mode": "layers"
+      },
+      "statuses": [
+        {
+          "method": "lod",
+          "status": "completed",
+          "reason": "Расчёт завершён"
+        },
+        {
+          "method": "block",
+          "status": "completed",
+          "reason": "Расчёт завершён"
+        },
+        {
+          "method": "mc",
+          "status": "completed",
+          "reason": "Расчёт завершён"
+        },
+        {
+          "method": "mc_control",
+          "status": "completed",
+          "reason": "Расчёт завершён"
+        },
+        {
+          "method": "mc_grouped",
+          "status": "completed",
+          "reason": "Расчёт завершён"
+        },
+        {
+          "method": "mc_control_grouped",
+          "status": "completed",
+          "reason": "Расчёт завершён"
+        }
+      ],
+      "ui_cli_values_and_counters_match": true,
+      "csv_json_zip_match": true
+    },
+    {
+      "scenario": "polynomial-slice",
+      "cli_exit": 0,
+      "configuration": {
+        "case": "polynomial",
+        "n": 8,
+        "alpha": 0.5,
+        "dt": 0.002,
+        "T": 0.004,
+        "mode": "slice",
+        "point": null,
+        "plane": "xy",
+        "index": 4,
+        "newton": true,
+        "methods": [
+          "lod",
+          "mc_control"
+        ],
+        "kinds": [
+          3,
+          3,
+          3,
+          3,
+          3,
+          3
+        ],
+        "betas": [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "capacity_gamma": 0.5,
+        "reaction_sigma": 1.0
+      },
+      "solver_settings": {
+        "tolerance": 1e-06,
+        "change_tolerance": 1e-06,
+        "linear_tolerance": 1e-10,
+        "relaxation": 1.0,
+        "max_outer": 8,
+        "max_inner": 20000,
+        "max_seconds": 5.0,
+        "max_workspace_bytes": 268435456,
+        "walks": 1024,
+        "seed": 31037,
+        "coarse_n": 4,
+        "max_walks": 12000000,
+        "max_transitions": 40000000,
+        "max_path_steps": 100000,
+        "mc_tolerance": 0.2,
+        "mc_change_tolerance": 0.1,
+        "batch_size": 128,
+        "conductivity_refresh_layers": 4,
+        "history_mode": "layers"
+      },
+      "statuses": [
+        {
+          "method": "lod",
+          "status": "completed",
+          "reason": "Расчёт завершён"
+        },
+        {
+          "method": "mc_control",
+          "status": "completed",
+          "reason": "Расчёт завершён"
+        }
+      ],
+      "ui_cli_values_and_counters_match": true,
+      "csv_json_zip_match": true
+    },
+    {
+      "scenario": "polynomial-field",
+      "cli_exit": 0,
+      "configuration": {
+        "case": "polynomial",
+        "n": 8,
+        "alpha": 0.5,
+        "dt": 0.002,
+        "T": 0.004,
+        "mode": "field",
+        "point": null,
+        "plane": "xy",
+        "index": null,
+        "newton": true,
+        "methods": [
+          "lod",
+          "mc_control"
+        ],
+        "kinds": [
+          3,
+          3,
+          3,
+          3,
+          3,
+          3
+        ],
+        "betas": [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "capacity_gamma": 0.5,
+        "reaction_sigma": 1.0
+      },
+      "solver_settings": {
+        "tolerance": 1e-06,
+        "change_tolerance": 1e-06,
+        "linear_tolerance": 1e-10,
+        "relaxation": 1.0,
+        "max_outer": 8,
+        "max_inner": 20000,
+        "max_seconds": 5.0,
+        "max_workspace_bytes": 268435456,
+        "walks": 1024,
+        "seed": 31037,
+        "coarse_n": 4,
+        "max_walks": 12000000,
+        "max_transitions": 40000000,
+        "max_path_steps": 100000,
+        "mc_tolerance": 0.2,
+        "mc_change_tolerance": 0.1,
+        "batch_size": 128,
+        "conductivity_refresh_layers": 4,
+        "history_mode": "layers"
+      },
+      "statuses": [
+        {
+          "method": "lod",
+          "status": "completed",
+          "reason": "Расчёт завершён"
+        },
+        {
+          "method": "mc_control",
+          "status": "completed",
+          "reason": "Расчёт завершён"
+        }
+      ],
+      "ui_cli_values_and_counters_match": true,
+      "csv_json_zip_match": true
+    },
+    {
+      "scenario": "limited-run",
+      "cli_exit": 2,
+      "configuration": {
+        "case": "polynomial",
+        "n": 8,
+        "alpha": 0.5,
+        "dt": 0.002,
+        "T": 0.004,
+        "mode": "field",
+        "point": null,
+        "plane": "xy",
+        "index": null,
+        "newton": true,
+        "methods": [
+          "lod",
+          "block",
+          "mc",
+          "mc_control",
+          "mc_grouped",
+          "mc_control_grouped"
+        ],
+        "kinds": [
+          3,
+          3,
+          3,
+          3,
+          3,
+          3
+        ],
+        "betas": [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "capacity_gamma": 0.5,
+        "reaction_sigma": 1.0
+      },
+      "solver_settings": {
+        "tolerance": 1e-06,
+        "change_tolerance": 1e-06,
+        "linear_tolerance": 1e-10,
+        "relaxation": 1.0,
+        "max_outer": 1,
+        "max_inner": 20000,
+        "max_seconds": 5.0,
+        "max_workspace_bytes": 268435456,
+        "walks": 1024,
+        "seed": 31037,
+        "coarse_n": 4,
+        "max_walks": 1,
+        "max_transitions": 40000000,
+        "max_path_steps": 100000,
+        "mc_tolerance": 0.2,
+        "mc_change_tolerance": 0.1,
+        "batch_size": 128,
+        "conductivity_refresh_layers": 4,
+        "history_mode": "layers"
+      },
+      "statuses": [
+        {
+          "method": "lod",
+          "status": "outer_limit",
+          "reason": "Слой 1: Лимит внешних итераций"
+        },
+        {
+          "method": "block",
+          "status": "outer_limit",
+          "reason": "Слой 1: Лимит внешних итераций"
+        },
+        {
+          "method": "mc",
+          "status": "walk_budget",
+          "reason": "Слой 1: update_max_walks"
+        },
+        {
+          "method": "mc_control",
+          "status": "walk_budget",
+          "reason": "Слой 1: update_max_walks"
+        },
+        {
+          "method": "mc_grouped",
+          "status": "walk_budget",
+          "reason": "Слой 1: update_max_walks"
+        },
+        {
+          "method": "mc_control_grouped",
+          "status": "walk_budget",
+          "reason": "Слой 1: update_max_walks"
+        }
+      ],
+      "ui_cli_values_and_counters_match": true,
+      "csv_json_zip_match": true
+    },
+    {
+      "scenario": "limited-study",
+      "cli_exit": 2,
+      "configuration": {
+        "case": "polynomial",
+        "n": 8,
+        "alpha": 0.5,
+        "dt": 0.002,
+        "T": 0.004,
+        "mode": "field",
+        "point": null,
+        "plane": "xy",
+        "index": null,
+        "newton": false,
+        "methods": [
+          "lod",
+          "block",
+          "mc",
+          "mc_control",
+          "mc_grouped",
+          "mc_control_grouped"
+        ],
+        "kinds": [
+          3,
+          3,
+          3,
+          3,
+          3,
+          3
+        ],
+        "betas": [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "capacity_gamma": 0.5,
+        "reaction_sigma": 1.0
+      },
+      "solver_settings": {
+        "tolerance": 1e-06,
+        "change_tolerance": 1e-06,
+        "linear_tolerance": 1e-10,
+        "relaxation": 1.0,
+        "max_outer": 1,
+        "max_inner": 20000,
+        "max_seconds": 5.0,
+        "max_workspace_bytes": 268435456,
+        "walks": 1024,
+        "seed": 31038,
+        "coarse_n": 4,
+        "max_walks": 1,
+        "max_transitions": 40000000,
+        "max_path_steps": 100000,
+        "mc_tolerance": 0.2,
+        "mc_change_tolerance": 0.1,
+        "batch_size": 128,
+        "conductivity_refresh_layers": 4,
+        "history_mode": "layers"
+      },
+      "statuses": [
+        {
+          "method": "lod",
+          "status": "confirmed",
+          "reason": "Цель подтверждена полной независимой финальной серией"
+        },
+        {
+          "method": "lod",
+          "status": "confirmed",
+          "reason": "Цель подтверждена полной независимой финальной серией"
+        },
+        {
+          "method": "lod",
+          "status": "confirmed",
+          "reason": "Цель подтверждена полной независимой финальной серией"
+        },
+        {
+          "method": "block",
+          "status": "confirmed",
+          "reason": "Цель подтверждена полной независимой финальной серией"
+        },
+        {
+          "method": "block",
+          "status": "confirmed",
+          "reason": "Цель подтверждена полной независимой финальной серией"
+        },
+        {
+          "method": "block",
+          "status": "confirmed",
+          "reason": "Цель подтверждена полной независимой финальной серией"
+        },
+        {
+          "method": "mc",
+          "status": "pilot_incomplete",
+          "reason": "Слой 1: update_max_walks"
+        },
+        {
+          "method": "mc",
+          "status": "pilot_incomplete",
+          "reason": "Слой 1: update_max_walks"
+        },
+        {
+          "method": "mc",
+          "status": "pilot_incomplete",
+          "reason": "Слой 1: update_max_walks"
+        },
+        {
+          "method": "mc_control",
+          "status": "pilot_incomplete",
+          "reason": "Слой 1: update_max_walks"
+        },
+        {
+          "method": "mc_control",
+          "status": "pilot_incomplete",
+          "reason": "Слой 1: update_max_walks"
+        },
+        {
+          "method": "mc_control",
+          "status": "pilot_incomplete",
+          "reason": "Слой 1: update_max_walks"
+        },
+        {
+          "method": "mc_grouped",
+          "status": "pilot_incomplete",
+          "reason": "Слой 1: update_max_walks"
+        },
+        {
+          "method": "mc_grouped",
+          "status": "pilot_incomplete",
+          "reason": "Слой 1: update_max_walks"
+        },
+        {
+          "method": "mc_grouped",
+          "status": "pilot_incomplete",
+          "reason": "Слой 1: update_max_walks"
+        },
+        {
+          "method": "mc_control_grouped",
+          "status": "pilot_incomplete",
+          "reason": "Слой 1: update_max_walks"
+        },
+        {
+          "method": "mc_control_grouped",
+          "status": "pilot_incomplete",
+          "reason": "Слой 1: update_max_walks"
+        },
+        {
+          "method": "mc_control_grouped",
+          "status": "pilot_incomplete",
+          "reason": "Слой 1: update_max_walks"
+        }
+      ],
+      "ui_cli_values_and_counters_match": true,
+      "csv_json_zip_match": true
+    }
+  ]
+}
