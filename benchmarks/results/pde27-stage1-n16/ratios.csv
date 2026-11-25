@@ -1,0 +1,19 @@
+﻿case,target_pct,lod_over_mc,mc_over_dirichlet_mc,reason
+sine-all_dirichlet,1.0,0.331896727210034,1.0,Ratios require both complete controls to confirm the same target
+sine-y0_robin,1.0,2.611628292324913,0.23355059886889787,Ratios require both complete controls to confirm the same target
+sine-all_robin,1.0,0.023310113734856856,23.516796534297672,Ratios require both complete controls to confirm the same target
+sine-all_dirichlet,5.0,3.572437149470135,1.0,Ratios require both complete controls to confirm the same target
+sine-y0_robin,5.0,2.1701006998271333,2.409710171770155,Ratios require both complete controls to confirm the same target
+sine-all_robin,5.0,1.136664593198147,3.7430638632939353,Ratios require both complete controls to confirm the same target
+sine-all_dirichlet,10.0,4.3679716110230755,1.0,Ratios require both complete controls to confirm the same target
+sine-y0_robin,10.0,3.8530222097598767,1.6594279307326287,Ratios require both complete controls to confirm the same target
+sine-all_robin,10.0,3.0227536432358306,1.7209649522633357,Ratios require both complete controls to confirm the same target
+polynomial-all_dirichlet,1.0,0.2944846007861441,1.0,Ratios require both complete controls to confirm the same target
+polynomial-y0_robin,1.0,1.2234638022471114,0.5102344043629659,Ratios require both complete controls to confirm the same target
+polynomial-all_robin,1.0,0.06389380986515394,4.398086948439513,Ratios require both complete controls to confirm the same target
+polynomial-all_dirichlet,5.0,1.4487095678566948,1.0,Ratios require both complete controls to confirm the same target
+polynomial-y0_robin,5.0,3.919656132406319,1.332738442497236,Ratios require both complete controls to confirm the same target
+polynomial-all_robin,5.0,0.6475256082631193,3.631597238004139,Ratios require both complete controls to confirm the same target
+polynomial-all_dirichlet,10.0,1.4487095678566948,1.0,Ratios require both complete controls to confirm the same target
+polynomial-y0_robin,10.0,2.0050806283927187,2.1652290030717225,Ratios require both complete controls to confirm the same target
+polynomial-all_robin,10.0,0.6475256082631193,3.631597238004139,Ratios require both complete controls to confirm the same target
