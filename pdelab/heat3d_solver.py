@@ -83,13 +83,14 @@ def _change(current, previous):
     return _relative(current - previous, max(_norm(current), _norm(previous)))
 
 
-def _workspace_estimate(n, method, points, initial_only=False):
+def _workspace_estimate(n, method, points, initial_only=False, free_nodes=None):
     # Explicit numerical-buffer estimate; this is not a measured process RSS.
     # Initial data evaluation also creates several complete temporary fields.
     buffers = 40 * (n + 1) ** 3 * 8
     if method == "newton" and not initial_only:
         # Conservative dense-fill storage allowance for the small sparse LU.
-        buffers += 16 * (n - 1) ** 6
+        unknowns = (n - 1) ** 3 if free_nodes is None else free_nodes
+        buffers += 16 * unknowns**2
     if method == "block" and not initial_only:
         buffers += block_workspace_bytes(n)
     return buffers + 2 * points.nbytes + len(points) * 8
@@ -264,11 +265,13 @@ def _picard_layer(
 
 def _newton_layer(problem, previous, t, dt, settings, deadline, layer):
     with _preparing(layer):
-        values, _, _ = _initial(problem, previous, t)
+        values, fixed, _ = _initial(problem, previous, t)
+        free = ~fixed
         source = problem.evaluate(problem.source, t)
         args = (previous, problem.alpha, source, dt)
-        scale = newton_scale3d(values, *args)
-        residual, jacobian = newton_system3d(values, *args)
+        boundary_args = dict(problem=problem, t=t)
+        scale = newton_scale3d(values, *args, **boundary_args)
+        residual, jacobian = newton_system3d(values, *args, **boundary_args)
     layer.values = values
     relative = _relative(residual, scale)
     if relative == 0:
@@ -288,15 +291,14 @@ def _newton_layer(problem, previous, t, dt, settings, deadline, layer):
         linear_residual = _relative(
             jacobian @ correction + residual.ravel(), _norm(residual)
         )
-        correction = correction.reshape((problem.n - 1,) * 3)
         _norm(correction)
         for backtrack in range(24):
             factor = 2.0 ** (-backtrack)
             candidate = values.copy()
-            candidate[1:-1, 1:-1, 1:-1] += factor * correction
+            candidate[free] += factor * correction
             layer.values = candidate
             try:
-                next_residual = newton_residual3d(candidate, *args)
+                next_residual = newton_residual3d(candidate, *args, **boundary_args)
                 next_relative = _relative(next_residual, scale)
             except (ValueError, FloatingPointError):
                 next_relative = float("inf")
@@ -340,7 +342,7 @@ def _newton_layer(problem, previous, t, dt, settings, deadline, layer):
             return layer
         values, relative = candidate, next_relative
         with _preparing(layer):
-            residual, jacobian = newton_system3d(values, *args)
+            residual, jacobian = newton_system3d(values, *args, **boundary_args)
     return layer
 
 
@@ -371,12 +373,22 @@ def solve_heat3d(
     )
     time_storage = _time_grid_bytes(dt, T)
     unsupported = (
-        any(face.kind != 1 for face in problem.faces.values())
+        any(face.kind not in (1, 3) for face in problem.faces.values())
         or (method == "newton" and problem.n > DIRECT_MAX_N)
         or (method == "block" and problem.n > BLOCK_MAX_N)
     )
+    # Count the Cartesian free-node set without allocating a grid or sampling data.
+    free_nodes = 1
+    for axis in "xyz":
+        free_nodes *= (
+            problem.n
+            + 1
+            - sum(problem.faces[f"{axis}{side}"].kind == 1 for side in (0, 1))
+        )
     storage = (
-        _workspace_estimate(problem.n, method, points, initial_only=T == 0)
+        _workspace_estimate(
+            problem.n, method, points, initial_only=T == 0, free_nodes=free_nodes
+        )
         + time_storage
     )
     if (
@@ -417,8 +429,8 @@ def solve_heat3d(
         return result
 
     if unsupported:
-        if any(face.kind != 1 for face in problem.faces.values()):
-            reason = "Поддержаны условия 1 рода на всех гранях"
+        if any(face.kind not in (1, 3) for face in problem.faces.values()):
+            reason = "Поддержаны граничные условия 1 и 3 рода"
         elif method == "block":
             reason = (
                 f"Матричная прогонка ограничена n≤{BLOCK_MAX_N} из-за плотных блоков"

@@ -11,6 +11,8 @@ from time import perf_counter
 import numpy as np
 from scipy.sparse.linalg import spsolve
 
+from .boundary3d import FACES
+from .heat3d_boundary_options import add_boundary_arguments, boundary_configuration
 from .heat3d_experiment import csv_bytes, json_bytes
 from .heat3d_mc import solve_frozen_mc3d, warmup_mc3d
 from .heat3d_operator import freeze_heat3d
@@ -23,6 +25,7 @@ def main(argv=None):
     parser.add_argument("--n", type=int, default=8)
     parser.add_argument("--case", choices=("sine", "polynomial"), default="sine")
     parser.add_argument("--alpha", type=float, default=0.5)
+    add_boundary_arguments(parser)
     parser.add_argument("--dt", type=float, default=0.01)
     parser.add_argument("--point", nargs=3, type=int, metavar=("X", "Y", "Z"))
     parser.add_argument("--method", choices=("mc", "mc_grouped"), default="mc")
@@ -50,7 +53,14 @@ def main(argv=None):
         warmup_mc3d(batch_size=batch_size)
         warm_seconds = perf_counter() - warm_start
         start = perf_counter()
-        problem = make_heat_problem3d(args.case, args.n, args.alpha)
+        boundaries = boundary_configuration(args)
+        problem = make_heat_problem3d(
+            args.case,
+            args.n,
+            args.alpha,
+            kinds=dict(zip(FACES, boundaries["kinds"], strict=True)),
+            beta=dict(zip(FACES, boundaries["betas"], strict=True)),
+        )
         points = select_points3d(args.n, point=args.point)
         previous = problem.initial_values()
         operator = freeze_heat3d(problem, previous, previous, args.dt, args.dt)
@@ -93,6 +103,7 @@ def main(argv=None):
         configuration={
             **{k: v for k, v in vars(args).items() if k != "out"},
             "batch_size": batch_size,
+            **boundaries,
         },
         commit=commit,
         dirty=dirty,
@@ -106,6 +117,7 @@ def main(argv=None):
                 root / "pdelab/heat3d_grouped_mc.py",
                 root / "pdelab/heat3d_operator.py",
                 root / "pdelab/heat3d_problem.py",
+                root / "pdelab/heat3d_boundary_options.py",
             )
         },
         coordinate_order="xyz",

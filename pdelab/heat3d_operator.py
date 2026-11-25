@@ -1,4 +1,4 @@
-"""Conservative frozen heat layers on a cube, initially with Dirichlet faces.
+"""Conservative frozen heat layers on a cube with essential and Robin faces.
 
 The public arrays follow ``heat3d_contract``: all rows are present, and known
 neighbors have already been eliminated from the right-hand side.
@@ -9,13 +9,13 @@ from dataclasses import dataclass
 import numpy as np
 from scipy.sparse import coo_matrix
 
-from .boundary3d import face_indices
+from .boundary3d import FACE_AXES, face_indices
 from .heat3d_contract import NEIGHBOR_OFFSETS_ZYX
 from .problem3d import DIRECT_MAX_N
 
 
 class UnsupportedHeatBoundaryError(ValueError):
-    """The first heat implementation supports six faces of kind 1 only."""
+    """Compatibility exception for callers of the original heat implementation."""
 
 
 class IncompatibleHeatBoundaryError(ValueError):
@@ -48,16 +48,14 @@ def _neighbor_slices(direction):
 
 
 def dirichlet_data3d(problem, t):
-    """Sample essential data at t, including agreement at every intersection."""
+    """Sample kind 1 data; essential faces take priority at mixed intersections."""
     if not np.isfinite(t) or t < 0:
         raise ValueError("Время должно быть конечным и неотрицательным")
-    if any(face.kind != 1 for face in problem.faces.values()):
-        raise UnsupportedHeatBoundaryError(
-            "3D-теплопроводность пока поддерживает только 1 род"
-        )
     fixed = np.zeros(problem.shape, dtype=bool)
     values = np.zeros(problem.shape)
     for face, index in face_indices().items():
+        if problem.faces[face].kind != 1:
+            continue
         sampled = problem.face_values(face, t)
         overlap = fixed[index]
         if not np.allclose(
@@ -193,8 +191,22 @@ def freeze_heat3d(problem, previous, iterate, t, dt):
             ) * problem.n**2
             weights[origin + (direction,)] = edge
             weights[neighbor + (direction + 1,)] = edge
+        # A boundary node owns a half-width dual cell in the face-normal
+        # direction. Only its inward row coefficient doubles; tangential
+        # weights keep their usual values, also at edges and corners.
+        for face, index in face_indices().items():
+            axis, end = FACE_AXES[face]
+            inward = 2 * axis + (end != 0)
+            weights[index + (inward,)] *= 2
         diagonal = 1 / dt + weights.sum(axis=-1)
         rhs = previous / dt + problem.evaluate(problem.source, t)
+        for face, index in face_indices().items():
+            condition = problem.faces[face]
+            if condition.kind == 3:
+                # k * du/dn = r - beta*u is already a physical flux.
+                # Face area / dual volume is 2/h for every incident face.
+                diagonal[index] += 2 * problem.n * condition.beta
+                rhs[index] += 2 * problem.n * problem.face_values(face, t)
         for direction in range(6):
             origin, neighbor = _neighbor_slices(direction)
             edge = weights[origin + (direction,)]

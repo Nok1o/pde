@@ -10,7 +10,6 @@ from pdelab.boundary3d import FACES
 from pdelab.heat3d_operator import (
     HeatOperator3D,
     IncompatibleHeatBoundaryError,
-    UnsupportedHeatBoundaryError,
     dirichlet_data3d,
     freeze_heat3d,
 )
@@ -142,12 +141,15 @@ def test_boundary_intersections_are_checked_again_at_later_times():
         )
 
 
-def test_reject_robin_and_invalid_layer_data():
+def test_accept_robin_and_reject_invalid_layer_data():
     kinds = dict.fromkeys(FACES, 1)
     kinds["y0"] = 3
     mixed = make_heat_problem3d(n=4, kinds=kinds)
-    with pytest.raises(UnsupportedHeatBoundaryError):
-        freeze_heat3d(mixed, mixed.initial_values(), mixed.initial_values(), 0.1, 0.1)
+    operator = freeze_heat3d(
+        mixed, mixed.initial_values(), mixed.initial_values(), 0.1, 0.1
+    )
+    assert not operator.fixed[2, 0, 2]
+    assert operator.fixed[0, 0, 0]
     problem = make_heat_problem3d(n=4)
     initial = problem.initial_values()
     for dt in (0, -1, np.nan, np.inf):
