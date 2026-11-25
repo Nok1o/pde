@@ -303,7 +303,7 @@ def render_heat3d_app():
             "Независимая проверка Ньютоном (n ≤ 16)", value=False, key="h3_newton"
         )
         with st.expander("Параметры Пикара и прогонок", key="h3_solver_parameters"):
-            choices = (0.5, 0.2, 0.1, 0.05, 0.01, 1e-3, 1e-5, 1e-7, 1e-9)
+            choices = (0.5, 0.2, 0.1, 0.05, 0.01, 1e-3, 1e-5, 1e-6, 1e-7, 1e-9)
             tolerance, change = defaults.tolerance, defaults.change_tolerance
             mc_tolerance, mc_change = (
                 defaults.mc_tolerance,
@@ -631,7 +631,7 @@ def render_heat3d_app():
         )
         budgets = st.multiselect(
             "Допуски Пикара для подбора",
-            (1e-3, 1e-5, 1e-7, 1e-9),
+            (1e-3, 1e-5, 1e-6, 1e-7, 1e-9),
             default=[1e-3, 1e-5, 1e-7, 1e-9],
             key="h3_budgets",
             disabled=not any(m not in MC_METHODS for m in methods),
