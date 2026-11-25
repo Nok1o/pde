@@ -187,3 +187,11 @@ def test_factory_rejects_boolean_boundary_kind():
     kinds["x0"] = True
     with pytest.raises(ValueError):
         make_heat_problem3d(kinds=kinds)
+
+
+@pytest.mark.parametrize("alpha,expected", [(0.0, 1.0), (1e-300, 1e100)])
+def test_conductivity_avoids_intermediate_overflow(alpha, expected):
+    problem = make_heat_problem3d(alpha=alpha)
+    np.testing.assert_allclose(problem.conductivity([1e200, -1e200]), expected)
+    with pytest.raises(ValueError, match="конечной"):
+        problem.conductivity(np.inf)

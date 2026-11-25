@@ -89,9 +89,9 @@ class LinearResult3D:
     status: Status3D
     reason: str
     relative_residual: float
-    iterations: int = 0
-    walks: int = 0  # actually executed, not requested budget
-    transitions: int = 0
+    iterations: int = 0  # complete xyz cycles; one full solve for a direct backend
+    walks: int = 0  # paths started, including an unfinished path on failure
+    transitions: int = 0  # executed transitions, including failed paths
 
 
 class LinearBackend3D(Protocol):
@@ -116,9 +116,9 @@ class HeatRunResult3D:
     completed_until: float
     points_zyx: np.ndarray  # integer [query,3], including boundary nodes
     values: np.ndarray | None  # [query] only after reaching target_time
-    physical_steps: int
-    outer_iterations: int
-    inner_iterations: int
+    physical_steps: int  # accepted time layers only
+    outer_iterations: int  # attempted Picard updates, including rejected ones
+    inner_iterations: int  # sum of LinearResult3D.iterations across all attempts
     walks: int
     transitions: int
     seconds: float  # total solve, including all preparation, excluding JIT/exact/UI

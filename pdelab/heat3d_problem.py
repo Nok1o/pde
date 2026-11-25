@@ -105,8 +105,12 @@ class HeatProblem3D:
         return _finite_field(self.faces[face].value(*coordinates, t), (self.n + 1,) * 2)
 
     def conductivity(self, values):
+        values = np.asarray(values, dtype=float)
+        if not np.isfinite(values).all():
+            raise ValueError("Температура должна быть конечной")
         with np.errstate(over="ignore", invalid="ignore"):
-            result = 1 + self.alpha * np.asarray(values, dtype=float) ** 2
+            scaled = np.sqrt(self.alpha) * values
+            result = 1 + scaled * scaled
         if not np.isfinite(result).all() or np.any(result <= 0):
             raise ValueError("Проводимость должна быть конечной и положительной")
         return result
