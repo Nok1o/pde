@@ -140,12 +140,15 @@ def _manufactured_fields(kind, x, y, z, t):
 
 
 def make_heat_problem3d(kind="sine", n=8, alpha=0.5, kinds=None, beta=1.0):
-    """Manufacture fixed F and face data from u*, never from a solver iterate."""
+    """Manufacture F and face data; beta is a scalar or a six-face mapping."""
     if kind not in ("sine", "polynomial"):
         raise ValueError("Проверочные случаи: sine, polynomial")
     kinds = dict.fromkeys(FACES, 1) if kinds is None else dict(kinds)
     if set(kinds) != set(FACES):
         raise ValueError("Укажите тип всех шести граней")
+    betas = dict(beta) if isinstance(beta, Mapping) else dict.fromkeys(FACES, beta)
+    if set(betas) != set(FACES):
+        raise ValueError("Укажите beta всех шести граней")
 
     def exact(x, y, z, t):
         return _manufactured_fields(kind, x, y, z, t)[0]
@@ -163,7 +166,7 @@ def make_heat_problem3d(kind="sine", n=8, alpha=0.5, kinds=None, beta=1.0):
 
         def value(x, y, z, t):
             u, _, gradient, _ = _manufactured_fields(kind, x, y, z, t)
-            return (1 + alpha * u * u) * sign * gradient[component] + beta * u
+            return (1 + alpha * u * u) * sign * gradient[component] + betas[face] * u
 
         return value
 
@@ -171,7 +174,7 @@ def make_heat_problem3d(kind="sine", n=8, alpha=0.5, kinds=None, beta=1.0):
         face: (
             HeatFace3D(kinds[face], exact)
             if kinds[face] == 1
-            else HeatFace3D(kinds[face], boundary_data(face), beta)
+            else HeatFace3D(kinds[face], boundary_data(face), betas[face])
         )
         for face in FACES
     }

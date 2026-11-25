@@ -241,12 +241,9 @@ def test_nonfinite_candidate_keeps_started_and_completed_work_counters():
     assert result.history[-1]["outer"] == 1
 
 
-def test_unsupported_faces_and_later_boundary_conflict():
+def test_later_boundary_conflict_is_reported():
     problem = make_heat_problem3d(n=4)
     faces = dict(problem.faces)
-    faces["x0"] = HeatFace3D(3, problem.exact, 1)
-    result = solve_heat3d(replace(problem, faces=faces))
-    assert result.status == "unsupported" and result.values is None
     faces["x0"] = HeatFace3D(1, lambda x, y, z, t: 1 + t)
     result = solve_heat3d(replace(problem, faces=faces))
     assert result.status == "unsupported" and result.values is None

@@ -27,9 +27,9 @@ from .ui_state import select_section
 
 SIDE_LABELS = {"left": "Левая", "right": "Правая", "bottom": "Нижняя", "top": "Верхняя"}
 KIND_LABELS = {
-    "dirichlet": "1-го рода · значение",
-    "neumann": "2-го рода · производная",
-    "robin": "3-го рода · теплообмен",
+    "dirichlet": "1 рода · значение",
+    "neumann": "2 рода · производная",
+    "robin": "3 рода · теплообмен",
 }
 
 

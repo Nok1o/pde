@@ -103,6 +103,7 @@ def boundary_metrics(result, points, reference, grid_reference, *, names=None):
         "preparation_seconds": result.extras.get("preparation_seconds"),
         "path_seconds": result.extras.get("path_seconds"),
         "workspace_bytes": result.extras.get("workspace_bytes"),
+        "reflection_table_bytes": result.extras.get("reflection_table_bytes"),
         "started_walks": result.extras.get("started_walks"),
         "rng": result.extras.get("rng"),
     }

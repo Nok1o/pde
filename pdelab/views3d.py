@@ -4,8 +4,6 @@ import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-from .solvers3d import METHODS_3D
-
 PLANES = {"xy": (0, "x", "y", "z"), "xz": (1, "x", "z", "y"), "yz": (2, "y", "z", "x")}
 
 
@@ -38,9 +36,10 @@ def slice_figure3d(experiment, plane="xy", index=None, error=False):
             )
         ]
     )
+    method_names = {row["method"]: row["name"] for row in experiment.metrics}
     entries += [
         (
-            METHODS_3D[method],
+            method_names[method],
             np.abs(result.values - reference) if error else result.values,
         )
         for method, result in experiment.results.items()

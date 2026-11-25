@@ -172,9 +172,10 @@ def solve_controlled_frozen_mc3d(
 ):
     """Build v from a strictly smaller grid, then correct the fine frozen layer.
 
-    Restrict caller-computed previous/iterate fields, sample known F/g on coarse
-    coordinates, freeze once, solve coarse lines, prolong v without overwriting
-    its boundary, and pay the full fine residual. No exact or fine solve access.
+    Restrict caller-computed previous/iterate fields, sample known F/g/r on
+    coarse coordinates with the same face kinds and beta, freeze once, solve
+    coarse lines, prolong v without overwriting its boundary, and pay the full
+    fine residual. No exact or fine solve access.
     """
     validation_start = perf_counter()
     options = _options(settings)

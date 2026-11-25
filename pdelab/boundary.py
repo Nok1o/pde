@@ -325,14 +325,19 @@ class BoundaryOperator:
         result[unknown] = values
         return self.normalize(result)
 
+    def mc_payoffs(self):
+        """Reward and killing per node, including the fixed-node convention."""
+        reward = self.b / self.diagonal
+        killing = self.reaction / self.diagonal
+        reward[self.fixed] = self.boundary[self.fixed]
+        killing[self.fixed] = 1
+        return reward, killing
+
     def mc_coefficients(self):
         """u=P*u+reward. Fixed nodes pay g, then terminate with probability 1."""
         probabilities = self.weights / self.diagonal[..., None]
-        reward = self.b / self.diagonal
-        killing = self.reaction / self.diagonal
         probabilities[self.fixed] = 0
-        reward[self.fixed] = self.boundary[self.fixed]
-        killing[self.fixed] = 1
+        reward, killing = self.mc_payoffs()
         return probabilities, reward, killing
 
 

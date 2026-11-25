@@ -7,7 +7,8 @@ from .workload3d import MAX_INTERACTIVE_EXPECTED_STEPS, MAX_INTERACTIVE_WALKS
 
 
 def boundary_workload3d(config, methods, walks=None, repeats=1):
-    if not any(m != "lod_serial" for m in methods):
+    stochastic_methods = sum(method != "lod_serial" for method in methods)
+    if not stochastic_methods:
         return 0, 0.0
     points = select_boundary_points3d(
         config.n, config.mode, config.point, config.plane, config.index
@@ -41,7 +42,7 @@ def boundary_workload3d(config, methods, walks=None, repeats=1):
         elif high:
             bounds.append(3 * (config.n - distance) * (config.n + distance))
     count = int(np.count_nonzero(~fixed))
-    paths = (config.walks if walks is None else walks) * repeats
+    paths = (config.walks if walks is None else walks) * repeats * stochastic_methods
     if not count:
         return 0, 0.0
     expected = np.min(bounds, axis=0) if bounds else np.full(len(points), np.inf)
