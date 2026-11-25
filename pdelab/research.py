@@ -17,9 +17,12 @@ from .reference import choose_reference
 from .solvers import METHODS, solve, warmup
 from .study_policy import (
     accuracy_metadata,
-    mean_relative_error,
     phase_seed_index,
     search_budgets,
+    study_error_metrics,
+)
+from .study_policy import (
+    mean_relative_error as mean_relative_error,
 )
 
 TARGETS_PCT = (1.0, 5.0, 10.0)
@@ -105,25 +108,51 @@ def _measure_budget(
                 f"{repeat_index + 1}/{repeats}"
             )
         seed = _trial_seed(config.seed, budget_index, phase, repeat_index)
-        result = solve(
-            problem,
-            points,
-            method,
-            walks=max(64, 2 * config.batches) if is_lod else int(budget),
-            seed=seed,
-            tol=float(budget) if is_lod else config.tol,
-            max_iter=config.max_iter,
-            batches=config.batches,
-            record=False,
-            coarse_n=config.coarse_n,
-        )
-        if not result.converged:
-            raise RuntimeError("ЛОМ не достиг допуска невязки")
-        value = result.values[tuple(points.T)]
-        if len(points) == 1:
-            value = float(value[0])
-        if not np.isfinite(value).all():
-            raise RuntimeError("Решатель вернул неконечное значение")
+        started = perf_counter()
+        result = None
+        try:
+            result = solve(
+                problem,
+                points,
+                method,
+                walks=max(64, 2 * config.batches) if is_lod else int(budget),
+                seed=seed,
+                tol=float(budget) if is_lod else config.tol,
+                max_iter=config.max_iter,
+                batches=config.batches,
+                record=False,
+                coarse_n=config.coarse_n,
+            )
+            if not result.converged:
+                raise RuntimeError("ЛОМ не достиг допуска невязки")
+            value = result.values[tuple(points.T)]
+            if len(points) == 1:
+                value = float(value[0])
+            metrics = study_error_metrics([value], study.reference_value)
+        except (ValueError, RuntimeError) as exc:
+            study.trials.append(
+                dict(
+                    method=method,
+                    name=METHODS[method],
+                    phase=phase,
+                    repeat=repeat_index + 1,
+                    seed=seed,
+                    budget=budget,
+                    status="solver_failed",
+                    reason=str(exc),
+                    value=None,
+                    relative_error_pct=None,
+                    absolute_error=None,
+                    seconds=(
+                        result.elapsed
+                        if result is not None
+                        else perf_counter() - started
+                    ),
+                    walks=result.walks if result is not None else None,
+                    steps=result.steps if result is not None else None,
+                )
+            )
+            raise RuntimeError(str(exc)) from exc
         values.append(value)
         times.append(result.elapsed)
         study.trials.append(
@@ -138,10 +167,11 @@ def _measure_budget(
                     "relative_residual_tolerance" if is_lod else "walks_per_start"
                 ),
                 "value": np.asarray(value).tolist(),
+                "status": "completed",
+                "reason": "",
                 "reference_value": study.reference_value,
-                "relative_error_pct": mean_relative_error(
-                    [value], study.reference_value
-                ),
+                "relative_error_pct": metrics["relative_error_pct"],
+                "absolute_error": metrics["absolute_error"],
                 "preparation_seconds": result.extras.get("preparation_seconds", 0.0),
                 "path_seconds": result.extras.get("path_seconds", result.elapsed),
                 "seconds": result.elapsed,
@@ -167,8 +197,10 @@ def _measure_budget(
         )
 
     return {
-        "relative_error_pct": mean_relative_error(values, study.reference_value),
+        **study_error_metrics(values, study.reference_value),
         "seconds": float(np.mean(times)),
+        "completed_repeats": len(values),
+        "requested_repeats": repeats,
     }
 
 
@@ -213,10 +245,6 @@ def accuracy_study(settings: StudySettings, progress=None):
     reference_value = (
         float(reference_values[0]) if len(points) == 1 else reference_values.tolist()
     )
-    if not np.any(reference_values):
-        raise ValueError(
-            "Эталон в этой точке равен нулю: относительная точность не определена. Выберите другую точку или задачу."
-        )
     study = StudyResult(settings, reference.kind, reference.label, reference_value)
     if progress:
         progress(0.0, "Подготовка решателей…")
@@ -245,10 +273,23 @@ def accuracy_study(settings: StudySettings, progress=None):
             )
 
         rows = search_budgets(
-            method, budgets, measure, settings.seconds_per_method, clock=perf_counter
+            method,
+            budgets,
+            measure,
+            settings.seconds_per_method,
+            clock=perf_counter,
+            relative_applicable=bool(np.any(reference_values)),
         )
         for row in rows:
             row["name"] = METHODS[method]
+            if not np.any(reference_values):
+                recorded = [t for t in study.trials if t["method"] == method]
+                row.update(
+                    requested_repeats=settings.repeats,
+                    recorded_repeats=len(recorded),
+                    completed_repeats=sum(t["status"] == "completed" for t in recorded),
+                    spent_seconds=sum(t["seconds"] for t in recorded),
+                )
         study.rows.extend(rows)
         if progress:
             progress((method_index + 1) / len(METHODS), f"{METHODS[method]}: готово")
@@ -283,7 +324,8 @@ def export_study(study, folder):
     ):
         if rows:
             with (folder / name).open("w", encoding="utf-8-sig", newline="") as stream:
-                writer = csv.DictWriter(stream, fieldnames=list(rows[0]))
+                columns = list(dict.fromkeys(key for row in rows for key in row))
+                writer = csv.DictWriter(stream, fieldnames=columns)
                 writer.writeheader()
                 writer.writerows(rows)
     try:

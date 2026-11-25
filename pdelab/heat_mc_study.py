@@ -17,9 +17,9 @@ from .study_policy import (
     ACCURACY_DESCRIPTION,
     ACCURACY_METRIC,
     SELECTION_POLICY,
-    mean_relative_error,
     phase_seed_index,
     search_budgets,
+    study_error_metrics,
 )
 
 VALIDATION_POLICY = SELECTION_POLICY
@@ -76,8 +76,7 @@ def heat_mc_study(
         if problem.exact
         else grid.fields[-1, y, x]
     )
-    if reference == 0:
-        raise ValueError("При нулевом эталоне относительная ошибка не определена")
+    reference_info = study_error_metrics([reference], reference)
     settings = dict(
         methods=list(methods),
         coarse_n=coarse_n,
@@ -103,7 +102,14 @@ def heat_mc_study(
         validation_policy=VALIDATION_POLICY,
         accuracy_metric=ACCURACY_METRIC,
         accuracy=ACCURACY_DESCRIPTION,
+        absolute_metric=reference_info["absolute_metric"],
+        relative_applicable=reference_info["relative_applicable"],
+        reference_norm=reference_info["reference_norm"],
         timing="Full solve to T including all known-data preparation; JIT/reference excluded.",
+        failure_accounting=(
+            "Exceptions retain measured call time. Counters and memory unavailable "
+            "from a failed legacy kernel remain null, never zero."
+        ),
     )
     trials, rows = [], []
     _warmup()
@@ -132,49 +138,80 @@ def heat_mc_study(
                         ]
                     ).generate_state(1)[0]
                 )
-                if method != "lod":
-                    result = solve_heat_mc(
-                        problem,
-                        dt,
-                        T,
-                        points,
-                        walks=budget,
-                        seed=trial_seed,
-                        max_transitions=max_transitions,
-                        method=method,
-                        coarse_n=coarse_n if method == "mc_control" else None,
-                    )
-                    value = float(result.values[0])
-                    preparation = result.preparation_seconds
-                    transitions = (
-                        result.spatial_transitions + result.temporal_transitions
-                    )
-                    memory = result.memory_bytes
-                else:
-                    result = solve_heat(problem, dt, T, tol=budget)
-                    value = float(result.fields[-1, y, x])
-                    preparation, transitions, memory = None, 0, result.fields.nbytes
+                record = dict(
+                    method=method,
+                    budget=float(budget),
+                    phase=phase,
+                    repeat=repeat,
+                    seed=trial_seed if method != "lod" else None,
+                    status="completed",
+                    reason="",
+                    value=None,
+                    relative_error_pct=None,
+                    absolute_error=None,
+                    seconds=None,
+                    preparation_seconds=None,
+                    walks=None,
+                    transitions=None,
+                    memory_bytes=None,
+                )
+                start = perf_counter()
+                try:
+                    if method != "lod":
+                        result = solve_heat_mc(
+                            problem,
+                            dt,
+                            T,
+                            points,
+                            walks=budget,
+                            seed=trial_seed,
+                            max_transitions=max_transitions,
+                            method=method,
+                            coarse_n=coarse_n if method == "mc_control" else None,
+                        )
+                        value = float(result.values[0])
+                        record.update(
+                            preparation_seconds=result.preparation_seconds,
+                            walks=int(budget),
+                            transitions=(
+                                result.spatial_transitions + result.temporal_transitions
+                            ),
+                            memory_bytes=result.memory_bytes,
+                        )
+                    else:
+                        result = solve_heat(problem, dt, T, tol=budget)
+                        value = float(result.fields[-1, y, x])
+                        record.update(transitions=0, memory_bytes=result.fields.nbytes)
+                    record["seconds"] = result.seconds
+                    metrics = study_error_metrics([value], reference)
+                except (ValueError, RuntimeError) as exc:
+                    if record["seconds"] is None:
+                        record["seconds"] = perf_counter() - start
+                    record.update(status="solver_failed", reason=str(exc))
+                    trials.append(record)
+                    raise RuntimeError(str(exc)) from exc
+                record.update(
+                    value=value,
+                    relative_error_pct=metrics["relative_error_pct"],
+                    absolute_error=metrics["absolute_error"],
+                )
+                trials.append(record)
                 values.append(value)
                 times.append(result.seconds)
-                trials.append(
-                    dict(
-                        method=method,
-                        budget=float(budget),
-                        phase=phase,
-                        repeat=repeat,
-                        seed=trial_seed if method != "lod" else None,
-                        value=value,
-                        seconds=result.seconds,
-                        preparation_seconds=preparation,
-                        transitions=transitions,
-                        memory_bytes=memory,
-                    )
-                )
-            error = mean_relative_error(values, reference)
-            return dict(relative_error_pct=error, seconds=float(np.mean(times)))
+            return dict(
+                **study_error_metrics(values, reference),
+                seconds=float(np.mean(times)),
+                completed_repeats=len(values),
+                requested_repeats=repeats,
+            )
 
         method_rows = search_budgets(
-            method, budgets, series, seconds_per_method, clock=perf_counter
+            method,
+            budgets,
+            series,
+            seconds_per_method,
+            clock=perf_counter,
+            relative_applicable=reference_info["relative_applicable"],
         )
         for row in method_rows:
             row["status_detail"] = row["status"]
@@ -185,6 +222,20 @@ def heat_mc_study(
                 "not_reached": "budget_exhausted",
             }.get(row["status_code"], row["status_code"])
             row["validation_error_pct"] = row["relative_error_pct"]
+            if not reference_info["relative_applicable"]:
+                recorded = [t for t in trials if t["method"] == method]
+                row.update(
+                    requested_repeats=repeats,
+                    recorded_repeats=len(recorded),
+                    completed_repeats=sum(t["status"] == "completed" for t in recorded),
+                    spent_seconds=sum(t["seconds"] for t in recorded),
+                    total_walks=(
+                        sum(t["walks"] for t in recorded)
+                        if method != "lod"
+                        and all(t["walks"] is not None for t in recorded)
+                        else None
+                    ),
+                )
         rows.extend(method_rows)
     return dict(
         settings=settings,

@@ -20,9 +20,10 @@ from .study_policy import (
     ACCURACY_METRIC,
     SELECTION_POLICY,
     RetryableSolverError,
-    mean_relative_error,
+    SolverSeriesError,
     phase_seed_index,
     search_budgets,
+    study_error_metrics,
 )
 
 
@@ -429,11 +430,15 @@ def _target_comparison(comparison, problem, final_time):
             if row["method"] == "mc"
             else [comparison.deterministic]
         )
-        row["relative_error_pct"] = (
-            mean_relative_error([r.fields[-1, y, x] for r in runs], reference)
-            if row["completed"] and reference != 0
-            else None
+        row.update(
+            absolute_error=None,
+            relative_error_pct=None,
+            relative_applicable=bool(reference != 0),
         )
+        if row["completed"]:
+            row.update(
+                study_error_metrics([r.fields[-1, y, x] for r in runs], reference)
+            )
     return replace(comparison, metrics=metrics)
 
 
@@ -516,6 +521,12 @@ def nonlinear_targets(
     pilots = []
     validations = {}
     first_deterministic = None
+    x, y = validate_query(problem.n, point)
+    relative_applicable = (
+        bool(problem.evaluate(problem.exact, T)[y, x] != 0)
+        if problem.exact is not None
+        else True
+    )
 
     def measure(budget, index, phase, deadline):
         nonlocal first_deterministic
@@ -555,19 +566,30 @@ def nonlinear_targets(
                     )
                     for r in failed
                 )
-                else RuntimeError
+                else SolverSeriesError
             )
             raise error_type(
                 f"Не завершено {len(failed)}/{len(comparison.stochastic)} запусков. "
-                + failure_message(failed[0])
+                + failure_message(failed[0]),
+                relative_applicable=metric["relative_applicable"],
             )
-        if metric["relative_error_pct"] is None:
-            raise RuntimeError("Нулевой эталон: относительная ошибка не определена")
         return dict(
-            relative_error_pct=metric["relative_error_pct"], seconds=metric["seconds"]
+            relative_error_pct=metric["relative_error_pct"],
+            absolute_error=metric["absolute_error"],
+            relative_applicable=metric["relative_applicable"],
+            seconds=metric["seconds"],
+            completed_repeats=metric["completed_runs"],
+            requested_repeats=metric["repeats"],
         )
 
-    mc_rows = search_budgets("mc", budgets, measure, float("inf"), fastest=True)
+    mc_rows = search_budgets(
+        "mc",
+        budgets,
+        measure,
+        float("inf"),
+        fastest=True,
+        relative_applicable=relative_applicable,
+    )
     if not pilots:
         raise RuntimeError(mc_rows[0]["status"])
     for row in mc_rows:
@@ -581,8 +603,20 @@ def nonlinear_targets(
             ),
             budget_kind="initial_walks_per_node",
             max_walks=base.max_walks,
-            reason=row["status"] if row["status_code"] == "solver_failed" else "",
+            reason=(
+                row["status"]
+                if row["status_code"] == "solver_failed"
+                else row.get("reason", "")
+            ),
         )
+        if not row["relative_applicable"]:
+            metric = pilots[0]["metrics"][1]
+            row.update(
+                completed_repeats=metric["completed_runs"],
+                requested_repeats=metric["repeats"],
+                total_walks=metric["walks"],
+                spent_seconds=metric["total_seconds"],
+            )
     deterministic_runs = [first_deterministic]
     deterministic_runs.extend(
         solve_nonlinear(problem, dt, T, "picard", deterministic)
@@ -602,9 +636,30 @@ def nonlinear_targets(
             dict(
                 target_pct=target,
                 method="picard",
-                status="confirmed" if lod_pass else "not_reached",
+                status=(
+                    "relative_target_not_applicable"
+                    if not pilots[0]["metrics"][0]["relative_applicable"]
+                    else "confirmed" if lod_pass else "not_reached"
+                ),
                 seconds=deterministic_seconds if lod_pass else None,
                 relative_error_pct=lod_error,
+                absolute_error=(
+                    pilots[0]["metrics"][0]["absolute_error"]
+                    if all(run.completed for run in deterministic_runs)
+                    else None
+                ),
+                diagnostic_seconds=deterministic_seconds,
+                spent_seconds=sum(run.seconds for run in deterministic_runs),
+                completed_repeats=sum(run.completed for run in deterministic_runs),
+                requested_repeats=repeats,
+                solver_status=(
+                    "completed"
+                    if all(run.completed for run in deterministic_runs)
+                    else "solver_failed"
+                ),
+                reason="; ".join(
+                    run.reason for run in deterministic_runs if not run.completed
+                ),
                 walks=None,
                 budget=deterministic_runs[0].settings.tolerance,
                 budget_kind="relative_residual_tolerance",

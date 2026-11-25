@@ -120,8 +120,13 @@ def test_reference_falls_back_to_grid_for_noncentral_point(monkeypatch):
 
 
 def test_zero_reference_is_not_silently_replaced_with_an_absolute_target():
-    with pytest.raises(ValueError, match="равен нулю"):
-        accuracy_study(StudySettings(Config(n=8, top=0.0)))
+    study = accuracy_study(StudySettings(Config(n=8, top=0.0), repeats=2, max_walks=64))
+    assert len(study.trials) == 2 * len(METHODS)
+    for row in study.rows:
+        assert row["status_code"] == "relative_target_not_applicable"
+        assert row["absolute_error"] == 0
+        assert row["seconds"] is None and row["relative_error_pct"] is None
+        assert row["completed_repeats"] == row["requested_repeats"] == 2
 
 
 @pytest.mark.parametrize(

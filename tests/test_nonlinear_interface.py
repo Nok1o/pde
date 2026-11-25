@@ -149,12 +149,22 @@ def test_nonlinear_targets_retry_failed_check_on_fresh_larger_budget(monkeypatch
             deterministic=baseline,
             stochastic=runs,
             metrics=[
-                dict(method="picard", relative_error_pct=0.0, completed=True),
+                dict(
+                    method="picard",
+                    relative_error_pct=0.0,
+                    absolute_error=0.0,
+                    relative_applicable=True,
+                    completed=True,
+                ),
                 dict(
                     method="mc",
                     relative_error_pct=20.0 if fails else 0.1,
                     seconds=0.01 * candidate.walks,
                     completed=True,
+                    absolute_error=0.2 if fails else 0.001,
+                    relative_applicable=True,
+                    completed_runs=repeats,
+                    repeats=repeats,
                 ),
             ],
         )
