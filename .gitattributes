@@ -7,3 +7,8 @@ benchmarks/results/heat3d-pilot/*.csv -text whitespace=cr-at-eol linguist-genera
 benchmarks/results/heat3d-six-methods/**/*.csv -text whitespace=cr-at-eol linguist-generated=true
 benchmarks/results/heat3d-six-methods/**/*.json -text linguist-generated=true
 benchmarks/results/heat3d-six-methods/*.csv -text whitespace=cr-at-eol linguist-generated=true
+benchmarks/results/heat3d-final-acceptance/**/*.csv -text whitespace=cr-at-eol linguist-generated=true
+benchmarks/results/heat3d-final-acceptance/**/*.json -text linguist-generated=true
+benchmarks/results/heat3d-final-acceptance/**/*.log -text whitespace=cr-at-eol linguist-generated=true
+benchmarks/results/heat3d-final/**/*.csv -text whitespace=cr-at-eol linguist-generated=true
+benchmarks/results/heat3d-final/**/*.json -text linguist-generated=true

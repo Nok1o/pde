@@ -1,0 +1,11 @@
+2026-11-26 01:13:40.989 WARNING streamlit.runtime.scriptrunner_utils.script_run_context: Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+sine-run: UI/CLI/export agree
+sine-study: UI/CLI/export agree
+polynomial-one-kind3: UI/CLI/export agree
+polynomial-all-kind3-full: UI/CLI/export agree
+polynomial-all-kind3-layers: UI/CLI/export agree
+polynomial-refresh4: UI/CLI/export agree
+polynomial-slice: UI/CLI/export agree
+polynomial-field: UI/CLI/export agree
+limited-run: UI/CLI/export agree
+limited-study: UI/CLI/export agree
