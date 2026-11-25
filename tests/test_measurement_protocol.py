@@ -59,7 +59,8 @@ def test_mean_error_is_neither_error_of_mean_nor_rmse():
 def test_field_error_is_l2_of_each_run_not_l1_or_pointwise_percentage():
     # Each difference has norm 5; reference norm 10, while L1 would give 70%.
     absolute, relative = query_error([[3, 14], [-3, 6]], [0, 10])
-    assert absolute == 5 and relative == 50
+    assert absolute == pytest.approx(5)
+    assert relative == pytest.approx(50)
 
 
 @pytest.mark.parametrize(
