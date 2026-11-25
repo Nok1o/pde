@@ -6,14 +6,14 @@ import pytest
 
 from pdelab.boundary3d import FACES
 from pdelab.heat3d_operator import freeze_heat3d
-from pdelab.heat3d_picard_mc import PicardSampler3D
+from pdelab.heat3d_picard_mc import CONTROL_MC_METHODS, MC_METHODS, PicardSampler3D
 from pdelab.heat3d_problem import make_heat_problem3d
 from pdelab.heat3d_solver import HeatSettings3D, solve_heat3d
 
 SETTINGS = HeatSettings3D(
     tolerance=0.2, change_tolerance=0.12, walks=1024, max_outer=12
 )
-METHODS = ("mc", "mc_control")
+METHODS = MC_METHODS
 
 
 def problem(n=5, alpha=0.5, faces=("x0",), case="polynomial"):
@@ -76,7 +76,7 @@ def test_advances_own_complete_field_and_validates_on_new_streams(method, monkey
     )
     assert result.validation_walks >= 2 * p.initial_values().size * SETTINGS.walks
     assert result.seconds >= result.preparation_seconds >= result.coarse_seconds
-    assert (result.coarse_iterations > 0) == (method == "mc_control")
+    assert (result.coarse_iterations > 0) == (method in CONTROL_MC_METHODS)
     assert result.coarse_iterations == result.inner_iterations
     streams = [
         h[k]
@@ -126,12 +126,13 @@ def test_ensembles_of_whole_histories_agree_with_newton(method, n, alpha, faces)
     )
 
 
-def test_multiple_picard_updates_and_independent_rejection(monkeypatch):
+@pytest.mark.parametrize("method", CONTROL_MC_METHODS)
+def test_multiple_picard_updates_and_independent_rejection(monkeypatch, method):
     import pdelab.heat3d_picard_mc as mc
 
     p = problem(6, faces=FACES)
     strict = replace(SETTINGS, walks=256, tolerance=0.01, change_tolerance=0.001)
-    r = solve_heat3d(p, method="mc_control", dt=0.006, T=0.01, settings=strict)
+    r = solve_heat3d(p, method=method, dt=0.006, T=0.01, settings=strict)
     assert r.status == "completed" and r.outer_iterations > r.physical_steps == 2
     original = mc.PicardSampler3D.draw
 
@@ -142,7 +143,7 @@ def test_multiple_picard_updates_and_independent_rejection(monkeypatch):
     monkeypatch.setattr(mc.PicardSampler3D, "draw", reject_check)
     r = solve_heat3d(
         p,
-        method="mc_control",
+        method=method,
         dt=0.002,
         T=0.003,
         settings=replace(SETTINGS, max_outer=2),
@@ -171,7 +172,8 @@ def test_run_limits_include_validation_and_preserve_only_accepted_time(method):
         settings=replace(SETTINGS, max_transitions=1),
     )
     assert limited.status == "walk_budget" and limited.transitions == 1
-    assert limited.walks == limited.completed_walks + 1
+    capacity = min(SETTINGS.walks, limited.batch_size or 1)
+    assert 1 <= limited.walks - limited.completed_walks <= capacity
     assert limited.values is None and limited.physical_steps == 0
     path = solve_heat3d(
         p,
@@ -180,21 +182,28 @@ def test_run_limits_include_validation_and_preserve_only_accepted_time(method):
         T=0.003,
         settings=replace(SETTINGS, max_path_steps=1),
     )
-    assert path.status == "path_limit" and path.walks == path.completed_walks + 1
+    assert path.status == "path_limit"
+    assert 1 <= path.walks - path.completed_walks <= capacity
     assert path.values is None
 
 
-def test_coarse_failure_workspace_and_t_zero():
+@pytest.mark.parametrize("method", CONTROL_MC_METHODS)
+def test_coarse_failure_does_not_start_paths(method):
     p = problem()
     run = solve_heat3d(
         p,
-        method="mc_control",
+        method=method,
         dt=0.002,
         T=0.003,
         settings=replace(SETTINGS, max_inner=1),
     )
     assert run.status == "linear_limit" and run.values is None and run.walks == 0
     assert run.coarse_iterations == 1 and run.coarse_seconds > 0
+    assert run.method == method
+
+
+def test_workspace_and_t_zero():
+    p = problem()
     for method in METHODS:
         run = solve_heat3d(
             p, method=method, T=0.01, settings=replace(SETTINGS, max_workspace_bytes=1)
@@ -206,8 +215,10 @@ def test_coarse_failure_workspace_and_t_zero():
             and initial.values[0] == p.initial_values()[0, 0, 0]
         )
         assert initial.physical_steps == initial.walks == initial.coarse_iterations == 0
-    bad = solve_heat3d(p, method="mc_control", settings=replace(SETTINGS, coarse_n=p.n))
-    assert bad.status == "unsupported" and bad.values is None
+    for method in CONTROL_MC_METHODS:
+        bad = solve_heat3d(p, method=method, settings=replace(SETTINGS, coarse_n=p.n))
+        assert bad.status == "unsupported" and bad.values is None
+        assert bad.method == method
 
 
 @pytest.mark.parametrize("method", METHODS)

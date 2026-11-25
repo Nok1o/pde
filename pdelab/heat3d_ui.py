@@ -20,7 +20,7 @@ from .heat3d_experiment import (
     result_archive,
     study_heat3d,
 )
-from .heat3d_picard_mc import MC_METHODS
+from .heat3d_picard_mc import CONTROL_MC_METHODS, GROUPED_MC_METHODS, MC_METHODS
 from .ui_state import select_section
 
 
@@ -139,6 +139,7 @@ def render_heat3d_app():
         has_mc = any(m in MC_METHODS for m in methods)
         defaults = HeatSettings3D.for_methods(methods)
         walks, mc_seed, coarse_n = defaults.walks, defaults.seed, defaults.coarse_n
+        batch_size = defaults.batch_size
         max_walks, max_transitions, max_path_steps = (
             defaults.max_walks,
             defaults.max_transitions,
@@ -156,7 +157,15 @@ def render_heat3d_app():
                 mc_seed = st.number_input(
                     "Seed сравнения", 0, 2**32 - 1, mc_seed, key="h3_mc_seed"
                 )
-                if "mc_control" in methods:
+                if any(m in GROUPED_MC_METHODS for m in methods):
+                    batch_size = st.number_input(
+                        "Размер группы частиц",
+                        1,
+                        65536,
+                        batch_size,
+                        key="h3_batch_size",
+                    )
+                if any(m in CONTROL_MC_METHODS for m in methods):
                     coarse_n = st.number_input(
                         "Интервалов грубой сетки", 4, 63, coarse_n, key="h3_coarse_n"
                     )
@@ -365,6 +374,7 @@ def render_heat3d_app():
         walks=walks,
         seed=mc_seed,
         coarse_n=coarse_n,
+        batch_size=batch_size,
         max_walks=max_walks,
         max_transitions=max_transitions,
         max_path_steps=max_path_steps,
@@ -463,6 +473,7 @@ def render_heat3d_app():
                             "Принятых слоёв": row["physical_steps"],
                             "Итераций Пикара": row["outer_iterations"],
                             "Линейных решений / циклов": row["inner_iterations"],
+                            "Размер группы": row.get("batch_size"),
                             "Начато путей": (
                                 row["walks"] if row["walks_applicable"] else None
                             ),
@@ -628,6 +639,7 @@ def render_heat3d_app():
                         "Цель, %": row["target_pct"],
                         "Статус": STATUS_LABELS.get(row["status"], row["status"]),
                         "Бюджет": row["budget"],
+                        "Размер группы": row.get("batch_size"),
                         "Единица бюджета": (
                             "Путей на узел"
                             if row["walks_applicable"]
