@@ -6,7 +6,7 @@ only after the whole time interval has completed; failed layers remain diagnosti
 
 import warnings
 from contextlib import contextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from sys import getsizeof
 from time import perf_counter
 
@@ -82,13 +82,6 @@ def _change(current, previous):
     return _relative(current - previous, max(_norm(current), _norm(previous)))
 
 
-def _history_bytes(history):
-    return getsizeof(history) + sum(
-        getsizeof(row) + sum(getsizeof(value) for value in row.values())
-        for row in history
-    )
-
-
 def _workspace_estimate(n, method, points, initial_only=False):
     # Explicit numerical-buffer estimate; this is not a measured process RSS.
     # Initial data evaluation also creates several complete temporary fields.
@@ -114,14 +107,17 @@ def _time_grid_bytes(dt, T):
 @dataclass
 class _Layer:
     values: np.ndarray | None
+    history: list  # the complete run's list; each record is stored once
+    number: int
+    t: float
+    dt: float
+    history_budget: int
+    history_storage: int
     status: str = "outer_limit"
     reason: str = "Лимит внешних итераций"
-    history: list = field(default_factory=list)
     outer_iterations: int = 0
     inner_iterations: int = 0
     preparation_seconds: float = 0.0
-    history_budget: int = 0
-    history_storage: int = 0
 
 
 @contextmanager
@@ -133,8 +129,21 @@ def _preparing(layer):
         layer.preparation_seconds += perf_counter() - started
 
 
-def _record(layer, *, outer, residual, scale, change=None, linear=None, accepted=False):
+def _record(
+    layer,
+    *,
+    outer,
+    residual,
+    scale,
+    change=None,
+    linear=None,
+    accepted=False,
+    relaxation=None,
+):
     row = dict(
+        layer=layer.number,
+        t=layer.t,
+        dt=layer.dt,
         outer=outer,
         linear_relative_residual=linear,
         nonlinear_relative_residual=residual,
@@ -145,14 +154,16 @@ def _record(layer, *, outer, residual, scale, change=None, linear=None, accepted
         transitions=0,
         reason="completed" if accepted else layer.reason,
     )
+    if relaxation is not None:
+        row["relaxation"] = relaxation
     layer.history.append(row)
-    # Include room for layer/t/dt added when collecting the complete run history.
-    layer.history_storage += (
-        getsizeof(row) + sum(getsizeof(value) for value in row.values()) + 128
+    layer.history_storage += getsizeof(row) + sum(
+        getsizeof(value) for value in row.values()
     )
     if layer.history_storage + getsizeof(layer.history) > layer.history_budget:
         layer.status = "memory_limit"
         layer.reason = "Лимит памяти диагностической истории"
+        layer.history_storage += getsizeof(layer.reason) - getsizeof(row["reason"])
         row.update(accepted=False, reason=layer.reason)
     return row
 
@@ -262,8 +273,8 @@ def _newton_layer(problem, previous, t, dt, settings, deadline, layer):
         )
         correction = correction.reshape((problem.n - 1,) * 3)
         _norm(correction)
-        factor = 1.0
-        for _ in range(24):
+        for backtrack in range(24):
+            factor = 2.0 ** (-backtrack)
             candidate = values.copy()
             candidate[1:-1, 1:-1, 1:-1] += factor * correction
             layer.values = candidate
@@ -277,21 +288,24 @@ def _newton_layer(problem, previous, t, dt, settings, deadline, layer):
                 or next_relative <= settings.tolerance
             ):
                 break
-            factor *= 0.5
         else:
             layer.reason = "Не удалось уменьшить невязку Ньютона"
             _record(
                 layer,
                 outer=outer,
-                residual=relative,
+                residual=next_relative,
                 scale=scale,
                 linear=linear_residual,
+                change=(
+                    _change(candidate, values) if np.isfinite(candidate).all() else None
+                ),
+                relaxation=factor,
             )
             return layer
         change = _change(candidate, values)
         # Newton is an independent residual-based diagnostic, not the Picard backend.
         passed = next_relative <= settings.tolerance
-        row = _record(
+        _record(
             layer,
             outer=outer,
             residual=next_relative,
@@ -299,8 +313,8 @@ def _newton_layer(problem, previous, t, dt, settings, deadline, layer):
             change=change,
             linear=linear_residual,
             accepted=passed,
+            relaxation=factor,
         )
-        row["relaxation"] = factor
         if layer.status == "memory_limit":
             return layer
         layer.values = candidate
@@ -407,12 +421,15 @@ def solve_heat3d(
                 settings,
                 deadline,
             )
+            records_before = len(result.history)
             layer = _Layer(
-                None,
-                history_budget=settings.max_workspace_bytes
-                - storage
-                - history_storage
-                - getsizeof(result.history),
+                values=None,
+                history=result.history,
+                number=index,
+                t=float(times[index]),
+                dt=float(step),
+                history_budget=settings.max_workspace_bytes - storage,
+                history_storage=history_storage,
             )
             try:
                 if method == "lod":
@@ -434,20 +451,14 @@ def solve_heat3d(
             except (ValueError, FloatingPointError) as exc:
                 layer.status, layer.reason = "nonfinite", str(exc)
             if layer.status != "completed" and (
-                not layer.history or layer.history[-1]["reason"] != layer.reason
+                len(layer.history) == records_before
+                or layer.history[-1]["reason"] != layer.reason
             ):
                 _record(layer, outer=layer.outer_iterations, residual=None, scale=None)
             result.outer_iterations += layer.outer_iterations
             result.inner_iterations += layer.inner_iterations
             result.preparation_seconds += layer.preparation_seconds
-            records = [
-                dict(layer=index, t=float(times[index]), dt=float(step), **row)
-                for row in layer.history
-            ]
-            history_storage += max(
-                _history_bytes(records) - getsizeof(records), layer.history_storage
-            )
-            result.history.extend(records)
+            history_storage = layer.history_storage
             result.workspace_bytes = (
                 storage + history_storage + getsizeof(result.history)
             )

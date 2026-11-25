@@ -9,6 +9,7 @@ from scipy.integrate import solve_ivp
 from pdelab.heat3d_contract import LinearResult3D
 from pdelab.heat3d_operator import freeze_heat3d
 from pdelab.heat3d_problem import HeatFace3D, HeatProblem3D, make_heat_problem3d
+from pdelab.heat3d_reference import newton_residual3d
 from pdelab.heat3d_solver import HeatSettings3D, solve_heat3d
 
 STRICT = HeatSettings3D(tolerance=1e-10, change_tolerance=1e-10, linear_tolerance=1e-12)
@@ -318,6 +319,47 @@ def test_history_memory_limit_is_checked_inside_a_long_layer():
     assert result.values is None and result.diagnostic_field is not None
     assert 1 < result.outer_iterations < 50
     assert not result.history[-1]["accepted"]
+
+
+def test_history_budget_accounts_for_final_records_without_layer_copies():
+    budget = 500000
+    result = solve_heat3d(
+        make_heat_problem3d(n=4, alpha=0),
+        T=0.01,
+        settings=replace(
+            STRICT, max_outer=10000, max_workspace_bytes=budget, relaxation=1e-5
+        ),
+    )
+    assert result.status == "memory_limit"
+    assert len(result.history) == result.outer_iterations
+    # At most the final diagnostic row/list growth may cross the estimated budget.
+    assert budget < result.workspace_bytes < budget + 5000
+    assert all(row["layer"] == 1 and row["dt"] == 0.01 for row in result.history)
+
+
+def test_failed_newton_backtracking_records_the_saved_candidate_residual():
+    def zero(*args):
+        return 0.0
+
+    faces = {face: HeatFace3D(1, zero) for face in ("x0", "x1", "y0", "y1", "z0", "z1")}
+    problem = HeatProblem3D("strong source", 4, 1.0, zero, lambda *args: 1e14, faces)
+    result = solve_heat3d(problem, T=0.01, method="newton")
+    assert result.status == "outer_limit" and result.values is None
+    assert result.outer_iterations == result.inner_iterations == 1
+    row = result.history[-1]
+    residual = newton_residual3d(
+        result.diagnostic_field,
+        problem.initial_values(),
+        problem.alpha,
+        problem.evaluate(problem.source, 0.01),
+        0.01,
+    )
+    assert row["nonlinear_relative_residual"] == pytest.approx(
+        np.max(abs(residual)) / row["residual_scale"]
+    )
+    assert row["nonlinear_relative_residual"] > 100
+    assert row["relaxation"] == 2.0**-23
+    assert row["relative_change"] == 1.0 and not row["accepted"]
 
 
 @pytest.mark.parametrize(
