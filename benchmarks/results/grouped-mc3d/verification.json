@@ -1,0 +1,30 @@
+{
+  "measured_commit": "12f4520817ad853ae60ab1a4c52c6966e1db566b",
+  "source_files_checked": 69,
+  "source_clean_unchanged": true,
+  "published_baseline_kernels_unchanged": true,
+  "raw_files_verified": 8,
+  "baseline_profile_files_preserved": 7,
+  "planned_distinct_seeds": 2400,
+  "actual_distinct_seeds": 1440,
+  "series_checked": 288,
+  "targets_checked": 126,
+  "statuses": {
+    "confirmed": 117,
+    "validation_failed": 9
+  },
+  "completed_solver_trials": 1440,
+  "memory_workers_checked": 42,
+  "common_N1024_series": 36,
+  "checks": "historical source/raw hashes, analytical references, individual errors, series aggregates, seed derivation, frozen selection, final statuses, CSV/JSON agreement, RSS units/counters",
+  "memory_at_target": {
+    "source_commit": "32e4b71a516485cdea133bf52ade0fb0bf7f4aad",
+    "source_files_checked": 73,
+    "workers": 108,
+    "target_rows_covered": 126,
+    "exact_value_matches": 108,
+    "original_timing_and_statuses_preserved": true,
+    "source_and_script_hashes_verified": true,
+    "input_results_hash_verified": true
+  }
+}

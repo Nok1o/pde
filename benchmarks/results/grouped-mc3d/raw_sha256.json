@@ -1,0 +1,23 @@
+{
+  "source_directory": "/private/tmp/pde29-pilot-full",
+  "measured_commit": "12f4520817ad853ae60ab1a4c52c6966e1db566b",
+  "raw_files_sha256": {
+    "manifest.json": "4f37f68eab842f76d08a5bbbc9d8a52567375dcca9c706cda177f4b9547c35a6",
+    "memory.csv": "16ab21c8156ed4405d5c1a93c7858412e5e196ed27c2135f4eabd4db60f77fad",
+    "memory.json": "c6714a9c06dbea0473535e4692f761a3e5f294f3429bf024b28e2f763dbc21cb",
+    "planned_seeds.csv": "8482c1b32346cd5aac45856590fea20a9031102558b3eb668aeb6975ba256563",
+    "results.csv": "f1b474047f152f25b7e15db3dd23f5b13fa2e36314cdcc7a808fa0b6e8cc87a3",
+    "results.json": "f7b5af7f4581890e3b4c1109aed4c4227e4ce8ced6cbd47453a64d448c7f715e",
+    "series.csv": "ecc0d6b6f46d1b4a68c4ea32c392d7069ab25f2646002e5606a4d76b44e6d870",
+    "trials.csv": "e4243840c888a75a4afd38ec75d0f8d2bdb55cd0c1c9a84c55bbf33a6bda4106"
+  },
+  "preserved_baseline_profile_sha256": {
+    "baseline-profile/warm_trials.csv": "0181e7a73d25f5e907c1346ee55c2cb9ef02430a951bf730017227787c35a5af",
+    "baseline-profile/summary.json": "866b58164322214d694ea037d7c1a4133e6efb25ed165e535d88fe9d769c06d3",
+    "baseline-profile/cold_disk_cache.json": "1a98e848a46978a8ac1fb32b5d451010323f154b8157ed66571afbc3a6c11a20",
+    "baseline-profile/cold_empty_cache.json": "25dfcced5511771edcc92306c871aee6b56ac913a489e7b9db69aa1062fab954",
+    "baseline-profile/particle_lifetimes.json": "8b2ae18a66c5aa2f96a8185ee137c6ad6adad47b5c15ae86bbb93f07ce36be13",
+    "baseline-profile/metadata.json": "f4ee9f89f5d775bad4eb05f640f7aff864dfb504df75df02573be4817b183340",
+    "baseline-profile/README.md": "3ac5358acb8de262e1cb092464de415674c6410fd06eb3d8c70ec55a13e18cf7"
+  }
+}
