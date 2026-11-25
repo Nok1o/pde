@@ -515,8 +515,10 @@ def nonlinear_targets(
         raise ValueError("Начальный бюджет исследования не должен превышать max_walks")
     pilots = []
     validations = {}
+    first_deterministic = None
 
     def measure(budget, index, phase, deadline):
+        nonlocal first_deterministic
         candidate = replace(
             base,
             walks=int(budget),
@@ -527,18 +529,32 @@ def nonlinear_targets(
             problem,
             T,
         )
+        if first_deterministic is None:
+            first_deterministic = comparison.deterministic
+        record = dict(
+            metrics=comparison.metrics,
+            seeds=[r.settings.seed for r in comparison.stochastic],
+            failures=[
+                failure_message(r) for r in comparison.stochastic if not r.completed
+            ],
+        )
         if phase == "validation":
-            validations[index] = comparison
+            validations[index] = dict(candidate=index, **record)
         else:
-            pilots.append((candidate, comparison, phase))
+            pilots.append(dict(settings=asdict(candidate), phase=phase, **record))
         metric = comparison.metrics[1]
         if not metric["completed"]:
             failed = [r for r in comparison.stochastic if not r.completed]
-            # More independent paths can resolve stochastic Picard nonconvergence.
-            # Resource exhaustion and invalid operators still stop the search.
+            # A larger initial batch can reduce Picard iterations and total paths.
+            # Keep each run's cap unchanged; preserve every unsuccessful attempt.
             error_type = (
                 RetryableSolverError
-                if all(r.reason.endswith(": max_outer") for r in failed)
+                if all(
+                    r.reason.endswith(
+                        (": max_outer", ": walk_budget", ": validation_budget")
+                    )
+                    for r in failed
+                )
                 else RuntimeError
             )
             raise error_type(
@@ -567,7 +583,7 @@ def nonlinear_targets(
             max_walks=base.max_walks,
             reason=row["status"] if row["status_code"] == "solver_failed" else "",
         )
-    deterministic_runs = [pilots[0][1].deterministic]
+    deterministic_runs = [first_deterministic]
     deterministic_runs.extend(
         solve_nonlinear(problem, dt, T, "picard", deterministic)
         for _ in range(int(repeats) - 1)
@@ -576,7 +592,7 @@ def nonlinear_targets(
     rows = []
     for mc_row in mc_rows:
         target = mc_row["target_pct"]
-        lod_error = pilots[0][1].metrics[0]["relative_error_pct"]
+        lod_error = pilots[0]["metrics"][0]["relative_error_pct"]
         lod_pass = (
             all(run.completed for run in deterministic_runs)
             and lod_error is not None
@@ -605,25 +621,8 @@ def nonlinear_targets(
             dict(seconds=run.seconds, completed=run.completed, reason=run.reason)
             for run in deterministic_runs
         ],
-        pilots=[
-            dict(
-                settings=asdict(s),
-                phase=phase,
-                metrics=c.metrics,
-                seeds=[r.settings.seed for r in c.stochastic],
-                failures=[failure_message(r) for r in c.stochastic if not r.completed],
-            )
-            for s, c, phase in pilots
-        ],
-        validations=[
-            dict(
-                candidate=i,
-                metrics=c.metrics,
-                seeds=[r.settings.seed for r in c.stochastic],
-                failures=[failure_message(r) for r in c.stochastic if not r.completed],
-            )
-            for i, c in validations.items()
-        ],
+        pilots=pilots,
+        validations=list(validations.values()),
     )
     return rows, evidence
 

@@ -3,7 +3,7 @@
 import io
 import json
 import zipfile
-from dataclasses import asdict
+from dataclasses import asdict, replace
 
 import numpy as np
 import pandas as pd
@@ -167,11 +167,16 @@ def _research_tab(config):
         seconds,
         methods=tuple(methods),
     )
+    limit_message = interactive_mc_limit_message(
+        replace(settings.config, walks=maximum), methods
+    )
+    if limit_message:
+        st.error(limit_message)
     if st.button(
         "Запустить исследование",
         key="study3d_run",
         type="primary",
-        disabled=not methods,
+        disabled=not methods or limit_message is not None,
     ):
         progress = st.progress(0.0)
         try:

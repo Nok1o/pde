@@ -14,7 +14,9 @@ from .heat_mc_views import heat_mc_archive
 from .study_policy import render_accuracy_results
 
 
-def _limit(settings, walks, diagnostic=False):
+def _limit(settings, walks, diagnostic=False, point=None):
+    if point is not None and any(index in (0, settings.n) for index in point):
+        return
     _, steps = time_grid(settings.dt, settings.T)
     if diagnostic:
         steps = steps[:1]
@@ -87,7 +89,7 @@ def render_heat_mc(settings):
     )
     if st.button("Рассчитать MC по времени", key="heat_mc_run", disabled=not methods):
         try:
-            _limit(settings, walks, diagnostic)
+            _limit(settings, walks, diagnostic, point=(y, x))
             p = make_heat_problem(settings.preset, settings.n, settings.a2)
             with st.spinner("Полные пространственно-временные траектории…"):
                 if diagnostic:
@@ -284,7 +286,8 @@ def render_heat_mc_study(settings):
         "Исследовать MC по времени", key="heat_study_run", disabled=not methods
     ):
         try:
-            _limit(settings, max_walks)
+            if any(method in HEAT_MC_METHODS for method in methods):
+                _limit(settings, max_walks, point=(y, x))
             with st.spinner("Подбор и независимая проверка…"):
                 study = heat_mc_study(
                     make_heat_problem(settings.preset, settings.n, settings.a2),

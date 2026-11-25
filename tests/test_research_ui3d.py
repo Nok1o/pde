@@ -17,7 +17,7 @@ def test_region_selection_runs_and_preserves_results(mode):
         app.selectbox(key="study3d_plane").set_value("yz").run()
         app.slider(key="study3d_index_8").set_value(3).run()
     app.number_input(key="study3d_repeats").set_value(2)
-    app.select_slider(key="study3d_walks").set_value(64)
+    app.select_slider(key="study3d_walks").set_value(64).run()
     app.button(key="study3d_run").click().run()
     assert not app.exception
     assert not app.error

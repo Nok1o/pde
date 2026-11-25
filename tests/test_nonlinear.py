@@ -343,6 +343,58 @@ def test_full_chain_statistics_targets_and_disjoint_validation_seeds():
     assert failed.metrics[1]["rmse"] is None and not failed.metrics[1]["completed"]
 
 
+def test_targets_retry_total_path_limit_and_release_pilot_fields(monkeypatch):
+    import gc
+    import weakref
+
+    import pdelab.nonlinear_study as module
+
+    previous_fields = []
+    original = module.compare_nonlinear
+
+    def tracked_comparison(*args, **kwargs):
+        gc.collect()
+        assert all(reference() is None for reference in previous_fields)
+        result = original(*args, **kwargs)
+        previous_fields[:] = [weakref.ref(run.fields) for run in result.stochastic]
+        return result
+
+    monkeypatch.setattr(module, "compare_nonlinear", tracked_comparison)
+    settings = NonlinearSettings(
+        tolerance=0.1,
+        change_tolerance=0.1,
+        walks=128,
+        max_walks=2048,
+        max_outer=100,
+        relaxation=0.7,
+        mc_variant="mc_plain",
+        schedule="constant",
+        max_total_walks=60000,
+    )
+    rows, evidence = module.nonlinear_targets(
+        make_nonlinear_problem(4, 0.5),
+        dt=0.01,
+        T=0.02,
+        repeats=2,
+        seed=42,
+        budgets=[128, 512],
+        settings=settings,
+    )
+    assert evidence["pilots"][0]["settings"]["walks"] == 128
+    assert evidence["pilots"][0]["failures"]
+    for row in rows:
+        if row["method"] == "mc" and row["target_pct"] in (5, 10):
+            assert row["status"] == "confirmed"
+            assert row["walks"] == 512
+            assert row["relative_error_pct"] <= row["target_pct"]
+    for phase in ("pilots", "validations"):
+        assert all(
+            record["metrics"][1]["walks"] <= 120000 for record in evidence[phase]
+        )
+    gc.collect()
+    assert all(reference() is None for reference in previous_fields)
+
+
 @pytest.mark.parametrize("T", [0.013, 0.04])
 def test_alpha_zero_agrees_with_merged_space_time_mc(T):
     from pdelab.heat_mc import solve_heat_mc

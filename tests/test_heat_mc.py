@@ -286,3 +286,39 @@ def test_failed_validation_retries_larger_budget(monkeypatch):
     assert all(row["validation_attempts"] == 2 for row in rows)
     assert all(row["calibration_error_pct"] == 0 for row in rows)
     assert all(row["validation_error_pct"] == 0 for row in rows)
+
+
+@pytest.mark.parametrize("point", [(0, 4), (8, 4), (4, 0), (4, 8)])
+def test_decay_boundary_has_exact_zero_and_undefined_relative_error(point):
+    problem = make_heat_problem("decay", 8)
+    assert problem.evaluate(problem.exact, 0.02)[point] == 0.0
+    assert problem.initial[point] == 0.0
+    with pytest.raises(ValueError, match="нулевом эталоне"):
+        heat_mc_study(problem, T=0.02, point=point, repeats=2, max_walks=64)
+
+
+@pytest.mark.parametrize(
+    "methods,x,allowed", [(["lod"], 32, True), (["mc"], 0, True), (["mc"], 32, False)]
+)
+def test_heat_study_limit_applies_only_to_interior_mc(monkeypatch, methods, x, allowed):
+    import pdelab.heat_mc_ui as module
+
+    calls = []
+
+    def study(*args, **kwargs):
+        calls.append(kwargs["methods"])
+        raise RuntimeError("Исследование запущено")
+
+    monkeypatch.setattr(module, "heat_mc_study", study)
+    app = AppTest.from_string(
+        "from pdelab.heat_ui import HeatSettings\n"
+        "from pdelab.heat_mc_ui import render_heat_mc_study\n"
+        "render_heat_mc_study(HeatSettings('manufactured', 64, 1., .01, 1., 1e-8))"
+    ).run()
+    app.multiselect(key="heat_study_methods").set_value(methods)
+    app.slider(key="heat_study_x").set_value(x)
+    app.button(key="heat_study_run").click().run()
+    assert not app.exception
+    assert bool(calls) == allowed
+    expected = "Исследование запущено" if allowed else "50 млн"
+    assert any(expected in item.value for item in app.error)

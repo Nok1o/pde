@@ -4,7 +4,7 @@ from time import perf_counter
 
 import numpy as np
 
-SELECTION_POLICY = "stable_pilot_adaptive_retry_v5"
+SELECTION_POLICY = "stable_pilot_adaptive_retry_v6"
 ACCURACY_METRIC = "mean_run_relative_l1_v1"
 ACCURACY_DESCRIPTION = "100 * mean_runs(sum_points(abs(u_run-reference)) / sum_points(abs(reference))); error of individual runs in the validation series"
 CALIBRATION_FRACTION = 0.5

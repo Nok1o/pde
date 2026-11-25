@@ -92,9 +92,11 @@ def make_heat_problem(kind="decay", n=24, a2=1.0):
     if kind == "decay":
 
         def exact(x, y, t):
-            return (
+            values = (
                 np.exp(-2 * np.pi**2 * a2 * t) * np.sin(np.pi * x) * np.sin(np.pi * y)
             )
+            boundary = (x == 0) | (x == 1) | (y == 0) | (y == 1)
+            return np.where(boundary, 0.0, values)
 
         def source(x, y, t):
             return 0.0
