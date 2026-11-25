@@ -172,7 +172,7 @@ class HeatOperator3D:
         return result
 
 
-def freeze_heat3d(problem, previous, iterate, t, dt):
+def freeze_heat3d(problem, previous, iterate, t, dt, *, conductivity=None):
     """Freeze k, c and cubic loss for one implicit physical-time layer."""
     if not np.isfinite(dt) or dt <= 0:
         raise ValueError("Длина слоя dt должна быть конечной и положительной")
@@ -180,7 +180,12 @@ def freeze_heat3d(problem, previous, iterate, t, dt):
     iterate = _field(iterate, problem.shape, "iterate").copy()
     fixed, boundary = dirichlet_data3d(problem, t)
     iterate[fixed] = boundary[fixed]
-    conductivity = problem.conductivity(iterate)
+    if conductivity is None:
+        conductivity = problem.conductivity(iterate)
+    else:
+        conductivity = _field(conductivity, problem.shape, "conductivity")
+        if np.any(conductivity <= 0):
+            raise ValueError("Пробная проводимость должна быть положительной")
     capacity = problem.capacity(iterate)
     reaction = problem.reaction_coefficient(iterate)
     weights = np.zeros((*problem.shape, 6))

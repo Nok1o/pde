@@ -15,6 +15,7 @@ from scipy.sparse.linalg import MatrixRankWarning, spsolve
 
 from .heat import time_grid
 from .heat3d_block import BLOCK_MAX_N, BlockThomasSolver3D, block_workspace_bytes
+from .heat3d_conductivity import ConductivityCache3D
 from .heat3d_contract import HeatRunResult3D
 from .heat3d_linear import solve_lines3d, warmup_lines3d
 from .heat3d_mc import _integer, warmup_mc3d
@@ -57,6 +58,7 @@ class HeatSettings3D:
     mc_tolerance: float | None = None
     mc_change_tolerance: float | None = None
     batch_size: int = 128
+    conductivity_refresh_layers: int = 1
 
     @classmethod
     def for_methods(cls, methods):
@@ -80,6 +82,9 @@ class HeatSettings3D:
         )
 
     def validate(self):
+        _integer(
+            self.conductivity_refresh_layers, "conductivity_refresh_layers", 1, 10000
+        )
         for name in ("tolerance", "change_tolerance", "linear_tolerance"):
             value = getattr(self, name)
             if not np.isfinite(value) or not 0 < value < 1:
@@ -175,6 +180,9 @@ class _Layer:
     factorizations: int = 0
     factor_reuses: int = 0
     mc_attempt: dict | None = None
+    conductivity_reuses: int = 0
+    conductivity_fallbacks: int = 0
+    lagged_conductivity: bool = False
 
 
 @contextmanager
@@ -210,6 +218,7 @@ def _record(
         walks=0,
         transitions=0,
         reason="completed" if accepted else layer.reason,
+        lagged_conductivity=layer.lagged_conductivity,
     )
     if relaxation is not None:
         row["relaxation"] = relaxation
@@ -258,7 +267,17 @@ def _deterministic_update(layer, backend, operator, values, settings):
 
 
 def _picard_layer(
-    problem, previous, t, dt, settings, deadline, factory, backend, layer, sampler=None
+    problem,
+    previous,
+    t,
+    dt,
+    settings,
+    deadline,
+    factory,
+    backend,
+    layer,
+    sampler=None,
+    conductivity_cache=None,
 ):
     with _preparing(layer):
         values, fixed, boundary = _initial(problem, previous, t)
@@ -277,12 +296,28 @@ def _picard_layer(
         layer.status, layer.reason = "completed", "Нулевая начальная невязка"
         _record(layer, outer=0, residual=0.0, scale=scale, change=0.0, accepted=True)
         return layer
+    if conductivity_cache is not None:
+        with _preparing(layer):
+            if conductivity_cache.can_reuse(layer.number):
+                operator = freeze_heat3d(
+                    problem,
+                    previous,
+                    values,
+                    t,
+                    dt,
+                    conductivity=conductivity_cache.values,
+                )
+                layer.lagged_conductivity = True
+            else:
+                conductivity_cache.refresh(problem, values, layer.number)
     for outer in range(1, int(settings.max_outer) + 1):
         if perf_counter() >= deadline:
             layer.status, layer.reason = "time_limit", "Лимит времени между итерациями"
             _record(layer, outer=outer - 1, residual=residual, scale=scale)
             return layer
         layer.outer_iterations += 1
+        if layer.lagged_conductivity:
+            layer.conductivity_reuses += 1
         if sampler is not None:
             # Keep counters available to the outer failure handler if evaluating
             # the nonlinear residual fails after a successful batch.
@@ -373,6 +408,12 @@ def _picard_layer(
             )
             return layer
         values, operator = candidate, candidate_operator
+        if conductivity_cache is not None and outer < settings.max_outer:
+            with _preparing(layer):
+                conductivity_cache.refresh(problem, values, layer.number)
+            if layer.lagged_conductivity:
+                layer.conductivity_fallbacks += 1
+            layer.lagged_conductivity = False
     return layer
 
 
@@ -497,6 +538,11 @@ def solve_heat3d(
         or (method == "newton" and problem.n > DIRECT_MAX_N)
         or (method == "block" and problem.n > BLOCK_MAX_N)
         or (method in CONTROL_MC_METHODS and T > 0 and settings.coarse_n >= problem.n)
+        or (
+            settings.conductivity_refresh_layers > 1
+            and method != "newton"
+            and operator_factory is not freeze_heat3d
+        )
     )
     # Count the Cartesian free-node set without allocating a grid or sampling data.
     free_nodes = 1
@@ -524,6 +570,9 @@ def solve_heat3d(
         storage += 24 * size + getsizeof(set())
         if batch_size is not None:
             storage += 40 * min(batch_size, int(settings.walks))
+    if T > 0 and method != "newton" and settings.conductivity_refresh_layers > 1:
+        # Retained k and the replacement allocation during refresh.
+        storage += 16 * (problem.n + 1) ** 3
     warmup_seconds = 0.0
     if T > 0 and not unsupported and storage <= settings.max_workspace_bytes:
         warm_start = perf_counter()
@@ -556,6 +605,9 @@ def solve_heat3d(
         history=[],
         warmup_seconds=warmup_seconds,
         batch_size=batch_size,
+        conductivity_refresh_layers=(
+            1 if method == "newton" else int(settings.conductivity_refresh_layers)
+        ),
     )
 
     def finish(status=None, reason=None):
@@ -573,7 +625,13 @@ def solve_heat3d(
                 f"Матричная прогонка ограничена n≤{BLOCK_MAX_N} из-за плотных блоков"
             )
         elif method in CONTROL_MC_METHODS:
-            reason = "Для MC с поправкой требуется 4 ≤ coarse_n < n"
+            reason = (
+                "Для MC с поправкой требуется 4 ≤ coarse_n < n"
+                if settings.coarse_n >= problem.n
+                else "Задержка проводимости требует стандартный оператор"
+            )
+        elif method != "newton":
+            reason = "Задержка проводимости требует стандартный оператор"
         else:
             reason = f"Независимый Ньютон ограничен n≤{DIRECT_MAX_N}"
         return finish("unsupported", reason)
@@ -590,6 +648,11 @@ def solve_heat3d(
             sampler = (
                 PicardSampler3D(problem, settings, result)
                 if is_mc and len(steps)
+                else None
+            )
+            conductivity_cache = (
+                ConductivityCache3D(int(settings.conductivity_refresh_layers))
+                if method != "newton" and settings.conductivity_refresh_layers > 1
                 else None
             )
         history_storage = 0
@@ -622,7 +685,14 @@ def solve_heat3d(
                 if method == "newton":
                     _newton_layer(*args, layer)
                 else:
-                    _picard_layer(*args, operator_factory, backend, layer, sampler)
+                    _picard_layer(
+                        *args,
+                        operator_factory,
+                        backend,
+                        layer,
+                        sampler,
+                        conductivity_cache,
+                    )
             except (UnsupportedHeatBoundaryError, IncompatibleHeatBoundaryError) as exc:
                 layer.status, layer.reason = "unsupported", str(exc)
             except MemoryError:
@@ -645,6 +715,8 @@ def solve_heat3d(
             result.outer_iterations += layer.outer_iterations
             result.inner_iterations += layer.inner_iterations
             result.preparation_seconds += layer.preparation_seconds
+            result.conductivity_reuses += layer.conductivity_reuses
+            result.conductivity_fallbacks += layer.conductivity_fallbacks
             for name in (
                 "assembly_seconds",
                 "factorization_seconds",
