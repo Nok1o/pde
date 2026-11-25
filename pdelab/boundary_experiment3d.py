@@ -24,6 +24,7 @@ from .boundary_experiment import (
     validate_boundary_budgets,
 )
 from .boundary_solvers3d import (
+    CACHED_METHODS,
     METHODS_BOUNDARY_3D,
     solve_boundary3d,
     warmup_boundary3d,
@@ -84,6 +85,22 @@ class BoundaryExperiment3D:
     metrics: list
 
 
+def selected_boundary_methods3d(operator, methods=None):
+    if methods is None:
+        defaults = [
+            method for method in METHODS_BOUNDARY_3D if method not in CACHED_METHODS
+        ]
+        return selected_boundary_methods(operator, names=defaults)
+    methods = selected_boundary_methods(operator, methods, names=METHODS_BOUNDARY_3D)
+    if any(method in CACHED_METHODS for method in methods) and not any(
+        face.kind == "robin" for face in operator.problem.faces.values()
+    ):
+        raise ValueError(
+            "Для кэша отражений нужно условие 3 рода хотя бы на одной грани"
+        )
+    return methods
+
+
 def _prepare(config, methods, budgets=None, tolerances=None):
     problem = problem_from_config3d(config)
     if problem.exact is None and problem.n > DIRECT_MAX_N:
@@ -92,7 +109,7 @@ def _prepare(config, methods, budgets=None, tolerances=None):
         )
     operator = BoundaryOperator3D(problem)
     operator.check_compatibility()
-    methods = selected_boundary_methods(operator, methods, names=METHODS_BOUNDARY_3D)
+    methods = selected_boundary_methods3d(operator, methods)
     if budgets is not None and tolerances is not None:
         validate_boundary_budgets(methods, budgets, tolerances)
     points = select_boundary_points3d(
@@ -100,17 +117,20 @@ def _prepare(config, methods, budgets=None, tolerances=None):
     )
     grid = operator.solve() if problem.n <= DIRECT_MAX_N else None
     reference = grid if problem.exact is None else operator.normalize(problem.exact)
-    warmup_boundary3d()
+    warmup_boundary3d(methods)
     return problem, points, grid, reference, methods
 
 
-def run_boundary_experiment3d(config=None, methods=None):
+def run_boundary_experiment3d(config=None, methods=None, *, progress=None):
     config = BoundaryConfig3D() if config is None else config
     problem, points, grid, reference, methods = _prepare(config, methods)
+    solver_problem = problem.without_reference()
     results = {}
-    for method in methods:
+    for index, method in enumerate(methods):
+        if progress is not None:
+            progress(index / len(methods), METHODS_BOUNDARY_3D[method])
         result = solve_boundary3d(
-            problem,
+            solver_problem,
             points,
             method,
             walks=config.walks,
@@ -125,6 +145,8 @@ def run_boundary_experiment3d(config=None, methods=None):
                 f"ЛОМ не сошёлся за {result.iterations} итераций; относительная невязка {result.relative_residual:.3g}"
             )
         results[method] = result
+    if progress is not None:
+        progress(1.0, "Сравнение завершено")
     return BoundaryExperiment3D(
         config,
         problem,
@@ -212,6 +234,7 @@ def benchmark_boundary3d(
     problem, points, grid, reference, methods = _prepare(
         config, methods, budgets, tolerances
     )
+    solver_problem = problem.without_reference()
     rows = []
     for method in methods:
         for budget in (tolerances if method == "lod_serial" else budgets):
@@ -220,7 +243,7 @@ def benchmark_boundary3d(
                     np.random.SeedSequence([config.seed, repeat]).generate_state(1)[0]
                 )
                 result = solve_boundary3d(
-                    problem,
+                    solver_problem,
                     points,
                     method,
                     seed=seed,

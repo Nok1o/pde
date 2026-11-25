@@ -73,6 +73,8 @@ def study_stationary3d(
     ):
         raise ValueError("Нужны относительные допуски ЛОМ между 0 и 1")
     points = validate_points3d(problem.n, points)
+    if mixed:
+        problem = problem.without_reference()
     reference = np.asarray(reference, dtype=float)
     output = dict(
         protocol=PROTOCOL_ID,
@@ -89,6 +91,9 @@ def study_stationary3d(
     )
     for method_index, method in enumerate(methods):
         diagnostics = []
+        group_size = (
+            batch_size if method in ("mc_grouped", "mc_grouped_cached") else None
+        )
         method_seed = int(
             np.random.SeedSequence(
                 [int(seed), 29, list(names).index(method)]
@@ -136,7 +141,7 @@ def study_stationary3d(
                 + (int(budget) * 8 if stochastic else 0),
             )
             record = dict(
-                batch_size=batch_size if method == "mc_grouped" else None,
+                batch_size=group_size,
                 effective_batch_size=work.get("effective_batch_size"),
                 started_walks=(
                     work.get("started_walks", walks if counters_known else None)
@@ -145,6 +150,7 @@ def study_stationary3d(
                 ),
                 counters_known=counters_known,
                 path_seconds=work.get("path_seconds"),
+                reflection_table_bytes=work.get("reflection_table_bytes"),
                 coarse_n=work.get("coarse_n"),
                 rng=work.get("rng"),
                 scheme=work.get("scheme", "uniform_finite_difference"),
@@ -207,7 +213,6 @@ def study_stationary3d(
                 status_code=code,
                 selection_policy=PROTOCOL_ID,
                 status_detail=row["reason"],
-                batch_size=batch_size if method == "mc_grouped" else None,
                 calibration_seconds=study["pilot_seconds"],
                 total_validation_seconds=study["final_seconds"],
                 search_seconds=study["elapsed_seconds"],
@@ -220,8 +225,14 @@ def study_stationary3d(
                 for t in study["trials"]
                 if (t["phase"], t["candidate"]) == (row["phase"], row["candidate"])
             ]
-            row.update(
-                method=method, batch_size=batch_size if method == "mc_grouped" else None
+            row.update(method=method, batch_size=group_size)
+            row["reflection_table_bytes"] = max(
+                (
+                    t["reflection_table_bytes"]
+                    for t in matching
+                    if t["reflection_table_bytes"] is not None
+                ),
+                default=None,
             )
             row["started_walks"] = (
                 sum(t["started_walks"] for t in matching)

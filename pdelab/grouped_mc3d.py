@@ -9,6 +9,8 @@ transition probabilities.
 import numpy as np
 from numba import njit
 
+from .reflections3d import advance_particle
+
 
 def grouped_workspace_bytes3d(walks, batch_size, point_count=1):
     """Bytes allocated by the kernel, excluding input operator/point arrays.
@@ -22,28 +24,18 @@ def grouped_workspace_bytes3d(walks, batch_size, point_count=1):
     return 48 * min(batch_size, walks) + 24 * point_count + 8 * walks
 
 
-@njit(inline="always")
-def _grouped_reflected_step(z, y, x, n, direction):
-    # Six equiprobable proposals; an outward proposal becomes an inward step.
-    # The order agrees with the mixed-boundary baseline, not raw _mc3d.
-    if direction == 0:
-        z += 1 if z < n else -1
-    elif direction == 1:
-        z -= 1 if z > 0 else -1
-    elif direction == 2:
-        y += 1 if y < n else -1
-    elif direction == 3:
-        y -= 1 if y > 0 else -1
-    elif direction == 4:
-        x += 1 if x < n else -1
-    else:
-        x -= 1 if x > 0 else -1
-    return z, y, x
-
-
 @njit(cache=True, nogil=True)
 def grouped_walks3d(
-    fixed, boundary, reward, killing, points, walks, seed, max_steps, batch_size
+    fixed,
+    boundary,
+    reward,
+    killing,
+    points,
+    walks,
+    seed,
+    max_steps,
+    batch_size,
+    reflection_table=None,
 ):
     """Return means, SEs, counts, steps, samples, failed_point, started_walks.
 
@@ -67,7 +59,6 @@ def grouped_walks3d(
     realization; the transition law and independent-path estimator agree.
     """
     np.random.seed(seed)
-    n = fixed.shape[0] - 1
     means = np.full(len(points), np.nan)
     standard_errors = np.full(len(points), np.nan)
     counts = np.zeros(len(points), dtype=np.int64)
@@ -117,20 +108,19 @@ def grouped_walks3d(
                             point_index,
                             started_walks,
                         )
-                    z, y, x = zs[slot], ys[slot], xs[slot]
-                    payoff = payoffs[slot] + reward[z, y, x]
+                    z, y, x, payoff, done = advance_particle(
+                        zs[slot],
+                        ys[slot],
+                        xs[slot],
+                        fixed,
+                        boundary,
+                        reward,
+                        killing,
+                        payoffs[slot],
+                        reflection_table,
+                    )
                     path_steps[slot] += 1
                     total_steps += 1
-                    done = False
-                    if killing[z, y, x] > 0:
-                        done = np.random.random() < killing[z, y, x]
-                    if not done:
-                        z, y, x = _grouped_reflected_step(
-                            z, y, x, n, np.random.randint(6)
-                        )
-                        if fixed[z, y, x]:
-                            payoff += boundary[z, y, x]
-                            done = True
 
                     if done:
                         counts[point_index] += 1
