@@ -1,0 +1,105 @@
+{
+  "description": "Limited n16 extension frozen after n8 cost review; B=128 unchanged",
+  "baseline": "131dda6",
+  "repeats": 5,
+  "seed": 31026,
+  "budgets": [
+    0.001,
+    1e-06
+  ],
+  "walk_budgets": [
+    256,
+    1024
+  ],
+  "calibration_fraction": 0.8,
+  "settings": {
+    "mc_tolerance": 0.2,
+    "mc_change_tolerance": 0.1,
+    "coarse_n": 8,
+    "max_outer": 8,
+    "max_seconds": 5,
+    "max_walks": 96000000,
+    "max_transitions": 320000000,
+    "max_path_steps": 100000,
+    "max_workspace_bytes": 268435456
+  },
+  "configuration": {
+    "n": 16,
+    "alpha": 0.5,
+    "dt": 0.002,
+    "T": 0.004,
+    "mode": "point"
+  },
+  "variants": [
+    {
+      "id": "lod",
+      "method": "lod"
+    },
+    {
+      "id": "block",
+      "method": "block"
+    },
+    {
+      "id": "mc",
+      "method": "mc"
+    },
+    {
+      "id": "mc_control",
+      "method": "mc_control"
+    },
+    {
+      "id": "mc_grouped",
+      "method": "mc_grouped",
+      "settings": {
+        "batch_size": 128
+      }
+    },
+    {
+      "id": "mc_control_grouped",
+      "method": "mc_control_grouped",
+      "settings": {
+        "batch_size": 128
+      }
+    }
+  ],
+  "cases": [
+    {
+      "id": "sine-centre-kind1",
+      "configuration": {
+        "case": "sine",
+        "point": [
+          8,
+          8,
+          8
+        ]
+      }
+    },
+    {
+      "id": "polynomial-all-kind3",
+      "configuration": {
+        "case": "polynomial",
+        "point": [
+          4,
+          8,
+          12
+        ],
+        "kinds": [
+          3,
+          3,
+          3,
+          3,
+          3,
+          3
+        ]
+      }
+    }
+  ],
+  "selection_basis": {
+    "n8_source": "aefae24",
+    "n8_accuracy_attempts": 270,
+    "n8_group_attempts": 200,
+    "maximum_observed_seconds": 0.49312208298943006,
+    "solver_seconds_all_n8_attempts": 42.50881432503229,
+    "decision": "Two extremes only: sine with kind 1 and polynomial with all kind 3; same normalized Q, dt, T, H/h=2 and B=128; path/move caps scale by 8, 5s soft deadline and 256MiB buffer cap remain."
+  }
+}

@@ -33,7 +33,10 @@ def utc_now():
 
 
 def source_state():
-    paths = [Path(__file__), *sorted((ROOT / "pdelab").glob("*.py"))]
+    paths = [
+        *sorted((ROOT / "benchmarks").glob("*.py")),
+        *sorted((ROOT / "pdelab").glob("*.py")),
+    ]
     return {
         "commit": git("rev-parse", "HEAD"),
         "dirty": bool(git("status", "--porcelain")),
@@ -80,20 +83,27 @@ def worker(plan, job, out):
 
     _, config, settings = list(jobs(plan))[job]
     start = perf_counter()
-    study = study_heat3d(
-        config,
-        settings,
-        repeats=plan["repeats"],
-        seed=plan["seed"],
-        budgets=plan["budgets"],
-        walk_budgets=plan["walk_budgets"],
-        calibration_fraction=plan["calibration_fraction"],
-    )
+    if plan.get("experiment") == "fixed_budget":
+        from benchmarks.heat3d_fixed import fixed_runs
+
+        result = {"fixed_budget": fixed_runs(plan, config, settings)}
+    else:
+        result = {
+            "study": study_heat3d(
+                config,
+                settings,
+                repeats=plan["repeats"],
+                seed=plan["seed"],
+                budgets=plan["budgets"],
+                walk_budgets=plan["walk_budgets"],
+                calibration_fraction=plan["calibration_fraction"],
+            )
+        }
     wall = perf_counter() - start
     raw = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     peak = raw if sys.platform == "darwin" else raw * 1024
     payload = {
-        "study": study,
+        **result,
         "process": {
             "study_call_seconds": wall,
             "peak_rss_bytes_before_export": peak,
@@ -257,6 +267,11 @@ def main():
         )
     manifest.update(source_after=after, finished_utc=utc_now(), complete=True)
     (args.out / "manifest.json").write_bytes(json_bytes(manifest))
+    if plan.get("experiment") == "fixed_budget":
+        from benchmarks.heat3d_fixed import summarize_fixed
+
+        summarize_fixed(results, args.out)
+        return
     targets, series, trials, costs = summarize(results)
     for name, rows in (
         ("targets", targets),
