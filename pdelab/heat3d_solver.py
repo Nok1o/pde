@@ -6,7 +6,7 @@ only after the whole time interval has completed; failed layers remain diagnosti
 
 import warnings
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from sys import getsizeof
 from time import perf_counter
 
@@ -49,12 +49,29 @@ class HeatSettings3D:
     max_walks: int = 8_000_000  # for the entire time history
     max_transitions: int = 80_000_000
     max_path_steps: int = 1_000_000
+    mc_tolerance: float | None = None
+    mc_change_tolerance: float | None = None
 
     @classmethod
     def for_methods(cls, methods):
         if any(method in MC_METHODS for method in methods):
-            return cls(tolerance=0.2, change_tolerance=0.1)
+            return cls(mc_tolerance=0.2, mc_change_tolerance=0.1)
         return cls()
+
+    def for_method(self, method):
+        if method not in MC_METHODS:
+            return self
+        return replace(
+            self,
+            tolerance=(
+                self.tolerance if self.mc_tolerance is None else self.mc_tolerance
+            ),
+            change_tolerance=(
+                self.change_tolerance
+                if self.mc_change_tolerance is None
+                else self.mc_change_tolerance
+            ),
+        )
 
     def validate(self):
         for name in ("tolerance", "change_tolerance", "linear_tolerance"):
@@ -456,6 +473,7 @@ def solve_heat3d(
     is_mc = method in MC_METHODS
     if settings is None:
         settings = HeatSettings3D.for_methods((method,))
+    settings = settings.for_method(method)
     settings.validate()
     if is_mc:
         settings.validate_mc(method)
@@ -494,7 +512,7 @@ def solve_heat3d(
             if method == "mc_control"
             else 384 * size
         )
-        storage += 24 * size
+        storage += 24 * size + getsizeof(set())
     warmup_seconds = 0.0
     if T > 0 and not unsupported and storage <= settings.max_workspace_bytes:
         warm_start = perf_counter()

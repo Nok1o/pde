@@ -10,6 +10,7 @@ import streamlit as st
 from streamlit.testing.v1 import AppTest
 
 from pdelab.heat3d_cli import main
+from pdelab.heat3d_experiment import HeatConfig3D, compare_heat3d, study_heat3d
 
 
 def test_ui_executes_full_history_and_reproduces_through_cli(tmp_path, monkeypatch):
@@ -88,6 +89,7 @@ def test_ui_executes_full_history_and_reproduces_through_cli(tmp_path, monkeypat
     )
     assert [r["status"] for r in csv_rows] == [r["status"] for r in study["rows"]]
     assert {r["target_pct"] for r in study["rows"]} == {1, 5, 10}
+    assert study["metadata"]["solver_settings"]["seed"] == study["seed"] == 42
     app.run()
     assert app.session_state["h3_comparison"]["history"] == run["history"]
 
@@ -139,3 +141,25 @@ def test_mixed_method_study_keeps_units_and_refusals(tmp_path):
         if row["method"] != "lod":
             assert row["seconds"] is None and row["relative_error_pct"] is None
             assert row["completed_repeats"] == 0 and row["total_walks"] == 2
+
+
+def test_comparing_with_mc_preserves_the_deterministic_baseline():
+    config = dict(n=5, T=0.003, dt=0.002)
+    baseline = compare_heat3d(HeatConfig3D(**config))
+    mixed = compare_heat3d(HeatConfig3D(**config, methods=("lod", "mc")))
+    assert mixed["arrays"]["lod"].tolist() == baseline["arrays"]["lod"].tolist()
+    assert (
+        mixed["rows"][0]["outer_iterations"] == baseline["rows"][0]["outer_iterations"]
+    )
+    assert mixed["rows"][0]["tolerance"] == 1e-7
+    assert mixed["rows"][1]["tolerance"] == 0.2
+    assert mixed["rows"][1]["change_tolerance"] == 0.1
+
+
+def test_study_keeps_errors_without_retaining_fields_for_every_repeat():
+    config = HeatConfig3D(n=6, T=0, mode="field", methods=("mc", "mc_control"))
+    study = study_heat3d(config, repeats=2, walk_budgets=[2])
+    assert len(study["trials"]) == 8
+    for trial in study["trials"]:
+        assert trial["status"] == "completed" and trial["absolute_error"] == 0
+        assert "values" not in trial

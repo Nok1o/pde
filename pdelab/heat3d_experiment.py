@@ -143,6 +143,7 @@ def _inputs(config, settings):
     settings.validate()
     for method in config.methods:
         if method in MC_METHODS:
+            settings.for_method(method).validate()
             settings.validate_mc(method)
     return problem, points, settings
 
@@ -291,6 +292,10 @@ def _reproduction(
     if command == "run" and config.newton:
         parts.append("--newton")
     if any(m in MC_METHODS for m in config.methods):
+        if settings.mc_tolerance is not None:
+            parts += ["--mc-tol", str(settings.mc_tolerance)]
+        if settings.mc_change_tolerance is not None:
+            parts += ["--mc-change-tol", str(settings.mc_change_tolerance)]
         parts += [
             "--walks",
             str(settings.walks),
@@ -344,13 +349,15 @@ def compare_heat3d(config=HeatConfig3D(), settings=None, progress=None):
         )
         runs[method] = result
         record = _record(result, exact)
+        effective = settings.for_method(method)
+        record.update(
+            tolerance=effective.tolerance, change_tolerance=effective.change_tolerance
+        )
         if method in MC_METHODS:
             record.update(
                 walks_per_free_node=settings.walks,
                 seed=settings.seed,
                 coarse_n=settings.coarse_n if method == "mc_control" else None,
-                tolerance=settings.tolerance,
-                change_tolerance=settings.change_tolerance,
             )
         records.append(record)
         if result.values is not None:
@@ -545,10 +552,10 @@ def study_heat3d(
                 else "relative_residual_tolerance"
             ),
             walks_applicable=stochastic,
-            retain_values=stochastic,
+            retain_values=stochastic and len(points) == 1,
             progress=_method_progress(progress, method, index, len(config.methods)),
         )
-        _study_diagnostics(study, method, diagnostics, settings)
+        _study_diagnostics(study, method, diagnostics, settings.for_method(method))
         studies.append(study)
     study = dict(studies[0])
     study["budgets_by_method"] = {

@@ -46,7 +46,7 @@ def _options(settings):
     defaults.update(settings)
     batch_size = defaults.pop("batch_size")
     for name, value in defaults.items():
-        minimum = 0 if name == "seed" else 2 if name == "walks" else 1
+        minimum = {"seed": 0, "max_transitions": 0, "walks": 2}.get(name, 1)
         maximum = (
             2**32 - 1 if name == "seed" else 2**31 - 1 if name == "walks" else 2**63 - 1
         )

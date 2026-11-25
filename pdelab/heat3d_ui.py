@@ -257,18 +257,38 @@ def render_heat3d_app():
             "Независимая проверка Ньютоном (n ≤ 16)", value=False, key="h3_newton"
         )
         with st.expander("Параметры Пикара и прогонок", key="h3_solver_parameters"):
-            tolerance = st.select_slider(
-                "Допуск нелинейной невязки",
-                (0.5, 0.2, 0.1, 0.05, 0.01, 1e-3, 1e-5, 1e-7, 1e-9),
-                value=defaults.tolerance,
-                key="h3_tol_mc" if has_mc else "h3_tol",
+            choices = (0.5, 0.2, 0.1, 0.05, 0.01, 1e-3, 1e-5, 1e-7, 1e-9)
+            tolerance, change = defaults.tolerance, defaults.change_tolerance
+            mc_tolerance, mc_change = (
+                defaults.mc_tolerance,
+                defaults.mc_change_tolerance,
             )
-            change = st.select_slider(
-                "Допуск изменения поля",
-                (0.5, 0.2, 0.1, 0.05, 0.01, 1e-3, 1e-5, 1e-7, 1e-9),
-                value=defaults.change_tolerance,
-                key="h3_change_mc" if has_mc else "h3_change",
-            )
+            if any(method not in MC_METHODS for method in methods):
+                tolerance = st.select_slider(
+                    "Допуск нелинейной невязки для прогонок",
+                    choices,
+                    value=tolerance,
+                    key="h3_tol",
+                )
+                change = st.select_slider(
+                    "Допуск изменения поля для прогонок",
+                    choices,
+                    value=change,
+                    key="h3_change",
+                )
+            if has_mc:
+                mc_tolerance = st.select_slider(
+                    "Допуск нелинейной невязки для MC",
+                    choices,
+                    value=mc_tolerance,
+                    key="h3_tol_mc",
+                )
+                mc_change = st.select_slider(
+                    "Допуск изменения поля для MC",
+                    choices,
+                    value=mc_change,
+                    key="h3_change_mc",
+                )
             linear = st.select_slider(
                 "Линейный допуск", (1e-8, 1e-10, 1e-12), value=1e-10, key="h3_linear"
             )
@@ -334,6 +354,8 @@ def render_heat3d_app():
     settings = HeatSettings3D(
         tolerance=tolerance,
         change_tolerance=change,
+        mc_tolerance=mc_tolerance,
+        mc_change_tolerance=mc_change,
         linear_tolerance=linear,
         relaxation=relaxation,
         max_outer=outer,

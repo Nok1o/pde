@@ -42,6 +42,10 @@ def main(argv=None):
     )
     parser.add_argument("--tol", type=float, help="Допуск нелинейной невязки Пикара")
     parser.add_argument("--change-tol", type=float, help="Допуск изменения поля Пикара")
+    parser.add_argument("--mc-tol", type=float, help="Отдельный допуск невязки для MC")
+    parser.add_argument(
+        "--mc-change-tol", type=float, help="Отдельный допуск изменения для MC"
+    )
     parser.add_argument("--linear-tol", type=float, default=1e-10)
     parser.add_argument("--relaxation", type=float, default=1.0)
     parser.add_argument("--max-outer", type=int, default=100)
@@ -104,6 +108,16 @@ def main(argv=None):
         tolerance=defaults.tolerance if args.tol is None else args.tol,
         change_tolerance=(
             defaults.change_tolerance if args.change_tol is None else args.change_tol
+        ),
+        mc_tolerance=(
+            defaults.mc_tolerance
+            if args.mc_tol is None and args.tol is None
+            else args.mc_tol
+        ),
+        mc_change_tolerance=(
+            defaults.mc_change_tolerance
+            if args.mc_change_tol is None and args.change_tol is None
+            else args.mc_change_tol
         ),
         linear_tolerance=args.linear_tol,
         relaxation=args.relaxation,

@@ -1,10 +1,12 @@
 from dataclasses import replace
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
 
 from pdelab.boundary3d import FACES
 from pdelab.heat3d_operator import freeze_heat3d
+from pdelab.heat3d_picard_mc import PicardSampler3D
 from pdelab.heat3d_problem import make_heat_problem3d
 from pdelab.heat3d_solver import HeatSettings3D, solve_heat3d
 
@@ -206,3 +208,24 @@ def test_coarse_failure_workspace_and_t_zero():
         assert initial.physical_steps == initial.walks == initial.coarse_iterations == 0
     bad = solve_heat3d(p, method="mc_control", settings=replace(SETTINGS, coarse_n=p.n))
     assert bad.status == "unsupported" and bad.values is None
+
+
+@pytest.mark.parametrize("method", METHODS)
+def test_validation_can_absorb_every_path_after_the_last_allowed_move(method):
+    p = problem(5, alpha=0, faces=())
+    settings = replace(SETTINGS, seed=0, walks=16)
+    kwargs = dict(method=method, dt=5e-6, T=5e-6)
+    reference = solve_heat3d(p, **kwargs, settings=settings)
+    limited = solve_heat3d(p, **kwargs, settings=replace(settings, max_transitions=1))
+    assert reference.transitions == limited.transitions == 1
+    assert limited.status == "completed" and limited.validation_walks == 1024
+    assert limited.completed_walks == limited.walks == reference.walks == 2048
+    np.testing.assert_array_equal(limited.values, reference.values)
+
+
+def test_distinct_validation_streams_after_a_32bit_seed_collision():
+    sampler = PicardSampler3D(problem(), replace(SETTINGS, seed=12), None)
+    # These layer/phase tuples produce the same first word of SeedSequence.
+    layers = [SimpleNamespace(number=i, history_storage=0) for i in (6069, 6844)]
+    first, second = [sampler._batch_seed(layer, 1, check=True) for layer in layers]
+    assert first == 2104905695 and second != first
