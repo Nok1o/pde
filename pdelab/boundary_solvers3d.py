@@ -221,7 +221,7 @@ def solve_boundary3d(
 
         return solve_extended(problem, points, method, walks, seed, max_steps)
     if method not in METHODS_BOUNDARY_3D:
-        raise ValueError("В 3D доступны только ЛОМ и обычный MC")
+        raise ValueError("Неизвестный метод для стационарной задачи 3D")
     points = validate_points3d(problem.n, points)
     for name, value, minimum, maximum in (
         ("walks", walks, 2, 2**31 - 1),
