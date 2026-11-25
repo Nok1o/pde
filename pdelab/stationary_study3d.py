@@ -12,6 +12,7 @@ import numpy as np
 
 from .boundary3d import BoundaryProblem3D, boundary_workspace_bytes3d
 from .grouped_solver3d import GroupedWalkFailure
+from .problem3d import validate_points3d
 from .study_policy import readable_status
 from .study_protocol import (
     METRIC_DESCRIPTION,
@@ -71,7 +72,7 @@ def study_stationary3d(
         not tolerances or any(not np.isfinite(t) or not 0 < t < 1 for t in tolerances)
     ):
         raise ValueError("Нужны относительные допуски ЛОМ между 0 и 1")
-    points = np.asarray(points, dtype=np.int64)
+    points = validate_points3d(problem.n, points)
     reference = np.asarray(reference, dtype=float)
     output = dict(
         protocol=PROTOCOL_ID,

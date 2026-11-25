@@ -20,6 +20,26 @@ def observation(value=1.0):
     )
 
 
+@pytest.mark.parametrize("point", [[[1.9, 2, 3]], [[5, 2, 3]], [[1, 2, 3], [1, 2, 3]]])
+def test_stationary_adapter_rejects_invalid_points_before_any_solve(point):
+    from pdelab.problem3d import make_problem3d
+    from pdelab.stationary_study3d import study_stationary3d
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("Invalid query must fail before running or confirming a solve")
+
+    with pytest.raises(ValueError):
+        study_stationary3d(
+            make_problem3d("affine", 4),
+            point,
+            [1.0],
+            ["lod_serial"],
+            tolerances=[1e-8],
+            repeats=2,
+            solver=forbidden,
+        )
+
+
 def test_stationary_observations_have_no_fictitious_time_and_retain_values():
     study = run_accuracy_study(
         lambda *args: observation(), [64], [1.0], repeats=2, retain_values=True

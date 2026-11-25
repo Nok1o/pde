@@ -242,8 +242,13 @@ def peak_rss_bytes():
     raise RuntimeError("RSS conversion is defined only for macOS bytes / Linux KiB")
 
 
-def rss_worker(case, variant):
+def rss_worker(case, variant, *, budget=None, seed=None):
     """One full solve in a fresh process; high-water marks are never subtracted."""
+    stochastic = variant["method"] != "lod_serial"
+    walks_budget = RSS_WALKS if budget is None or not stochastic else int(budget)
+    tolerance = RSS_TOLERANCE if budget is None or stochastic else float(budget)
+    trial_seed = experiment_seed(case, variant, purpose=1) if seed is None else seed
+    values = None
     prewarm = peak_rss_bytes()
     warming_seconds = warmup()
     postwarm = peak_rss_bytes()
@@ -257,9 +262,9 @@ def rss_worker(case, variant):
             problem,
             points,
             variant["method"],
-            walks=RSS_WALKS,
-            tol=RSS_TOLERANCE,
-            seed=experiment_seed(case, variant, purpose=1),
+            walks=walks_budget,
+            tol=tolerance,
+            seed=trial_seed,
             batch_size=variant["batch_size"] or 128,
             max_iter=MAX_ITER,
         )
@@ -267,6 +272,8 @@ def rss_worker(case, variant):
         walks, events, iterations = result.walks, result.steps, result.iterations
         if not result.converged:
             status, reason = "linear_limit", "LOM tolerance was not reached"
+        else:
+            values = result.values[tuple(points.T)].tolist()
     except GroupedWalkFailure as exc:
         seconds, extras = exc.seconds, exc.diagnostics
         walks, events = extras["walks"], extras["transitions"]
@@ -275,12 +282,11 @@ def rss_worker(case, variant):
         seconds = perf_counter() - started
         status, reason = "solver_failed", str(exc)
     aftersolve = peak_rss_bytes()
-    stochastic = variant["method"] != "lod_serial"
     reserve = (
         boundary_workspace_bytes3d if case["family"] == "mixed" else workspace_bytes
     )
     workspace_estimate = extras.get(
-        "workspace_bytes", reserve(case["n"]) + (8 * RSS_WALKS if stochastic else 0)
+        "workspace_bytes", reserve(case["n"]) + (8 * walks_budget if stochastic else 0)
     )
     grouped = variant["method"] == "mc_grouped"
     return dict(
@@ -290,9 +296,10 @@ def rss_worker(case, variant):
         batch_size=variant["batch_size"],
         n=case["n"],
         location=case["location"],
-        fixed_walk_budget=RSS_WALKS if stochastic else None,
-        fixed_lod_tolerance=RSS_TOLERANCE if not stochastic else None,
-        seed=experiment_seed(case, variant, purpose=1),
+        fixed_walk_budget=walks_budget if stochastic else None,
+        fixed_lod_tolerance=tolerance if not stochastic else None,
+        seed=trial_seed,
+        values=values,
         status=status,
         reason=reason,
         diagnostic_solve_seconds=seconds,
@@ -318,11 +325,11 @@ def rss_worker(case, variant):
             else f"{reserve.__module__}.{reserve.__name__} + first-point samples"
         ),
         batch_aux_exact_bytes=(
-            48 * min(variant["batch_size"], RSS_WALKS) if grouped else 0
+            48 * min(variant["batch_size"], walks_budget) if grouped else 0
         ),
         batch_aux_definition="six int64/float64 particle arrays; array payload only",
         kernel_array_payload_bytes=(
-            grouped_workspace_bytes3d(RSS_WALKS, variant["batch_size"], len(points))
+            grouped_workspace_bytes3d(walks_budget, variant["batch_size"], len(points))
             if grouped
             else None
         ),
@@ -330,7 +337,7 @@ def rss_worker(case, variant):
     )
 
 
-def rss_diagnostics(case, variant):
+def rss_diagnostics(case, variant, *, budget=None, seed=None):
     environment = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
     command = [
         sys.executable,
@@ -340,6 +347,10 @@ def rss_diagnostics(case, variant):
         case["id"],
         variant["id"],
     ]
+    if budget is not None:
+        command.extend(["--rss-budget", str(budget)])
+    if seed is not None:
+        command.extend(["--rss-seed", str(seed)])
     try:
         completed = subprocess.run(
             command,
@@ -588,13 +599,17 @@ def main():
     parser.add_argument(
         "--rss-worker", nargs=2, metavar=("CASE", "VARIANT"), help=argparse.SUPPRESS
     )
+    parser.add_argument("--rss-budget", type=float, help=argparse.SUPPRESS)
+    parser.add_argument("--rss-seed", type=int, help=argparse.SUPPRESS)
     args = parser.parse_args()
     if args.rss_worker:
         case = next(c for c in CASES if c["id"] == args.rss_worker[0])
         variant = next(v for v in VARIANTS if v["id"] == args.rss_worker[1])
         print(
             json.dumps(
-                rss_worker(case, variant), default=_json_default, allow_nan=False
+                rss_worker(case, variant, budget=args.rss_budget, seed=args.rss_seed),
+                default=_json_default,
+                allow_nan=False,
             )
         )
     else:
