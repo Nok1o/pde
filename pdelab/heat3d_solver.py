@@ -24,7 +24,12 @@ from .heat3d_operator import (
     dirichlet_data3d,
     freeze_heat3d,
 )
-from .heat3d_picard_mc import MC_METHODS, PicardSampler3D
+from .heat3d_picard_mc import (
+    CONTROL_MC_METHODS,
+    GROUPED_MC_METHODS,
+    MC_METHODS,
+    PicardSampler3D,
+)
 from .heat3d_reference import (
     newton_residual3d,
     newton_scale3d,
@@ -51,6 +56,7 @@ class HeatSettings3D:
     max_path_steps: int = 1_000_000
     mc_tolerance: float | None = None
     mc_change_tolerance: float | None = None
+    batch_size: int = 128
 
     @classmethod
     def for_methods(cls, methods):
@@ -102,8 +108,10 @@ class HeatSettings3D:
         _integer(self.seed, "seed", 0, 2**32 - 1)
         for name in ("max_walks", "max_transitions", "max_path_steps"):
             _integer(getattr(self, name), name, 1, 2**63 - 1)
-        if method == "mc_control":
+        if method in CONTROL_MC_METHODS:
             _integer(self.coarse_n, "coarse_n", 4, 64)
+        if method in GROUPED_MC_METHODS:
+            _integer(self.batch_size, "batch_size", 1, 65536)
 
 
 def _norm(values):
@@ -479,6 +487,7 @@ def solve_heat3d(
         settings.validate_mc(method)
     if method not in ("lod", "block", "newton", *MC_METHODS):
         raise ValueError("Неизвестный метод 3D-теплопроводности")
+    batch_size = int(settings.batch_size) if method in GROUPED_MC_METHODS else None
     points = validate_points3d(
         problem.n, [(problem.n // 2,) * 3] if points_zyx is None else points_zyx
     )
@@ -487,7 +496,7 @@ def solve_heat3d(
         any(face.kind not in (1, 3) for face in problem.faces.values())
         or (method == "newton" and problem.n > DIRECT_MAX_N)
         or (method == "block" and problem.n > BLOCK_MAX_N)
-        or (method == "mc_control" and T > 0 and settings.coarse_n >= problem.n)
+        or (method in CONTROL_MC_METHODS and T > 0 and settings.coarse_n >= problem.n)
     )
     # Count the Cartesian free-node set without allocating a grid or sampling data.
     free_nodes = 1
@@ -509,16 +518,20 @@ def solve_heat3d(
         size = (problem.n + 1) ** 3
         storage += (
             768 * size + 512 * (settings.coarse_n + 1) ** 3
-            if method == "mc_control"
+            if method in CONTROL_MC_METHODS
             else 384 * size
         )
         storage += 24 * size + getsizeof(set())
+        if batch_size is not None:
+            storage += 40 * min(batch_size, int(settings.walks))
     warmup_seconds = 0.0
     if T > 0 and not unsupported and storage <= settings.max_workspace_bytes:
         warm_start = perf_counter()
         if is_mc:
-            warmup_mc3d()
-        if method == "mc_control" or (method == "lod" and backend is solve_lines3d):
+            warmup_mc3d(batch_size=batch_size)
+        if method in CONTROL_MC_METHODS or (
+            method == "lod" and backend is solve_lines3d
+        ):
             warmup_lines3d()
         warmup_seconds = perf_counter() - warm_start
         started += warmup_seconds
@@ -542,6 +555,7 @@ def solve_heat3d(
         peak_rss_bytes=None,
         history=[],
         warmup_seconds=warmup_seconds,
+        batch_size=batch_size,
     )
 
     def finish(status=None, reason=None):
@@ -558,7 +572,7 @@ def solve_heat3d(
             reason = (
                 f"Матричная прогонка ограничена n≤{BLOCK_MAX_N} из-за плотных блоков"
             )
-        elif method == "mc_control":
+        elif method in CONTROL_MC_METHODS:
             reason = "Для MC с поправкой требуется 4 ≤ coarse_n < n"
         else:
             reason = f"Независимый Ньютон ограничен n≤{DIRECT_MAX_N}"

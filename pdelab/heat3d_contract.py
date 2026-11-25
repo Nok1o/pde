@@ -142,3 +142,4 @@ class HeatRunResult3D:
     coarse_seconds: float = 0.0  # included in preparation_seconds
     interpolation_seconds: float = 0.0
     defect_seconds: float = 0.0
+    batch_size: int | None = None  # only grouped MC, including failed/initial-only runs
