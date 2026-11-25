@@ -17,6 +17,7 @@ from .heat import time_grid
 from .heat3d_block import BLOCK_MAX_N, BlockThomasSolver3D, block_workspace_bytes
 from .heat3d_conductivity import ConductivityCache3D
 from .heat3d_contract import HeatRunResult3D
+from .heat3d_history import HISTORY_MODES, store_record
 from .heat3d_linear import solve_lines3d, warmup_lines3d
 from .heat3d_mc import _integer, warmup_mc3d
 from .heat3d_operator import (
@@ -59,6 +60,7 @@ class HeatSettings3D:
     mc_change_tolerance: float | None = None
     batch_size: int = 128
     conductivity_refresh_layers: int = 1
+    history_mode: str = "full"
 
     @classmethod
     def for_methods(cls, methods):
@@ -85,6 +87,8 @@ class HeatSettings3D:
         _integer(
             self.conductivity_refresh_layers, "conductivity_refresh_layers", 1, 10000
         )
+        if self.history_mode not in HISTORY_MODES:
+            raise ValueError("history_mode: требуется full или layers")
         for name in ("tolerance", "change_tolerance", "linear_tolerance"):
             value = getattr(self, name)
             if not np.isfinite(value) or not 0 < value < 1:
@@ -169,6 +173,8 @@ class _Layer:
     dt: float
     history_budget: int
     history_storage: int
+    history_mode: str = "full"
+    history_records_discarded: int = 0
     status: str = "outer_limit"
     reason: str = "Лимит внешних итераций"
     outer_iterations: int = 0
@@ -225,10 +231,9 @@ def _record(
     if layer.mc_attempt is not None:
         row.update(layer.mc_attempt)
         layer.mc_attempt = None
-    layer.history.append(row)
-    layer.history_storage += getsizeof(row) + sum(
-        getsizeof(value) for value in row.values()
-    )
+    stored_bytes, discarded = store_record(layer.history, row, layer.history_mode)
+    layer.history_storage += stored_bytes
+    layer.history_records_discarded += discarded
     if layer.history_storage + getsizeof(layer.history) > layer.history_budget:
         layer.status = "memory_limit"
         layer.reason = "Лимит памяти диагностической истории"
@@ -608,6 +613,7 @@ def solve_heat3d(
         conductivity_refresh_layers=(
             1 if method == "newton" else int(settings.conductivity_refresh_layers)
         ),
+        history_mode=settings.history_mode,
     )
 
     def finish(status=None, reason=None):
@@ -680,6 +686,7 @@ def solve_heat3d(
                 dt=float(step),
                 history_budget=settings.max_workspace_bytes - storage,
                 history_storage=history_storage,
+                history_mode=settings.history_mode,
             )
             try:
                 if method == "newton":
@@ -713,6 +720,7 @@ def solve_heat3d(
             ):
                 _record(layer, outer=layer.outer_iterations, residual=None, scale=None)
             result.outer_iterations += layer.outer_iterations
+            result.history_records_discarded += layer.history_records_discarded
             result.inner_iterations += layer.inner_iterations
             result.preparation_seconds += layer.preparation_seconds
             result.conductivity_reuses += layer.conductivity_reuses

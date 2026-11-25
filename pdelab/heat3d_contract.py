@@ -146,3 +146,5 @@ class HeatRunResult3D:
     conductivity_refresh_layers: int = 1
     conductivity_reuses: int = 0  # lagged first updates, including failed attempts
     conductivity_fallbacks: int = 0  # rejected lagged updates followed by a fresh one
+    history_mode: str = "full"  # all outer records, or the latest record of each layer
+    history_records_discarded: int = 0  # intermediate diagnostics removed, not work
