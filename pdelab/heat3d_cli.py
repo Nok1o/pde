@@ -1,8 +1,9 @@
-"""python -m pdelab.heat3d_cli run|study: all conditions of kind 1."""
+"""python -m pdelab.heat3d_cli run|study: per-face conditions of kind 1 or 3."""
 
 import argparse
 from pathlib import Path
 
+from .heat3d_boundary_options import add_boundary_arguments, boundary_configuration
 from .heat3d_experiment import (
     APPLICABILITY,
     METHOD_NAMES,
@@ -22,6 +23,7 @@ def main(argv=None):
     parser.add_argument("--case", choices=("sine", "polynomial"), default="sine")
     parser.add_argument("--n", type=int, default=8)
     parser.add_argument("--alpha", type=float, default=0.5)
+    add_boundary_arguments(parser)
     parser.add_argument("--dt", type=float, default=0.01)
     parser.add_argument("--T", type=float, default=0.02)
     parser.add_argument(
@@ -79,6 +81,7 @@ def main(argv=None):
         index=args.index,
         newton=args.newton,
         methods=tuple(args.methods),
+        **boundary_configuration(args),
     )
     settings = HeatSettings3D(
         tolerance=args.tol,

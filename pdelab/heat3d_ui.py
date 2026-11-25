@@ -7,6 +7,7 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
+from .boundary3d import FACES
 from .heat3d_block import BLOCK_MAX_N
 from .heat3d_experiment import (
     APPLICABILITY,
@@ -103,7 +104,9 @@ def _saved_settings(result, current):
                     "query_size",
                     "target_time",
                     "boundary_kinds",
+                    "boundary_betas",
                 )
+                if key in saved
             }
         )
         st.code(saved["reproduction"], language="bash")
@@ -135,6 +138,26 @@ def render_heat3d_app():
         alpha = st.number_input(
             "α в k(u)=1+αu²", min_value=0.0, max_value=100.0, value=0.5, key="h3_alpha"
         )
+        kinds, betas = [], []
+        with st.expander("Граничные условия", key="h3_boundaries"):
+            for face in FACES:
+                kind = st.selectbox(
+                    "Грань " + face,
+                    (1, 3),
+                    format_func=lambda value: f"{value} рода",
+                    key="h3_kind_" + face,
+                )
+                beta = st.number_input(
+                    "β на " + face,
+                    min_value=0.0001,
+                    max_value=1000.0,
+                    value=1.0,
+                    format="%.4f",
+                    disabled=kind == 1,
+                    key="h3_beta_" + face,
+                )
+                kinds.append(kind)
+                betas.append(beta)
         dt = st.number_input(
             "Физический шаг dt",
             min_value=0.0001,
@@ -257,6 +280,8 @@ def render_heat3d_app():
         index=index,
         newton=newton,
         methods=tuple(methods),
+        kinds=tuple(kinds),
+        betas=tuple(betas),
     )
     settings = HeatSettings3D(
         tolerance=tolerance,
@@ -278,16 +303,24 @@ def render_heat3d_app():
         else:
             st.latex(r"u^*(x,y,z,t)=1+t+\frac{x+2y+3z+xy+xz+yz+x^2+y^2+z^2}{4}")
         st.latex(r"F=u_t^*-(1+\alpha(u^*)^2)\Delta u^*-2\alpha u^*|\nabla u^*|^2")
-        st.latex(
-            r"u(x,y,z,0)=u^*(x,y,z,0),\qquad u|_{\partial\Omega}=g=u^*|_{\partial\Omega}"
-        )
+        st.latex(r"u(x,y,z,0)=u^*(x,y,z,0)")
+        if 1 in kinds:
+            st.latex(r"\text{1 род:}\quad u=g,\qquad g=u^*|_{\Gamma}")
+        if 3 in kinds:
+            st.latex(
+                r"\text{3 род:}\quad (1+\alpha u^2)\frac{\partial u}{\partial n}+\beta u=r,\quad"
+                r"r=(1+\alpha (u^*)^2)\frac{\partial u^*}{\partial n}+\beta u^*"
+            )
+            st.write(
+                "n — внешняя нормаль, β > 0 — коэффициент теплообмена; r — заданные граничные данные. На рёбрах вклады граней складываются; условие 1 рода фиксирует общий узел."
+            )
         st.write(
             "u — температура, k(u)=1+αu² — теплопроводность, F — источник. "
             "Параметр α задаёт силу нелинейности; при α=0 уравнение линейное. "
             "u* — известное проверочное решение, используемое для оценки ошибки."
         )
         st.write(
-            "На всех шести гранях заданы условия 1 рода. Источник и границы согласованы с выбранным аналитическим решением. Неявный Эйлер использует фактический последний шаг до T; коэффициенты заморожены на всю линейную серию Пикара."
+            "Источник и границы согласованы с выбранным аналитическим решением. Неявный Эйлер использует фактический последний шаг до T; коэффициенты заморожены на всё линейное решение Пикара."
         )
         st.write(
             "Ошибка в области Q — относительная L2-норма к аналитическому решению. В исследовании усредняются ошибки отдельных полных запусков. Независимый Ньютон — отдельная сеточная диагностика; невязка не заменяет ошибку к аналитическому решению."

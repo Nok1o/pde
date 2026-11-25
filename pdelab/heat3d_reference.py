@@ -1,8 +1,9 @@
-"""Independent small-grid Newton assembly for Dirichlet heat layers in 3D.
+"""Independent small-grid Newton assembly for physical heat layers in 3D.
 
-Only interior temperatures are unknown. All input fields use [z, y, x];
-the sparse matrix uses C order, so x varies fastest. This reference does
-not use the frozen production operator or substitute manufactured solutions.
+All input fields use [z, y, x]; unknowns use C order, so x varies fastest.
+The legacy call has interior unknowns; supplying a problem also admits free
+Robin boundary nodes. Neither assembly uses the frozen production operator
+or substitutes manufactured solutions.
 """
 
 import numpy as np
@@ -124,28 +125,155 @@ def _evaluate(values, previous, alpha, source, dt, *, jacobian=False, scale=Fals
     return residual, matrix, residual_scale
 
 
-def newton_system3d(values, previous, alpha, source, dt):
-    """Return the interior nonlinear residual and its independent CSR Jacobian.
+def _evaluate_boundaries(
+    values, previous, alpha, source, dt, *, problem, t, jacobian=False, scale=False
+):
+    """Assemble half-control-volume rows independently of the production stencil."""
+    n, values, previous, source, alpha, inverse_dt = _validated_inputs(
+        values, previous, alpha, source, dt
+    )
+    t = _scalar(t, "t")
+    if problem.n != n:
+        raise ValueError("problem: размер сетки должен совпадать с полями")
+    fixed = np.zeros(values.shape, dtype=bool)
+    boundary = np.zeros(values.shape)
+    robin = []
+    # Deliberately derive the geometry here, without production masks or weights.
+    for axis, letter in enumerate("zyx"):
+        for side in (0, 1):
+            face = problem.faces[f"{letter}{side}"]
+            index = [slice(None)] * 3
+            index[axis] = -1 if side else 0
+            index = tuple(index)
+            sampled = problem.face_values(f"{letter}{side}", t)
+            if face.kind == 1:
+                overlap = fixed[index]
+                if not np.allclose(
+                    boundary[index][overlap], sampled[overlap], rtol=1e-12, atol=1e-12
+                ):
+                    raise ValueError("На ребре или в углу несовместимы условия 1 рода")
+                boundary[index] = sampled
+                fixed[index] = True
+            elif face.kind == 3:
+                robin.append((index, face.beta, sampled))
+            else:
+                raise ValueError("Поддержаны граничные условия 1 и 3 рода")
+    values = values.copy()
+    values[fixed] = boundary[fixed]
+    free = ~fixed
+    size = int(free.sum())
+    rows, columns, coefficients = [], [], []
+    indices = np.full(values.shape, -1, dtype=int) if jacobian else None
+    if jacobian:
+        indices[free] = np.arange(size)
+    diagonal = np.full(values.shape, inverse_dt) if jacobian else None
+    with np.errstate(over="ignore", invalid="ignore"):
+        scaled = np.sqrt(alpha) * values
+        conductivity = 1 + scaled * scaled
+        if not np.isfinite(conductivity).all():
+            raise ValueError("Проводимость должна быть конечной")
+        residual = (values - previous) * inverse_dt - source
+        rhs = previous * inverse_dt + source if scale else None
+        for index, beta, load in robin:
+            # k * du/dn is already present in r; no additional k belongs here.
+            residual[index] += 2 * n * (beta * values[index] - load)
+            if jacobian:
+                diagonal[index] += 2 * n * beta
+            if scale:
+                rhs[index] += 2 * n * load
+        for axis in range(3):
+            for sign in (-1, 1):
+                origin = [slice(None)] * 3
+                neighbor = [slice(None)] * 3
+                origin[axis] = slice(1, None) if sign < 0 else slice(None, -1)
+                neighbor[axis] = slice(None, -1) if sign < 0 else slice(1, None)
+                origin, neighbor = tuple(origin), tuple(neighbor)
+                center, adjacent = values[origin], values[neighbor]
+                geometry = np.full(center.shape, float(n**2))
+                boundary_origin = [slice(None)] * 3
+                boundary_origin[axis] = -1 if sign < 0 else 0
+                # The inward normal edge spans a half width at the boundary.
+                geometry[tuple(boundary_origin)] *= 2
+                weight = (
+                    0.5 * conductivity[origin] + 0.5 * conductivity[neighbor]
+                ) * geometry
+                difference = center - adjacent
+                residual[origin] += weight * difference
+                if jacobian:
+                    diagonal[origin] += weight + alpha * center * difference * geometry
+                    derivative = -weight + alpha * adjacent * difference * geometry
+                    connected = free[origin] & free[neighbor]
+                    rows.append(indices[origin][connected])
+                    columns.append(indices[neighbor][connected])
+                    coefficients.append(derivative[connected])
+                if scale:
+                    known = fixed[neighbor]
+                    rhs[origin] += weight * np.where(known, adjacent, 0)
+        residual = residual[free]
+        if not np.isfinite(residual).all():
+            raise ValueError("Нелинейная невязка должна быть конечной")
+        matrix = None
+        if jacobian:
+            rows.append(indices[free])
+            columns.append(indices[free])
+            coefficients.append(diagonal[free])
+            data = np.concatenate(coefficients)
+            if not np.isfinite(data).all():
+                raise ValueError("Якобиан должен быть конечным")
+            matrix = csr_matrix(
+                (data, (np.concatenate(rows), np.concatenate(columns))),
+                shape=(size, size),
+            )
+            if not np.isfinite(matrix.data).all():
+                raise ValueError("Якобиан должен быть конечным")
+        residual_scale = None
+        if scale:
+            rhs = rhs[free]
+            applied = residual + rhs
+            if not np.isfinite(rhs).all() or not np.isfinite(applied).all():
+                raise ValueError("Масштаб невязки должен быть конечным")
+            residual_scale = float(max(np.max(np.abs(rhs)), np.max(np.abs(applied))))
+    return residual, matrix, residual_scale
+
+
+def _dispatch(values, previous, alpha, source, dt, *, problem, t, **options):
+    if problem is None:
+        return _evaluate(values, previous, alpha, source, dt, **options)
+    return _evaluate_boundaries(
+        values, previous, alpha, source, dt, problem=problem, t=t, **options
+    )
+
+
+def newton_system3d(values, previous, alpha, source, dt, *, problem=None, t=0.0):
+    """Return the nonlinear residual and its independent CSR Jacobian.
 
     ``values`` already contains the current Dirichlet boundary data;
     ``previous`` is the actual previous time layer. ``source`` is the fixed
     full-grid F at the current time, and dt is the actual layer duration.
+    With ``problem``, physical face data are sampled at ``t`` and the residual
+    is a flat C-order vector of all nodes free of kind-1 constraints, including
+    kind-3 faces, edges and corners. Without it, the original interior residual
+    shape (n-1, n-1, n-1) and supplied boundary values are preserved.
     No derivative or matrix column is introduced for a fixed boundary node.
     All fields must have shape (n+1, n+1, n+1), with 4 <= n <= DIRECT_MAX_N.
     """
-    residual, matrix, _ = _evaluate(values, previous, alpha, source, dt, jacobian=True)
+    residual, matrix, _ = _dispatch(
+        values, previous, alpha, source, dt, problem=problem, t=t, jacobian=True
+    )
     return residual, matrix
 
 
-def newton_residual3d(values, previous, alpha, source, dt):
+def newton_residual3d(values, previous, alpha, source, dt, *, problem=None, t=0.0):
     """Evaluate the same residual without allocating a sparse Jacobian."""
-    return _evaluate(values, previous, alpha, source, dt)[0]
+    return _dispatch(values, previous, alpha, source, dt, problem=problem, t=t)[0]
 
 
-def newton_scale3d(values, previous, alpha, source, dt):
-    """Return max(||rhs||inf, ||A(values) values||inf) on interior nodes.
+def newton_scale3d(values, previous, alpha, source, dt, *, problem=None, t=0.0):
+    """Return max(||rhs||inf, ||A(values) values||inf) on free nodes.
 
     The fixed boundary contributions are included in rhs and removed from A.
     Call once at the start of a layer to obtain its fixed residual scale.
     """
-    return _evaluate(values, previous, alpha, source, dt, scale=True)[2]
+    return _dispatch(
+        values, previous, alpha, source, dt, problem=problem, t=t, scale=True
+    )[2]

@@ -14,6 +14,7 @@ from time import perf_counter
 
 import numpy as np
 
+from .boundary3d import FACES
 from .heat3d_problem import make_heat_problem3d
 from .problem3d import select_points3d
 from .study_protocol import (
@@ -55,9 +56,8 @@ STATUS_LABELS = {
     "unsupported": "Не поддерживается",
 }
 APPLICABILITY = (
-    "Нелинейная нестационарная теплопроводность в 3D, все условия 1 рода. "
-    "MC для этой модели и условия 2/3 рода здесь не реализованы; "
-    "они не заменяются стационарными или двумерными методами."
+    "Нелинейная нестационарная теплопроводность в 3D, условия 1 или 3 рода на каждой грани. "
+    "MC пока доступен только для диагностики одной замороженной системы."
 )
 
 
@@ -74,6 +74,8 @@ class HeatConfig3D:
     index: int | None = None
     newton: bool = False
     methods: tuple[str, ...] = ("lod",)
+    kinds: tuple[int, ...] = (1, 1, 1, 1, 1, 1)  # x0,x1,y0,y1,z0,z1
+    betas: tuple[float, ...] = (1.0, 1.0, 1.0, 1.0, 1.0, 1.0)
 
 
 def _inputs(config, settings):
@@ -92,7 +94,34 @@ def _inputs(config, settings):
         raise ValueError("Шаг времени должен быть положительным и конечным")
     if not np.isfinite(config.T) or config.T < 0:
         raise ValueError("Конечное время должно быть неотрицательным и конечным")
-    problem = make_heat_problem3d(config.case, config.n, config.alpha)
+    if (
+        not isinstance(config.kinds, (tuple, list))
+        or len(config.kinds) != 6
+        or any(
+            isinstance(kind, (bool, np.bool_)) or kind not in (1, 3)
+            for kind in config.kinds
+        )
+    ):
+        raise ValueError("Задайте условия 1 или 3 рода для всех шести граней")
+    if (
+        not isinstance(config.betas, (tuple, list))
+        or len(config.betas) != 6
+        or any(
+            not np.isscalar(beta)
+            or np.iscomplexobj(beta)
+            or not np.isfinite(beta)
+            or beta <= 0
+            for beta in config.betas
+        )
+    ):
+        raise ValueError("Для каждой грани нужен конечный beta > 0")
+    problem = make_heat_problem3d(
+        config.case,
+        config.n,
+        config.alpha,
+        kinds=dict(zip(FACES, config.kinds, strict=True)),
+        beta=dict(zip(FACES, config.betas, strict=True)),
+    )
     points = select_points3d(
         config.n, config.mode, config.point, config.plane, config.index
     )
@@ -135,7 +164,11 @@ def _metadata(config, settings, points):
         method_names=[METHOD_NAMES[method] for method in config.methods],
         method=config.methods[0] if len(config.methods) == 1 else "multiple",
         method_name="; ".join(METHOD_NAMES[method] for method in config.methods),
-        boundary_kinds=dict.fromkeys(("x0", "x1", "y0", "y1", "z0", "z1"), 1),
+        boundary_kinds=dict(zip(FACES, config.kinds, strict=True)),
+        boundary_betas={
+            face: beta if kind == 3 else None
+            for face, kind, beta in zip(FACES, config.kinds, config.betas, strict=True)
+        },
         applicability=APPLICABILITY,
         points_zyx=points.tolist(),
         array_order="zyx",
@@ -221,6 +254,8 @@ def _reproduction(
     ]
     if config.mode == "point" and config.point is not None:
         parts += ["--point", *(str(v) for v in config.point)]
+    for face, kind, beta in zip(FACES, config.kinds, config.betas, strict=True):
+        parts += ["--" + face, str(kind), "--beta-" + face, str(beta)]
     if config.mode == "slice":
         parts += [
             "--plane",
