@@ -14,6 +14,37 @@ from pdelab.study_policy import (
 )
 
 
+def incomplete_details_app():
+    from pdelab.study_policy import SELECTION_POLICY, render_accuracy_results
+
+    render_accuracy_results(
+        [
+            dict(
+                method="picard",
+                target_pct=1.0,
+                status="confirmed",
+                seconds=0.002,
+                relative_error_pct=0.5,
+                selection_policy=SELECTION_POLICY,
+            )
+        ],
+        key="test_details",
+    )
+
+
+def test_missing_phase_measurements_are_not_shown_as_zero_cost():
+    from streamlit.testing.v1 import AppTest
+
+    app = AppTest.from_function(incomplete_details_app).run()
+    assert not app.exception
+    row = app.dataframe[1].value.iloc[0]
+    assert row["Подбор, %"] == "нет данных"
+    assert row["Попыток проверки"] == "нет данных"
+    assert row["Подбор и проверки, с"] == "нет данных"
+    assert row["Проверка, %"] == "0.5"
+    assert row["Статус"] == "Достигнута"
+
+
 @pytest.mark.parametrize("failed_phase", ["calibration", "validation"])
 def test_nonconvergence_retries_larger_budget_with_fresh_series(failed_phase):
     calls = []

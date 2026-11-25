@@ -381,6 +381,7 @@ def render_accuracy_results(rows, names=None, *, key):
             continue
         pilot = row.get("calibration_error_pct")
         check = row.get("relative_error_pct", row.get("validation_error_pct"))
+        search_seconds = row.get("search_seconds")
         status = readable_status(row)
         if row.get("calibration_margin_relaxed"):
             status += "; максимум путей, без дополнительного запаса"
@@ -395,10 +396,14 @@ def render_accuracy_results(rows, names=None, *, key):
             {
                 "Метод": names.get(row["method"], row.get("name", row["method"])),
                 "Бюджет": budget_label(row),
-                "Подбор, %": f"{pilot:.3g}" if pilot is not None else "не завершён",
-                "Проверка, %": f"{check:.3g}" if check is not None else "не завершена",
-                "Попыток проверки": row.get("validation_attempts", 1),
-                "Подбор и проверки, с": round(row.get("search_seconds", 0), 3),
+                "Подбор, %": f"{pilot:.3g}" if pilot is not None else "нет данных",
+                "Проверка, %": f"{check:.3g}" if check is not None else "нет данных",
+                "Попыток проверки": str(row.get("validation_attempts", "нет данных")),
+                "Подбор и проверки, с": (
+                    f"{search_seconds:.3g}"
+                    if search_seconds is not None
+                    else "нет данных"
+                ),
                 "Статус": status,
             }
         )
