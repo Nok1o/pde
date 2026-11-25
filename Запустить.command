@@ -6,7 +6,8 @@ export XDG_CACHE_HOME="$PWD/.cache"
 if [[ ! -x .venv/bin/python ]]; then
   echo 'Первый запуск: подготовка Python и библиотек. Понадобится интернет.'
   python3 -m venv .venv
-  .venv/bin/python -m pip install -e .
+  .venv/bin/python -m pip install -r requirements-tested.txt
+  .venv/bin/python -m pip install --no-deps -e .
 fi
 echo 'Открывается программа. Для остановки нажмите Ctrl+C в этом окне.'
 .venv/bin/python main.py
