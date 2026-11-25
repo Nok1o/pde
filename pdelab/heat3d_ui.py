@@ -548,6 +548,7 @@ def render_heat3d_app():
             key="h3_margin",
         )
         study_config = replace(config, newton=False)
+        study_settings = replace(settings, seed=seed) if has_mc else settings
         study_parameters = dict(
             repeats=repeats,
             seed=seed,
@@ -568,7 +569,7 @@ def render_heat3d_app():
             try:
                 st.session_state["h3_study"] = study_heat3d(
                     study_config,
-                    settings,
+                    study_settings,
                     **study_parameters,
                     progress=lambda fraction, text: bar.progress(
                         float(fraction), text=text
@@ -583,7 +584,8 @@ def render_heat3d_app():
             _saved_settings(
                 study,
                 dict(
-                    configuration=asdict(study_config), solver_settings=asdict(settings)
+                    configuration=asdict(study_config),
+                    solver_settings=asdict(study_settings),
                 ),
             )
             if any(

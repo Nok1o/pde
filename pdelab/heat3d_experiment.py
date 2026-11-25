@@ -40,6 +40,7 @@ BLOCK_DIAGNOSTICS = (
     "factor_reuses",
 )
 MC_DIAGNOSTICS = (
+    "warmup_seconds",
     "completed_walks",
     "validation_walks",
     "coarse_iterations",
@@ -58,7 +59,7 @@ STATUS_LABELS = {
     "relative_target_not_applicable": "Относительная цель неприменима",
     "linear_limit": "Лимит линейных итераций",
     "outer_limit": "Лимит итераций Пикара",
-    "walk_budget": "Лимит числа путей",
+    "walk_budget": "Лимит числа путей или переходов",
     "path_limit": "Лимит длины пути",
     "time_limit": "Лимит времени полного запуска",
     "memory_limit": "Лимит рабочей памяти",
@@ -200,7 +201,7 @@ def _metadata(config, settings, points):
         python=platform.python_version(),
         platform=platform.platform(),
         versions=_versions(),
-        timing="Each solve includes preparation, all physical layers, Picard and linear iterations; analytic/Newton references and UI/export are separate. preparation_seconds is a subset of seconds. Block assembly_seconds is included in preparation_seconds; factorization_seconds and solve_seconds are also subsets of seconds, never additional total costs.",
+        timing="Solver seconds include preparation, all physical layers, Picard iterations, and independent MC checks. JIT warmup_seconds, external references and UI/export are separate. Preparation, block assembly/factorization/solve and coarse/interpolation/defect times are subsets of solver seconds.",
         memory="workspace_bytes is an estimated numerical working set; peak_rss_bytes is null unless measured, never inferred from workspace_bytes.",
     )
 
@@ -494,6 +495,8 @@ def study_heat3d(
     ):
         raise ValueError("Бюджеты MC должны быть целыми от 2 до 2³¹−1")
     problem, points, settings = _inputs(config, settings)
+    if any(method in MC_METHODS for method in config.methods):
+        settings = replace(settings, seed=seed)
     started = perf_counter()
     exact = problem.evaluate(problem.exact, config.T)[tuple(points.T)]
     analytic_seconds = perf_counter() - started
