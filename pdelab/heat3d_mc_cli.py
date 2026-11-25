@@ -11,7 +11,9 @@ from time import perf_counter
 import numpy as np
 from scipy.sparse.linalg import spsolve
 
+from .heat3d_control import solve_controlled_frozen_mc3d
 from .heat3d_experiment import csv_bytes, json_bytes
+from .heat3d_linear import warmup_lines3d
 from .heat3d_mc import solve_frozen_mc3d, warmup_mc3d
 from .heat3d_operator import freeze_heat3d
 from .heat3d_problem import make_heat_problem3d
@@ -26,6 +28,10 @@ def main(argv=None):
     parser.add_argument("--dt", type=float, default=0.01)
     parser.add_argument("--point", nargs=3, type=int, metavar=("X", "Y", "Z"))
     parser.add_argument("--walks", type=int, default=4096)
+    parser.add_argument("--method", choices=("mc", "mc_control"), default="mc")
+    parser.add_argument("--coarse-n", type=int, default=4)
+    parser.add_argument("--coarse-tol", type=float, default=1e-8)
+    parser.add_argument("--coarse-max-iterations", type=int, default=20000)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--max-steps", type=int, default=1000000)
     parser.add_argument("--max-walks", type=int, default=1000000)
@@ -45,16 +51,14 @@ def main(argv=None):
     try:
         warm_start = perf_counter()
         warmup_mc3d()
+        if args.method == "mc_control":
+            warmup_lines3d()
         warm_seconds = perf_counter() - warm_start
         start = perf_counter()
         problem = make_heat_problem3d(args.case, args.n, args.alpha)
         points = select_points3d(args.n, point=args.point)
         previous = problem.initial_values()
-        operator = freeze_heat3d(problem, previous, previous, args.dt, args.dt)
-        construction_seconds = perf_counter() - start
-        result = solve_frozen_mc3d(
-            operator,
-            points,
+        settings = dict(
             walks=args.walks,
             seed=args.seed,
             max_steps=args.max_steps,
@@ -62,10 +66,32 @@ def main(argv=None):
             max_transitions=args.max_transitions,
             max_workspace_bytes=args.max_workspace_bytes,
         )
+        operator = None
+        if args.method == "mc_control":
+            context_seconds = perf_counter() - start
+            result = solve_controlled_frozen_mc3d(
+                problem,
+                previous,
+                previous,
+                args.dt,
+                args.dt,
+                points,
+                coarse_n=args.coarse_n,
+                coarse_tolerance=args.coarse_tol,
+                coarse_max_iterations=args.coarse_max_iterations,
+                **settings,
+            )
+            construction_seconds = context_seconds + result.operator_seconds
+        else:
+            operator = freeze_heat3d(problem, previous, previous, args.dt, args.dt)
+            construction_seconds = perf_counter() - start
+            result = solve_frozen_mc3d(operator, points, **settings)
         full_seconds = perf_counter() - start
         reference, reference_seconds = None, 0.0
         if args.direct:
             reference_start = perf_counter()
+            if operator is None:
+                operator = freeze_heat3d(problem, previous, previous, args.dt, args.dt)
             matrix, rhs = operator.assemble()
             reference = spsolve(matrix, rhs).reshape(operator.shape)[tuple(points.T)]
             reference_seconds = perf_counter() - reference_start
@@ -93,7 +119,11 @@ def main(argv=None):
         numpy=np.__version__,
         source_sha256={
             p.name: hashlib.sha256(p.read_bytes()).hexdigest()
-            for p in (Path(__file__), root / "pdelab/heat3d_mc.py")
+            for p in (
+                Path(__file__),
+                root / "pdelab/heat3d_mc.py",
+                root / "pdelab/heat3d_control.py",
+            )
         },
         coordinate_order="xyz",
         array_order="zyx",
