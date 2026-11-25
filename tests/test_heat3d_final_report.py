@@ -69,6 +69,25 @@ def test_missing_counters_and_incomplete_runs_do_not_claim_parity_speedup():
     assert pair["time_ratio"] is None
 
 
+@pytest.mark.parametrize("method", ["lod", "block"])
+def test_deterministic_pair_has_no_seed_but_requires_all_work_counters(method):
+    fixed, trials = histories()
+    for row in fixed + trials:
+        row["method"] = method
+    for trial in trials:
+        trial.pop("seed")
+    assert paired_history(fixed, trials)[0]["same_results_and_work"]
+    trials[-1].pop("completed_walks")
+    assert not paired_history(fixed, trials)[0]["same_results_and_work"]
+
+
+def test_mc_pair_requires_seed():
+    fixed, trials = histories()
+    for trial in trials:
+        trial.pop("seed")
+    assert not paired_history(fixed, trials)[0]["same_results_and_work"]
+
+
 def test_report_rejects_confirmed_target_backed_by_failed_trials():
     config = dict(
         case="sine",

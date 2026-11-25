@@ -114,6 +114,11 @@ def job_rows(stage, name, payload, key):
                     ),
                     "study_pilot_seconds": result["pilot_seconds"],
                     "study_final_seconds": result["final_seconds"],
+                    **{
+                        k: sum(t[k] for t in selected)
+                        for k in DIAGNOSTICS
+                        if selected and all(k in t for t in selected)
+                    },
                 }
             )
     else:
@@ -225,11 +230,13 @@ def paired_history(fixed, trials):
             ]
             for m in ("full", "layers")
         ]
+        fields = tuple(
+            field
+            for field in PARITY_FIELDS
+            if field != "seed" or method.startswith("mc")
+        )
         equal = len(pair[0]) == len(pair[1]) and all(
-            all(
-                field in a and field in b and a[field] == b[field]
-                for field in PARITY_FIELDS
-            )
+            all(field in a and field in b and a[field] == b[field] for field in fields)
             for a, b in zip(*pair, strict=True)
         )
         comparable = equal and full["complete"] and layers["complete"]
@@ -368,6 +375,7 @@ def plots(root, targets, fixed, history):
 
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
+    from matplotlib.ticker import FuncFormatter, LogLocator, NullLocator
 
     colors = dict(zip(METHODS, plt.get_cmap("tab10").colors, strict=False))
     for stage in ("core-n8", "core-n16", "conductivity-n8", "coarse-n16"):
@@ -376,10 +384,12 @@ def plots(root, targets, fixed, history):
         )
         if not cases:
             continue
+        columns = min(2, len(cases))
+        rows = (len(cases) + columns - 1) // columns
         fig, axes = plt.subplots(
-            (len(cases) + 1) // 2,
-            2,
-            figsize=(13, 3.2 * ((len(cases) + 1) // 2)),
+            rows,
+            columns,
+            figsize=(6.5 * columns, 3.2 * rows),
             squeeze=False,
         )
         for ax, case in zip(axes.flat, cases):
@@ -393,11 +403,25 @@ def plots(root, targets, fixed, history):
             for row in selected:
                 if row["status"] != "confirmed":
                     continue
+                label = METHODS[row["method"]]
+                if stage == "conductivity-n8":
+                    label += f", период {row['conductivity_refresh_layers']}"
+                elif stage == "coarse-n16":
+                    label += f", H/h={row['n'] / row['coarse_n']:g}"
                 ax.scatter(
                     row["seconds"],
                     row["relative_error_pct"],
                     color=colors[row["method"]],
-                    label=row["variant"],
+                    label=label,
+                    marker=(
+                        {1: "o", 2: "^", 4: "s"}[row["conductivity_refresh_layers"]]
+                        if stage == "conductivity-n8"
+                        else (
+                            "s"
+                            if stage == "coarse-n16" and row["coarse_n"] == 4
+                            else "o"
+                        )
+                    ),
                 )
             ax.set(
                 title=case,
@@ -406,6 +430,9 @@ def plots(root, targets, fixed, history):
                 xscale="log",
             )
             ax.grid(alpha=0.2)
+            ax.xaxis.set_major_locator(LogLocator(base=10, subs=(1, 2, 5)))
+            ax.xaxis.set_major_formatter(FuncFormatter(lambda value, _: f"{value:g}"))
+            ax.xaxis.set_minor_locator(NullLocator())
             if ax.collections:
                 ax.legend(fontsize=7)
             else:
@@ -470,6 +497,7 @@ def plots(root, targets, fixed, history):
             )
             ax.legend(fontsize=8)
             ax.grid(alpha=0.2)
+        fig.suptitle("Размер группы · N=1024 на узел, R=5 полных историй")
         fig.tight_layout()
         fig.savefig(root / "groups.png", dpi=150)
         plt.close(fig)
@@ -493,6 +521,44 @@ def plots(root, targets, fixed, history):
         fig.suptitle("Только полные пары с одинаковыми результатами и работой")
         fig.tight_layout()
         fig.savefig(root / "history.png", dpi=150)
+        plt.close(fig)
+    queries = [
+        r
+        for r in fixed
+        if r["stage"] in ("history-n8", "query-slice-n8")
+        and r["history_mode"] == "full"
+        and r["method"] in ("lod", "mc_control")
+        and r["complete"]
+    ]
+    if queries:
+        fig, axes = plt.subplots(1, 2, figsize=(11, 4))
+        for method in ("lod", "mc_control"):
+            rows = sorted(
+                (r for r in queries if r["method"] == method),
+                key=lambda r: r["query_size"],
+            )
+            for ax, key, scale, ylabel in zip(
+                axes,
+                ("completed_mean_seconds", "workspace_bytes"),
+                (1000, 1 / 2**20),
+                ("Полное время, мс", "Оценка буферов, МиБ"),
+                strict=True,
+            ):
+                ax.plot(
+                    [r["query_size"] for r in rows],
+                    [r[key] * scale for r in rows],
+                    "o-",
+                    label=METHODS[method],
+                    color=colors[method],
+                )
+                ax.set(xscale="log", xlabel="Число точек запроса Q", ylabel=ylabel)
+                ax.set_xticks([1, 49, 343], ["1 · точка", "49 · срез", "343 · поле"])
+                ax.xaxis.set_minor_locator(NullLocator())
+                ax.legend()
+                ax.grid(alpha=0.2)
+        fig.suptitle("n=8 · 4 слоя · R=5 · каждый запрос с новой подготовкой")
+        fig.tight_layout()
+        fig.savefig(root / "queries.png", dpi=150)
         plt.close(fig)
 
 

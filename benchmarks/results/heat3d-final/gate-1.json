@@ -1,0 +1,64 @@
+{
+  "timestamp": "2026-11-25T22:20:50.492182+00:00",
+  "source_commit": "0305ca8c48cf7c0ef4357e7ef0e1adef71e01388",
+  "stages": [
+    {
+      "stage": "core-n8",
+      "jobs": 48,
+      "attempts": 550,
+      "seconds": 22.15553279267624,
+      "statuses": {
+        "completed": 475,
+        "outer_limit": 75
+      }
+    },
+    {
+      "stage": "groups-n8",
+      "jobs": 20,
+      "attempts": 100,
+      "seconds": 7.302778208031668,
+      "statuses": {
+        "completed": 100
+      }
+    },
+    {
+      "stage": "history-n8",
+      "jobs": 24,
+      "attempts": 120,
+      "seconds": 7.656841366973822,
+      "statuses": {
+        "completed": 120
+      }
+    },
+    {
+      "stage": "query-slice-n8",
+      "jobs": 2,
+      "attempts": 10,
+      "seconds": 0.5326110829773825,
+      "statuses": {
+        "completed": 10
+      }
+    },
+    {
+      "stage": "sensitivity-n8",
+      "jobs": 10,
+      "attempts": 50,
+      "seconds": 1.8695941280457191,
+      "statuses": {
+        "completed": 50
+      }
+    },
+    {
+      "stage": "conductivity-n8",
+      "jobs": 36,
+      "attempts": 360,
+      "seconds": 24.514306295866845,
+      "statuses": {
+        "completed": 360
+      }
+    }
+  ],
+  "total_solver_seconds": 64.03166387457168,
+  "threshold_seconds": 300,
+  "core_n16_allowed": true
+}
