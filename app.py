@@ -47,9 +47,17 @@ evolution = st.sidebar.radio(
     key="evolution",
 )
 if evolution == "Квазилинейная теплопроводность":
-    from pdelab.nonlinear_ui import render_nonlinear_app
+    nonlinear_dimension = st.sidebar.radio(
+        "Размерность задачи", ["2D", "3D"], horizontal=True, key="nonlinear_dimension"
+    )
+    if nonlinear_dimension == "3D":
+        from pdelab.heat3d_ui import render_heat3d_app
 
-    render_nonlinear_app()
+        render_heat3d_app()
+    else:
+        from pdelab.nonlinear_ui import render_nonlinear_app
+
+        render_nonlinear_app()
     st.stop()
 
 if evolution == "Теплопроводность":
