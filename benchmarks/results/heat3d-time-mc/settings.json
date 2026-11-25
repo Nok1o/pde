@@ -50,7 +50,9 @@
       "coarse_n": 4,
       "max_walks": 8000000,
       "max_transitions": 80000000,
-      "max_path_steps": 1000000
+      "max_path_steps": 1000000,
+      "mc_tolerance": null,
+      "mc_change_tolerance": null
     },
     "methods": [
       "lod"
@@ -92,7 +94,7 @@
     "accuracy_metric": "mean_run_relative_l2_v1",
     "accuracy": "100 * mean_runs(norm_Q(u_run-reference, 2) / norm_Q(reference, 2))",
     "nonlinear_residual": "||A(u)u-rhs(u)||inf / fixed layer scale S; separate from analytic error",
-    "commit": "9fb7046b6ee83c83706f7bc39218eac867c039fd",
+    "commit": "896f6c6a71c2748cc68e0006d462acf39b6e36af",
     "working_tree_dirty": false,
     "python": "3.15.2",
     "platform": "macOS-26.7.2-arm64-arm-64bit-Mach-O",
@@ -102,12 +104,12 @@
       "numba": "0.68.1",
       "streamlit": "1.67.0"
     },
-    "timing": "Each solve includes preparation, all physical layers, Picard and linear iterations; analytic/Newton references and UI/export are separate. preparation_seconds is a subset of seconds. Block assembly_seconds is included in preparation_seconds; factorization_seconds and solve_seconds are also subsets of seconds, never additional total costs.",
+    "timing": "Solver seconds include preparation, all physical layers, Picard iterations, and independent MC checks. JIT warmup_seconds, external references and UI/export are separate. Preparation, block assembly/factorization/solve and coarse/interpolation/defect times are subsets of solver seconds.",
     "memory": "workspace_bytes is an estimated numerical working set; peak_rss_bytes is null unless measured, never inferred from workspace_bytes.",
     "command": "run",
     "reproduction": "python -m pdelab.heat3d_cli run --case polynomial --n 6 --alpha 0.5 --dt 0.004 --T 0.007 --query point --methods lod --tol 1e-11 --change-tol 1e-11 --linear-tol 1e-10 --relaxation 1.0 --max-outer 100 --max-inner 20000 --max-seconds 60.0 --max-workspace-bytes 268435456 --point 0 0 0 --x0 3 --beta-x0 1.0 --x1 1 --beta-x1 1.0 --y0 3 --beta-y0 1.0 --y1 1 --beta-y1 1.0 --z0 3 --beta-z0 1.0 --z1 1 --beta-z1 1.0 --newton --out runs/heat3d-run",
-    "analytic_reference_seconds": 3.329099854454398e-05,
-    "grid_reference_seconds": 0.004916624995530583
+    "analytic_reference_seconds": 3.791699418798089e-05,
+    "grid_reference_seconds": 0.00525658400147222
   },
   "newton_value": 1.0079722026875784,
   "analytic_value": 1.007,
