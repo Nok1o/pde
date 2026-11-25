@@ -16,22 +16,41 @@ SETTINGS = HeatSettings3D(
 METHODS = MC_METHODS
 
 
-def problem(n=5, alpha=0.5, faces=("x0",), case="polynomial"):
+def problem(n=5, alpha=0.5, faces=("x0",), case="polynomial", gamma=0.0, sigma=0.0):
     return make_heat_problem3d(
-        case, n, alpha, kinds={f: 3 if f in faces else 1 for f in FACES}
+        case,
+        n,
+        alpha,
+        kinds={f: 3 if f in faces else 1 for f in FACES},
+        capacity_gamma=gamma,
+        reaction_sigma=sigma,
     )
 
 
 @pytest.mark.parametrize("method", METHODS)
-def test_advances_own_complete_field_and_validates_on_new_streams(method, monkeypatch):
+@pytest.mark.parametrize("gamma,sigma", [(0.0, 0.0), (0.4, 0.25)])
+def test_advances_own_complete_field_and_validates_on_new_streams(
+    method, monkeypatch, gamma, sigma
+):
     import pdelab.heat3d_control as control
 
     def no_reference(*args):
         pytest.fail("The full-history solver tried to read a reference")
 
-    original = problem(faces=FACES)
+    original = problem(faces=FACES, gamma=gamma, sigma=sigma)
     p = replace(original, exact=no_reference)
     line_solver = control.solve_lines3d
+    coarse_freeze = control.freeze_heat3d
+    coarse_calls = []
+
+    def same_material(coarse_problem, *args, **kwargs):
+        coarse_calls.append(coarse_problem.n)
+        assert coarse_problem.capacity_gamma == gamma
+        assert coarse_problem.reaction_sigma == sigma
+        assert coarse_problem.exact is None
+        return coarse_freeze(coarse_problem, *args, **kwargs)
+
+    monkeypatch.setattr(control, "freeze_heat3d", same_material)
 
     def only_coarse(operator, initial, **kwargs):
         assert operator.n == SETTINGS.coarse_n < p.n
@@ -77,6 +96,7 @@ def test_advances_own_complete_field_and_validates_on_new_streams(method, monkey
     assert result.validation_walks >= 2 * p.initial_values().size * SETTINGS.walks
     assert result.seconds >= result.preparation_seconds >= result.coarse_seconds
     assert (result.coarse_iterations > 0) == (method in CONTROL_MC_METHODS)
+    assert bool(coarse_calls) == (method in CONTROL_MC_METHODS)
     assert result.coarse_iterations == result.inner_iterations
     streams = [
         h[k]
@@ -103,8 +123,11 @@ def test_advances_own_complete_field_and_validates_on_new_streams(method, monkey
     "n,alpha,faces",
     [(5, 0, ()), (5, 0.5, ("x0",)), (6, 0.5, ("x0", "y0", "z0")), (6, 0.5, FACES)],
 )
-def test_ensembles_of_whole_histories_agree_with_newton(method, n, alpha, faces):
-    p = problem(n, alpha, faces)
+@pytest.mark.parametrize("gamma,sigma", [(0.0, 0.0), (0.4, 0.25)])
+def test_ensembles_of_whole_histories_agree_with_newton(
+    method, n, alpha, faces, gamma, sigma
+):
+    p = problem(n, alpha, faces, gamma=gamma, sigma=sigma)
     points = [[n // 2] * 3, [2, 2, 0], [2, 0, 0], [0, 0, 0]]
     args = dict(dt=0.002, T=0.003)
     ref = solve_heat3d(

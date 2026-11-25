@@ -77,10 +77,13 @@ def test_temporal_order_against_exact_semidiscrete_evolution():
     assert 1.8 < errors[1] / errors[2] < 2.1
 
 
-def test_spatial_order_with_small_fixed_time_step():
+@pytest.mark.parametrize("gamma,sigma", [(0.0, 0.0), (0.4, 0.3)])
+def test_spatial_order_with_small_fixed_time_step(gamma, sigma):
     errors = []
     for n in (4, 8, 16):
-        problem = make_heat_problem3d(n=n, alpha=0.5)
+        problem = make_heat_problem3d(
+            n=n, alpha=0.5, capacity_gamma=gamma, reaction_sigma=sigma
+        )
         result = solve_heat3d(problem, dt=0.001, T=0.01, settings=STRICT)
         assert result.status == "completed"
         errors.append(
@@ -90,9 +93,12 @@ def test_spatial_order_with_small_fixed_time_step():
     assert 3.7 < errors[1] / errors[2] < 4.5
 
 
-def test_nonlinear_temporal_order_against_independent_semidiscrete_ode():
+@pytest.mark.parametrize("gamma,sigma", [(0.0, 0.0), (0.4, 0.3)])
+def test_nonlinear_temporal_order_against_independent_semidiscrete_ode(gamma, sigma):
     n = 6
-    problem = make_heat_problem3d(n=n, alpha=0.5)
+    problem = make_heat_problem3d(
+        n=n, alpha=0.5, capacity_gamma=gamma, reaction_sigma=sigma
+    )
     interior = np.s_[1:-1, 1:-1, 1:-1]
 
     def rhs(t, unknowns):
@@ -112,6 +118,8 @@ def test_nonlinear_temporal_order_against_independent_semidiscrete_ode():
                     * (conductivity[interior] + conductivity[neighbor])
                     * (values[neighbor] - values[interior])
                 )
+        derivative -= sigma * values[interior] ** 3
+        derivative /= 1 + gamma * values[interior] ** 2
         return derivative.ravel()
 
     reference = solve_ivp(

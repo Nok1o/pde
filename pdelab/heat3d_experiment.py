@@ -71,6 +71,7 @@ STATUS_LABELS = {
 }
 APPLICABILITY = (
     "Нелинейная нестационарная теплопроводность в 3D, условия 1 или 3 рода на каждой грани. "
+    "k=1+αu², c=1+γu², источник F−σu³; α, γ, σ ≥ 0. "
     "Все варианты MC вычисляют полное поле на каждой итерации Пикара."
 )
 
@@ -90,6 +91,8 @@ class HeatConfig3D:
     methods: tuple[str, ...] = ("lod",)
     kinds: tuple[int, ...] = (1, 1, 1, 1, 1, 1)  # x0,x1,y0,y1,z0,z1
     betas: tuple[float, ...] = (1.0, 1.0, 1.0, 1.0, 1.0, 1.0)
+    capacity_gamma: float = 0.0
+    reaction_sigma: float = 0.0
 
 
 def _inputs(config, settings):
@@ -135,6 +138,8 @@ def _inputs(config, settings):
         config.alpha,
         kinds=dict(zip(FACES, config.kinds, strict=True)),
         beta=dict(zip(FACES, config.betas, strict=True)),
+        capacity_gamma=config.capacity_gamma,
+        reaction_sigma=config.reaction_sigma,
     )
     points = select_points3d(
         config.n, config.mode, config.point, config.plane, config.index
@@ -199,6 +204,13 @@ def _metadata(config, settings, points):
         accuracy_metric=METRIC_ID,
         accuracy=METRIC_DESCRIPTION,
         nonlinear_residual="||A(u)u-rhs(u)||inf / fixed layer scale S; separate from analytic error",
+        material_model=dict(
+            capacity="1 + capacity_gamma*u^2",
+            conductivity="1 + alpha*u^2",
+            source="F(x,y,z,t) - reaction_sigma*u^3",
+            time_discretization="c(u_new)*(u_new-u_previous)/dt; implicit Euler, not an enthalpy difference",
+            picard="freeze c(v), k(v), reaction_sigma*v^2; validate the original nonlinear residual",
+        ),
         commit=commit,
         working_tree_dirty=dirty,
         python=platform.python_version(),
@@ -255,6 +267,10 @@ def _reproduction(
         str(config.n),
         "--alpha",
         str(config.alpha),
+        "--capacity-gamma",
+        str(config.capacity_gamma),
+        "--reaction-sigma",
+        str(config.reaction_sigma),
         "--dt",
         str(config.dt),
         "--T",
