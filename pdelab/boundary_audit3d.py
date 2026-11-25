@@ -31,16 +31,73 @@ from .boundary_solvers3d import solve_boundary3d, warmup_boundary3d
 from .heat3d_problem import make_heat_problem3d
 from .measurement_protocol import (
     ACCURACY_METRIC,
-    SCHEMA_VERSION,
     SELECTION_POLICY,
     Trial,
+    export_series,
     run_seed,
     summarize,
 )
 
 VARIANTS = ("all_dirichlet", "y0_robin", "all_robin")
+AUDIT_SCHEMA_VERSION = "boundary_audit_v1"
 TARGETS = (1.0, 5.0, 10.0)
 METHODS = ("lod_serial", "mc")
+
+
+def canonical_series_files(attempt, protocol, *, target_pct):
+    """Explicit boundary_audit_v1 -> measurement_v1 adapter.
+
+    Unknown counters in legacy exceptions cannot be represented by Trial.
+    Refuse that conversion rather than silently omitting work or using zeros.
+    The source summary stays in diagnostics even when metrics are recomputed.
+    """
+    if attempt.get("schema_version") != AUDIT_SCHEMA_VERSION:
+        raise ValueError("Expected boundary_audit_v1; migrate legacy labels explicitly")
+    if attempt["failures"]:
+        raise ValueError(
+            "Unknown failure counters cannot be represented in measurement_v1"
+        )
+    method = attempt["method"]
+    phase = attempt["summary"]["phase"]
+    identity = f"{attempt['case']}/{method}/{phase}/{attempt['budget_index']}"
+    metadata = dict(
+        series_id=identity,
+        commit=protocol["commit"],
+        dirty=protocol["dirty"],
+        environment=protocol["environment"],
+        configuration=dict(protocol=protocol, case=attempt["case"], method=method),
+        reference=dict(description=protocol["reference"]),
+        query=dict(points_zyx=protocol["points_zyx"], xyz=protocol["query_xyz"]),
+        budget=dict(
+            value=attempt["budget"],
+            kind=(
+                "paths_per_estimate"
+                if method == "mc"
+                else "relative_residual_tolerance"
+            ),
+        ),
+        timing=dict(
+            boundary=protocol["timing"], elapsed_seconds=attempt["elapsed_seconds"]
+        ),
+        memory=dict(
+            workspace_method=protocol["workspace_method"],
+            peak_rss_reason=protocol["peak_rss_reason"],
+        ),
+        diagnostics=dict(
+            source_schema=AUDIT_SCHEMA_VERSION,
+            source_summary=attempt["summary"],
+            source_diagnostics=attempt["diagnostics"],
+        ),
+    )
+    return export_series(
+        metadata,
+        [Trial(**t) for t in attempt["trials"]],
+        attempt["reference_values"],
+        requested_repeats=protocol["repeats"],
+        target_pct=target_pct,
+        phase=phase,
+        stochastic=method == "mc",
+    )
 
 
 def stationary_snapshot(kind, n, variant):
@@ -76,9 +133,10 @@ def stationary_snapshot(kind, n, variant):
 
 
 def json_write(path, value):
-    path.write_text(
-        json.dumps(value, ensure_ascii=False, indent=2, allow_nan=False) + "\n",
-        encoding="utf-8",
+    path.write_bytes(
+        (
+            json.dumps(value, ensure_ascii=False, indent=2, allow_nan=False) + "\n"
+        ).encode("utf-8")
     )
 
 
@@ -87,7 +145,9 @@ def csv_write(path, rows):
         path.write_text("", encoding="utf-8")
         return
     buffer = io.StringIO(newline="")
-    writer = csv.DictWriter(buffer, list(dict.fromkeys(k for row in rows for k in row)))
+    writer = csv.DictWriter(
+        buffer, list(dict.fromkeys(k for row in rows for k in row)), lineterminator="\n"
+    )
     writer.writeheader()
     writer.writerows(rows)
     path.write_bytes(buffer.getvalue().encode("utf-8-sig"))
@@ -208,13 +268,18 @@ def measure_series(
             )
             break
     summary = summarize(
-        trials, reference, requested_repeats=len(seeds), target_pct=target, phase=phase
+        trials,
+        reference,
+        requested_repeats=len(seeds),
+        target_pct=target,
+        phase=phase,
+        stochastic=method == "mc",
     )
     summary["spent_seconds"] += sum(f["seconds"] for f in failures)
     if failures:
         summary.update(walks=None, transitions=None, reason=failures[-1]["reason"])
     return dict(
-        schema_version=SCHEMA_VERSION,
+        schema_version=AUDIT_SCHEMA_VERSION,
         summary=summary,
         trials=[asdict(t) for t in trials],
         failures=failures,
@@ -259,6 +324,7 @@ def run(
         "lod_serial": (0.01, 0.001, 0.0001, 0.00001),
     }
     meta = dict(
+        schema_version=AUDIT_SCHEMA_VERSION,
         **provenance(),
         accuracy_metric=ACCURACY_METRIC,
         selection_policy=SELECTION_POLICY,
@@ -421,6 +487,7 @@ def run(
                         requested_repeats=repeats,
                         target_pct=target,
                         phase="control",
+                        stochastic=method == "mc",
                     )
                     result["spent_seconds"] = data["summary"]["spent_seconds"]
                     if data["failures"]:
@@ -469,7 +536,15 @@ def run(
                 )
     csv_write(out / "ratios.csv", ratios)
     json_write(out / "protocol.json", meta)
-    json_write(out / "results.json", dict(protocol=meta, summary=rows, ratios=ratios))
+    json_write(
+        out / "results.json",
+        dict(
+            schema_version=AUDIT_SCHEMA_VERSION,
+            protocol=meta,
+            summary=rows,
+            ratios=ratios,
+        ),
+    )
     return rows
 
 

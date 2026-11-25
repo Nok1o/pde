@@ -129,5 +129,6 @@
   "peak_rss_reason": "No isolated process RSS measurement in this pilot",
   "timing": "Fresh data sampling plus solve/mandatory checks. JIT, external reference, metric, export excluded. Soft phase limit between full runs.",
   "reproduction": "python -m pdelab.boundary_audit3d --n 16 --repeats 5 --seed 20261125 --seconds 120.0 --functions sine polynomial --point center --out runs/boundary-audit-reproduction",
-  "warmup_seconds": 4.190726900007576
+  "warmup_seconds": 4.190726900007576,
+  "schema_version": "boundary_audit_v1"
 }

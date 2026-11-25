@@ -2,6 +2,7 @@
 
 import argparse
 import json
+from collections import Counter
 from pathlib import Path
 
 import matplotlib
@@ -38,8 +39,26 @@ def render(folder):
             trials.append(row)
     csv_write(folder / "trials.csv", trials)
     rows = results["summary"]
-    figures, axes = plt.subplots(2, 3, figsize=(13, 7), squeeze=False)
-    for axis, case in zip(axes.flat, dict.fromkeys(a["case"] for a in attempts)):
+    cases = list(dict.fromkeys(a["case"] for a in attempts))
+    functions = list(dict.fromkeys(r["case"].split("-", 1)[0] for r in rows))
+    counts = Counter(r["status"] for r in rows)
+    count_text = "; ".join(
+        f"{status}: {count}" for status, count in sorted(counts.items())
+    )
+    control_text = (
+        "Все строки целей подтверждены."
+        if rows and counts["confirmed"] == len(rows)
+        else "Есть неподтверждённые цели; их причины приведены ниже."
+    )
+    columns = min(3, max(1, len(cases)))
+    figure_rows = max(1, (len(cases) + columns - 1) // columns)
+    figures, axes = plt.subplots(
+        figure_rows, columns, figsize=(4.4 * columns, 3.5 * figure_rows), squeeze=False
+    )
+    for axis in axes.flat[len(cases) :]:
+        axis.set_visible(False)
+    for axis, case in zip(axes.flat, cases):
+        plotted = False
         for method, color in (("lod_serial", "tab:blue"), ("mc", "tab:orange")):
             for phase, marker in (("pilot", "x"), ("control", "o")):
                 subset = [
@@ -49,7 +68,13 @@ def render(folder):
                     and a["method"] == method
                     and a["summary"]["phase"] == phase
                     and a["summary"]["relative_error_pct"] is not None
+                    and a["summary"]["relative_error_pct"] > 0
+                    and a["summary"].get("mean_seconds") is not None
+                    and a["summary"]["mean_seconds"] > 0
                 ]
+                if not subset:
+                    continue
+                plotted = True
                 axis.scatter(
                     [a["mean_seconds"] for a in subset],
                     [a["relative_error_pct"] for a in subset],
@@ -65,11 +90,22 @@ def render(folder):
             ylabel="Ошибка, %",
         )
         axis.grid(alpha=0.25)
+        if not plotted:
+            axis.set_xlim(1, 10)
+            axis.set_ylim(1, 10)
+            axis.text(
+                0.5,
+                0.5,
+                "Нет положительных точек\nдля логарифмического графика",
+                ha="center",
+                transform=axis.transAxes,
+            )
         axis.xaxis.set_major_locator(LogLocator(base=10, subs=(1, 2, 5)))
         axis.xaxis.set_major_formatter(FuncFormatter(lambda value, _: f"{value:.3g}"))
         axis.xaxis.set_minor_formatter(NullFormatter())
         axis.tick_params(axis="x", labelsize=8)
-    axes[0, 0].legend(fontsize=7)
+    if cases and axes[0, 0].get_legend_handles_labels()[0]:
+        axes[0, 0].legend(fontsize=7)
     figures.tight_layout()
     figures.savefig(folder / "error-time.png", dpi=150)
     plt.close(figures)
@@ -78,7 +114,8 @@ def render(folder):
         "# Ранние результаты #27: стационарные 3D-границы",
         "",
         f"n={protocol['n']}, R={protocol['repeats']}, Q={protocol['query_xyz']}, seed={protocol['root_seed']}. "
-        "Две функции #24 при t=0, k=1, beta=1. Ошибка — среднее относительных L2-ошибок полных запусков. "
+        f"Функции #24: {', '.join(functions)}; t=0, k=1, beta={protocol.get('beta', 1)}. "
+        "Ошибка — среднее относительных L2-ошибок полных запусков. "
         "Это стационарный опыт; перенос на нелинейную временную задачу ещё не выполнен.",
         "",
         "## Цель 1%",
@@ -126,6 +163,24 @@ def render(folder):
             f"{row.get('budget','—')} | {counter} | "
             f"{workspace_label} | {row['status']} |"
         )
+    lines.extend(["", "## Итог всех целей", "", f"{control_text} {count_text}.", ""])
+    failed = [r for r in rows if r["status"] != "confirmed"]
+    if failed:
+        lines.extend(
+            [
+                "| Случай | Метод | Цель, % | Статус | Причина |",
+                "|---|---|---:|---|---|",
+            ]
+        )
+        for row in failed:
+            reason = (
+                str(row.get("reason", "нет данных"))
+                .replace("|", "/")
+                .replace("\n", " ")
+            )
+            lines.append(
+                f"| {row['case']} | {row['method']} | {row['target_pct']:g} | {row['status']} | {reason} |"
+            )
     lines.extend(
         [
             "",
@@ -155,13 +210,15 @@ def render(folder):
             "",
             "## Ограничения",
             "",
-            "R=5 — пилот без статистической гарантии. Одна сетка и одна внутренняя точка; "
-            "n=32 и нецентральная точка ещё не измерены. Нет вывода об универсальном выигрыше. "
-            "Все выбранные здесь контрольные серии прошли, но неподходящие бюджеты пилота также сохранены. "
+            f"R={protocol['repeats']} — пилот без статистической гарантии. "
+            f"Область выводов: n={protocol['n']}, Q={protocol['query_xyz']}, функции {', '.join(functions)}. "
+            "Остальные конфигурации не входят в данный пакет. Нет вывода об универсальном выигрыше. "
+            "Все попытки подбора и контроля сохранены независимо от результата. "
             "Пределы времени и пути мягкие/явные согласно protocol.json. Отказы и неполные серии проверены отдельными тестами.",
             "",
             "В файлах protocol.json/source.zip сохранены commit, признак dirty, хеши и исходники исполнявшегося кода. "
-            "Незакоммиченный runner не объявлен частью main. Отчёт построен из сохранённых наблюдений отдельно, без повторного подбора.",
+            f"Признак dirty измеренного запуска: {protocol.get('dirty', 'не указан')}. "
+            "Отчёт построен из сохранённых наблюдений отдельно, без повторного подбора.",
             "",
             "## Воспроизведение",
             "",

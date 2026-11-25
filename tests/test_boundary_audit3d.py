@@ -201,6 +201,7 @@ def test_control_failure_does_not_restart_pilot_and_selection_is_written_first(
                 requested_repeats=len(seeds),
                 target_pct=target,
                 phase=phase,
+                stochastic=method == "mc",
             ),
             trials=[asdict(t) for t in trials],
             failures=[],
