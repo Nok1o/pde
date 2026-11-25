@@ -1,14 +1,16 @@
 """Supported nonlinear 3D workflow; saved settings belong to saved results."""
 
+import json
 from dataclasses import asdict, replace
 
 import pandas as pd
 import plotly.express as px
 import streamlit as st
 
+from .heat3d_block import BLOCK_MAX_N
 from .heat3d_experiment import (
     APPLICABILITY,
-    METHOD_NAME,
+    METHOD_NAMES,
     STATUS_LABELS,
     HeatConfig3D,
     compare_heat3d,
@@ -30,6 +32,29 @@ def _error_text(row, *, absolute=False):
     ):
         return "неприменима: нулевой эталон"
     return "нет оценки: расчёт или серия не завершены"
+
+
+def _block_diagnostics(rows):
+    labels = {
+        "phase": "Серия",
+        "budget": "Допуск",
+        "assembly_seconds": "Сборка блоков, с",
+        "factorization_seconds": "Факторизация, с",
+        "solve_seconds": "Решение с факторами, с",
+        "factorizations": "Факторизаций",
+        "factor_reuses": "Повторных использований факторов",
+    }
+    display = [
+        {label: row[key] for key, label in labels.items() if row.get(key) is not None}
+        for row in rows
+        if row.get("method") == "block"
+    ]
+    if display:
+        st.caption(
+            "Времена сборки блоков, факторизации и решения входят в полное время. "
+            "Сборка блоков также входит во время подготовки; эти времена не складываются."
+        )
+        st.dataframe(pd.DataFrame(display), hide_index=True, width="stretch")
 
 
 def _downloads(result, key):
@@ -62,7 +87,7 @@ def _downloads(result, key):
 def _saved_settings(result, current):
     saved = result["metadata"]
     if (
-        saved["configuration"] != current["configuration"]
+        saved["configuration"] != json.loads(json_bytes(current["configuration"]))
         or saved["solver_settings"] != current["solver_settings"]
     ):
         st.info("Настройки изменены. Показан сохранённый расчёт с параметрами ниже.")
@@ -98,6 +123,14 @@ def render_heat3d_app():
         )
         n = st.select_slider(
             "Интервалов по оси", (4, 6, 8, 12, 16, 24, 32, 64), value=8, key="h3_n"
+        )
+        methods = st.multiselect(
+            "Методы",
+            tuple(METHOD_NAMES),
+            default=["lod"],
+            format_func=METHOD_NAMES.get,
+            help=f"Матричная прогонка ограничена n ≤ {BLOCK_MAX_N} и общим лимитом рабочей памяти.",
+            key="h3_methods",
         )
         alpha = st.number_input(
             "α в k(u)=1+αu²", min_value=0.0, max_value=100.0, value=0.5, key="h3_alpha"
@@ -207,6 +240,7 @@ def render_heat3d_app():
         run = st.button(
             "Рассчитать 3D",
             type="primary",
+            disabled=not methods,
             key="h3_run",
             on_click=select_section,
             args=("h3_sections", "Сравнение"),
@@ -222,6 +256,7 @@ def render_heat3d_app():
         plane=plane,
         index=index,
         newton=newton,
+        methods=tuple(methods),
     )
     settings = HeatSettings3D(
         tolerance=tolerance,
@@ -283,38 +318,45 @@ def render_heat3d_app():
             st.info("Выберите параметры и нажмите «Рассчитать 3D».")
         else:
             _saved_settings(result, current)
-            row = result["rows"][0]
-            st.write(
-                METHOD_NAME + ": " + STATUS_LABELS.get(row["status"], row["status"])
-            )
-            if row["status"] != "completed":
-                st.warning(row["reason"])
-                if "failed_candidate" in result["arrays"]:
-                    with st.expander(
-                        "Последнее приближение при остановке", key="h3_failed"
-                    ):
-                        st.caption(
-                            f"Кандидат слоя t={row['diagnostic_time']:g}; это не решение в T."
-                        )
-                        points = result["arrays"]["points_zyx"]
-                        diagnostic = pd.DataFrame(points, columns=["z", "y", "x"])
-                        diagnostic["Последнее приближение"] = result["arrays"][
-                            "failed_candidate"
-                        ][tuple(points.T)]
-                        st.dataframe(diagnostic, hide_index=True, width="stretch")
+            for row in result["rows"]:
+                method_name = row["method_name"]
+                if row["status"] != "completed":
+                    st.warning(method_name + ": " + row["reason"])
+                    candidate_key = (
+                        "failed_candidate"
+                        if row["method"] == "lod"
+                        else row["method"] + "_failed_candidate"
+                    )
+                    if candidate_key in result["arrays"]:
+                        with st.expander(
+                            "Последнее приближение при остановке · " + method_name,
+                            key="h3_failed_" + row["method"],
+                        ):
+                            st.caption(
+                                f"Кандидат слоя t={row['diagnostic_time']:g}; это не решение в T."
+                            )
+                            points = result["arrays"]["points_zyx"]
+                            diagnostic = pd.DataFrame(points, columns=["z", "y", "x"])
+                            diagnostic["Последнее приближение"] = result["arrays"][
+                                candidate_key
+                            ][tuple(points.T)]
+                            st.dataframe(diagnostic, hide_index=True, width="stretch")
             st.dataframe(
                 pd.DataFrame(
                     [
                         {
+                            "Метод": row["method_name"],
+                            "Статус": STATUS_LABELS.get(row["status"], row["status"]),
                             "Ошибка, %": _error_text(row),
                             "Абсолютная L2-ошибка": _error_text(row, absolute=True),
                             "Полное время, с": row["seconds"],
                             "Достигнутое время": row["completed_until"],
                             "Принятых слоёв": row["physical_steps"],
                             "Итераций Пикара": row["outer_iterations"],
-                            "Циклов прогонок": row["inner_iterations"],
+                            "Линейных решений / циклов": row["inner_iterations"],
                             "Рабочие массивы, байт": row["workspace_bytes"],
                         }
+                        for row in result["rows"]
                     ]
                 ),
                 hide_index=True,
@@ -327,22 +369,38 @@ def render_heat3d_app():
                 + ". "
                 + diagnostic.get("reason", "")
             )
-            if "lod_vs_grid" in diagnostic:
-                st.write(
-                    "Ошибка ЛОМ к независимому сеточному решению, %:",
-                    diagnostic["lod_vs_grid"]["relative_error_pct"],
-                )
-            if "lod" in result["arrays"]:
+            for row in result["rows"]:
+                key = row["method"] + "_vs_grid"
+                if key in diagnostic:
+                    st.write(
+                        row["method_name"] + " · ошибка к сеточному решению, %:",
+                        diagnostic[key]["relative_error_pct"],
+                    )
+            completed_methods = [
+                row["method"]
+                for row in result["rows"]
+                if row["method"] in result["arrays"]
+            ]
+            if completed_methods:
+                method = completed_methods[0]
+                if len(completed_methods) > 1:
+                    method = st.selectbox(
+                        "Метод для просмотра значений",
+                        completed_methods,
+                        format_func=METHOD_NAMES.get,
+                        key="h3_value_method",
+                    )
+                label = {"lod": "ЛОМ", "block": "Матричная прогонка"}[method]
                 arrays = result["arrays"]
                 values = pd.DataFrame(arrays["points_zyx"], columns=["z", "y", "x"])
-                values["ЛОМ"] = arrays["lod"]
+                values[label] = arrays[method]
                 values["Аналитическое решение"] = arrays["analytic"]
-                values["Абсолютная ошибка"] = abs(arrays["lod"] - arrays["analytic"])
+                values["Абсолютная ошибка"] = abs(arrays[method] - arrays["analytic"])
                 st.dataframe(values, hide_index=True, width="stretch")
                 if len(values) > 1:
                     view = st.selectbox(
                         "Показать в области Q",
-                        ("ЛОМ", "Аналитическое решение", "Абсолютная ошибка"),
+                        (label, "Аналитическое решение", "Абсолютная ошибка"),
                         key="h3_view",
                     )
                     st.plotly_chart(
@@ -353,12 +411,11 @@ def render_heat3d_app():
                 st.dataframe(
                     pd.DataFrame(result["history"]), hide_index=True, width="stretch"
                 )
+                _block_diagnostics(result["rows"])
             _downloads(result, "h3_comparison")
     with study_tab:
         st.caption(
-            "Только "
-            + METHOD_NAME
-            + ". Подбор с фиксированным запасом → фиксация допуска → одна новая финальная серия. После её неудачи подбор не продолжается."
+            "Для каждого выбранного метода: подбор с фиксированным запасом → фиксация допуска → одна новая финальная серия. После её неудачи подбор не продолжается. Ньютон используется только как диагностика в сравнении."
         )
         repeats = st.number_input(
             "Полных повторов в каждой серии",
@@ -393,7 +450,7 @@ def render_heat3d_app():
         )
         if st.button(
             "Проверить 1/5/10% · 3D",
-            disabled=not budgets,
+            disabled=not budgets or not methods,
             key="h3_study_run",
             on_click=select_section,
             args=("h3_sections", "Исследование 1/5/10%"),
@@ -434,6 +491,7 @@ def render_heat3d_app():
             for row in study["rows"]:
                 display.append(
                     {
+                        "Метод": row["method_name"],
                         "Цель, %": row["target_pct"],
                         "Статус": STATUS_LABELS.get(row["status"], row["status"]),
                         "Допуск": row["budget"],
@@ -466,6 +524,7 @@ def render_heat3d_app():
                         x="seconds",
                         y="relative_error_pct",
                         color="phase",
+                        symbol="method" if "method" in attempts else None,
                         hover_data=["budget", "status", "repeat"],
                         labels={
                             "seconds": "Полное время запуска, с",
@@ -474,4 +533,9 @@ def render_heat3d_app():
                     ),
                     width="stretch",
                 )
+            if any(row.get("method") == "block" for row in study["series"]):
+                with st.expander(
+                    "Затраты матричной прогонки по сериям", key="h3_block_study"
+                ):
+                    _block_diagnostics(study["series"])
             _downloads(study, "h3_study")

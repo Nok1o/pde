@@ -24,6 +24,17 @@ from .study_protocol import (
 )
 
 METHOD_NAME = "Пикар + ЛОМ (направленные прогонки, 3D)"
+METHOD_NAMES = {
+    "lod": METHOD_NAME,
+    "block": "Пикар + матричная прогонка (3D)",
+}
+BLOCK_DIAGNOSTICS = (
+    "assembly_seconds",
+    "factorization_seconds",
+    "solve_seconds",
+    "factorizations",
+    "factor_reuses",
+)
 STATUS_LABELS = {
     "not_requested": "Проверка не выбрана",
     "completed": "Завершён",
@@ -62,11 +73,19 @@ class HeatConfig3D:
     plane: str = "xy"
     index: int | None = None
     newton: bool = False
+    methods: tuple[str, ...] = ("lod",)
 
 
 def _inputs(config, settings):
     from .heat3d_solver import HeatSettings3D
 
+    if (
+        not isinstance(config.methods, (tuple, list))
+        or not config.methods
+        or any(method not in METHOD_NAMES for method in config.methods)
+        or len(set(config.methods)) != len(config.methods)
+    ):
+        raise ValueError("Выберите неповторяющиеся методы из lod, block")
     if config.n > 64:
         raise ValueError("Для этого режима требуется n ≤ 64")
     if not np.isfinite(config.dt) or config.dt <= 0:
@@ -110,10 +129,12 @@ def _metadata(config, settings, points):
         commit, dirty = None, None
     return dict(
         schema_version="heat3d_v1",
-        configuration=asdict(config),
+        configuration=_json_data(asdict(config)),
         solver_settings=asdict(settings),
-        method="lod",
-        method_name=METHOD_NAME,
+        methods=list(config.methods),
+        method_names=[METHOD_NAMES[method] for method in config.methods],
+        method=config.methods[0] if len(config.methods) == 1 else "multiple",
+        method_name="; ".join(METHOD_NAMES[method] for method in config.methods),
         boundary_kinds=dict.fromkeys(("x0", "x1", "y0", "y1", "z0", "z1"), 1),
         applicability=APPLICABILITY,
         points_zyx=points.tolist(),
@@ -130,7 +151,7 @@ def _metadata(config, settings, points):
         python=platform.python_version(),
         platform=platform.platform(),
         versions=_versions(),
-        timing="Each solve includes preparation, all physical layers, Picard and linear iterations; analytic/Newton references and UI/export are separate. preparation_seconds is a subset of seconds.",
+        timing="Each solve includes preparation, all physical layers, Picard and linear iterations; analytic/Newton references and UI/export are separate. preparation_seconds is a subset of seconds. Block assembly_seconds is included in preparation_seconds; factorization_seconds and solve_seconds are also subsets of seconds, never additional total costs.",
         memory="workspace_bytes is an estimated numerical working set; peak_rss_bytes is null unless measured, never inferred from workspace_bytes.",
     )
 
@@ -142,10 +163,8 @@ def _record(result, exact):
         if field.name not in ("values", "points_zyx", "history", "diagnostic_field")
     }
     record.update(
-        method_name=(
-            METHOD_NAME
-            if result.method == "lod"
-            else "Ньютон · независимый сеточный эталон"
+        method_name=METHOD_NAMES.get(
+            result.method, "Ньютон · независимый сеточный эталон"
         ),
         relative_error_pct=None,
         absolute_error=None,
@@ -181,6 +200,8 @@ def _reproduction(
         str(config.T),
         "--query",
         config.mode,
+        "--methods",
+        *config.methods,
         "--tol",
         str(settings.tolerance),
         "--change-tol",
@@ -231,25 +252,33 @@ def compare_heat3d(config=HeatConfig3D(), settings=None, progress=None):
     started = perf_counter()
     exact = problem.evaluate(problem.exact, config.T)[tuple(points.T)]
     analytic_seconds = perf_counter() - started
-    result = solve_heat3d(
-        problem,
-        points,
-        dt=config.dt,
-        T=config.T,
-        settings=settings,
-        method="lod",
-        progress=progress,
-    )
-    record = _record(result, exact)
+    records, histories, runs = [], [], {}
+    arrays = {"points_zyx": points, "analytic": exact}
+    progress_count = len(config.methods) + int(config.newton and config.n <= 16)
+    for index, method in enumerate(config.methods):
+        result = solve_heat3d(
+            problem,
+            points,
+            dt=config.dt,
+            T=config.T,
+            settings=settings,
+            method=method,
+            progress=_method_progress(progress, method, index, progress_count),
+        )
+        runs[method] = result
+        records.append(_record(result, exact))
+        if result.values is not None:
+            arrays[method] = result.values
+        if result.diagnostic_field is not None:
+            # Existing consumers of the default LOM export retain their key.
+            key = (
+                "failed_candidate" if method == "lod" else method + "_failed_candidate"
+            )
+            arrays[key] = result.diagnostic_field
+        histories += [{"method": method, **row} for row in result.history]
     grid_diagnostic = dict(
         status="not_requested", reason="Независимый сеточный эталон не запрошен"
     )
-    arrays = {"points_zyx": points, "analytic": exact}
-    if result.values is not None:
-        arrays["lod"] = result.values
-    if result.diagnostic_field is not None:
-        arrays["failed_candidate"] = result.diagnostic_field
-    histories = [{"method": "lod", **row} for row in result.history]
     reference_seconds = 0.0
     if config.newton:
         if config.n > 16:
@@ -259,7 +288,9 @@ def compare_heat3d(config=HeatConfig3D(), settings=None, progress=None):
             )
         else:
             if progress:
-                progress(0.0, "Независимая сеточная проверка Ньютоном…")
+                _method_progress(
+                    progress, "newton", len(config.methods), progress_count
+                )(0.0, "Независимая сеточная проверка…")
             grid = solve_heat3d(
                 problem,
                 points,
@@ -267,7 +298,9 @@ def compare_heat3d(config=HeatConfig3D(), settings=None, progress=None):
                 T=config.T,
                 settings=replace(settings, tolerance=1e-11, change_tolerance=1e-11),
                 method="newton",
-                progress=progress,
+                progress=_method_progress(
+                    progress, "newton", len(config.methods), progress_count
+                ),
             )
             reference_seconds = grid.seconds
             grid_diagnostic = _record(grid, exact)
@@ -276,10 +309,11 @@ def compare_heat3d(config=HeatConfig3D(), settings=None, progress=None):
             histories += [{"method": "newton", **row} for row in grid.history]
             if grid.values is not None:
                 arrays["newton"] = grid.values
-                if result.values is not None:
-                    grid_diagnostic["lod_vs_grid"] = error_metrics(
-                        result.values, grid.values
-                    )
+                for method, result in runs.items():
+                    if result.values is not None:
+                        grid_diagnostic[method + "_vs_grid"] = error_metrics(
+                            result.values, grid.values
+                        )
     metadata = _metadata(config, settings, points)
     metadata.update(
         command="run",
@@ -289,11 +323,48 @@ def compare_heat3d(config=HeatConfig3D(), settings=None, progress=None):
     )
     return dict(
         metadata=metadata,
-        rows=[record],
+        rows=records,
         grid_diagnostic=grid_diagnostic,
         history=histories,
         arrays=arrays,
     )
+
+
+def _method_progress(progress, method, index, count):
+    if progress is None:
+        return None
+
+    def report(fraction, message):
+        progress(
+            (index + fraction) / count,
+            METHOD_NAMES.get(method, "Ньютон") + ": " + message,
+        )
+
+    return report
+
+
+def _study_diagnostics(study, method, diagnostics):
+    """Attach backend costs without changing candidate selection or its metric."""
+    for trial, diagnostic in zip(study["trials"], diagnostics, strict=True):
+        trial.update(diagnostic)
+    for collection in ("rows", "trials", "series"):
+        for row in study[collection]:
+            row.update(method=method, method_name=METHOD_NAMES[method])
+            if collection != "trials":
+                trials = [
+                    trial
+                    for trial in study["trials"]
+                    if (trial["phase"], trial["candidate"])
+                    == (row["phase"], row["candidate"])
+                ]
+                for key in BLOCK_DIAGNOSTICS:
+                    values = [trial.get(key) for trial in trials]
+                    if any(value is not None for value in values):
+                        row[key] = (
+                            sum(values)
+                            if all(value is not None for value in values)
+                            else None
+                        )
 
 
 def study_heat3d(
@@ -322,31 +393,48 @@ def study_heat3d(
     exact = problem.evaluate(problem.exact, config.T)[tuple(points.T)]
     analytic_seconds = perf_counter() - started
 
-    def runner(budget, trial_seed):
-        # Deterministic runner ignores the independent stream; retain its ID in evidence.
-        return solve_heat3d(
-            problem,
-            points,
-            dt=config.dt,
-            T=config.T,
-            settings=replace(
-                settings, tolerance=float(budget), change_tolerance=float(budget)
-            ),
-            method="lod",
-        )
+    studies = []
+    for index, method in enumerate(config.methods):
+        diagnostics = []
 
-    study = run_accuracy_study(
-        runner,
-        budgets,
-        exact,
-        repeats=repeats,
-        seed=seed,
-        calibration_fraction=calibration_fraction,
-        method="lod",
-        progress=progress,
-    )
-    for row in study["rows"]:
-        row["method_name"] = METHOD_NAME
+        def runner(budget, trial_seed):
+            # Deterministic runners retain the stream ID as protocol evidence.
+            result = solve_heat3d(
+                problem,
+                points,
+                dt=config.dt,
+                T=config.T,
+                settings=replace(
+                    settings, tolerance=float(budget), change_tolerance=float(budget)
+                ),
+                method=method,
+            )
+            diagnostics.append(
+                {
+                    key: getattr(result, key)
+                    for key in BLOCK_DIAGNOSTICS
+                    if getattr(result, key, None) is not None
+                }
+            )
+            return result
+
+        study = run_accuracy_study(
+            runner,
+            budgets,
+            exact,
+            repeats=repeats,
+            seed=seed,
+            calibration_fraction=calibration_fraction,
+            method=method,
+            progress=_method_progress(progress, method, index, len(config.methods)),
+        )
+        _study_diagnostics(study, method, diagnostics)
+        studies.append(study)
+    study = dict(studies[0])
+    for key in ("rows", "trials", "series"):
+        study[key] = [row for item in studies for row in item[key]]
+    for key in ("pilot_seconds", "final_seconds", "elapsed_seconds"):
+        study[key] = sum(item[key] for item in studies)
     metadata = _metadata(config, settings, points)
     metadata.update(
         command="study",
@@ -366,7 +454,7 @@ def study_heat3d(
             margin=calibration_fraction,
         ),
         analytic_reference_seconds=analytic_seconds,
-        seed_usage="Independent phase/candidate/repeat stream identifiers; deterministic LOM does not consume random numbers.",
+        seed_usage="Independent phase/candidate/repeat stream identifiers within each method; deterministic LOM and block solvers do not consume random numbers.",
     )
     return dict(metadata=metadata, **study)
 

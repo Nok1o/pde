@@ -5,6 +5,7 @@ from pathlib import Path
 
 from .heat3d_experiment import (
     APPLICABILITY,
+    METHOD_NAMES,
     HeatConfig3D,
     compare_heat3d,
     csv_bytes,
@@ -23,6 +24,9 @@ def main(argv=None):
     parser.add_argument("--alpha", type=float, default=0.5)
     parser.add_argument("--dt", type=float, default=0.01)
     parser.add_argument("--T", type=float, default=0.02)
+    parser.add_argument(
+        "--methods", nargs="+", choices=tuple(METHOD_NAMES), default=["lod"]
+    )
     parser.add_argument(
         "--query", choices=("point", "patch", "slice", "field"), default="point"
     )
@@ -74,6 +78,7 @@ def main(argv=None):
         plane=args.plane or "xy",
         index=args.index,
         newton=args.newton,
+        methods=tuple(args.methods),
     )
     settings = HeatSettings3D(
         tolerance=args.tol,

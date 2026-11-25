@@ -14,6 +14,7 @@ import numpy as np
 from scipy.sparse.linalg import MatrixRankWarning, spsolve
 
 from .heat import time_grid
+from .heat3d_block import BLOCK_MAX_N, BlockThomasSolver3D, block_workspace_bytes
 from .heat3d_contract import HeatRunResult3D
 from .heat3d_linear import solve_lines3d, warmup_lines3d
 from .heat3d_operator import (
@@ -89,6 +90,8 @@ def _workspace_estimate(n, method, points, initial_only=False):
     if method == "newton" and not initial_only:
         # Conservative dense-fill storage allowance for the small sparse LU.
         buffers += 16 * (n - 1) ** 6
+    if method == "block" and not initial_only:
+        buffers += block_workspace_bytes(n)
     return buffers + 2 * points.nbytes + len(points) * 8
 
 
@@ -118,6 +121,11 @@ class _Layer:
     outer_iterations: int = 0
     inner_iterations: int = 0
     preparation_seconds: float = 0.0
+    assembly_seconds: float = 0.0
+    factorization_seconds: float = 0.0
+    solve_seconds: float = 0.0
+    factorizations: int = 0
+    factor_reuses: int = 0
 
 
 @contextmanager
@@ -208,6 +216,15 @@ def _picard_layer(
             max_iterations=int(settings.max_inner),
         )
         layer.inner_iterations += linear.iterations
+        for name in (
+            "assembly_seconds",
+            "factorization_seconds",
+            "solve_seconds",
+            "factorizations",
+            "factor_reuses",
+        ):
+            setattr(layer, name, getattr(layer, name) + getattr(linear, name, 0))
+        layer.preparation_seconds += getattr(linear, "assembly_seconds", 0)
         candidate = (
             1 - settings.relaxation
         ) * values + settings.relaxation * linear.values
@@ -347,14 +364,16 @@ def solve_heat3d(
     """
     settings = HeatSettings3D() if settings is None else settings
     settings.validate()
-    if method not in ("lod", "newton"):
-        raise ValueError("Методы 3D-теплопроводности: lod или newton")
+    if method not in ("lod", "block", "newton"):
+        raise ValueError("Методы 3D-теплопроводности: lod, block или newton")
     points = validate_points3d(
         problem.n, [(problem.n // 2,) * 3] if points_zyx is None else points_zyx
     )
     time_storage = _time_grid_bytes(dt, T)
-    unsupported = any(face.kind != 1 for face in problem.faces.values()) or (
-        method == "newton" and problem.n > DIRECT_MAX_N
+    unsupported = (
+        any(face.kind != 1 for face in problem.faces.values())
+        or (method == "newton" and problem.n > DIRECT_MAX_N)
+        or (method == "block" and problem.n > BLOCK_MAX_N)
     )
     storage = (
         _workspace_estimate(problem.n, method, points, initial_only=T == 0)
@@ -398,9 +417,21 @@ def solve_heat3d(
         return result
 
     if unsupported:
-        return finish("unsupported", "Поддержаны условия 1 рода; Newton требует n≤16")
+        if any(face.kind != 1 for face in problem.faces.values()):
+            reason = "Поддержаны условия 1 рода на всех гранях"
+        elif method == "block":
+            reason = (
+                f"Матричная прогонка ограничена n≤{BLOCK_MAX_N} из-за плотных блоков"
+            )
+        else:
+            reason = f"Независимый Ньютон ограничен n≤{DIRECT_MAX_N}"
+        return finish("unsupported", reason)
     if storage > settings.max_workspace_bytes:
         return finish("memory_limit", "Оценка рабочих буферов превышает лимит памяти")
+    if method == "block" and backend is solve_lines3d:
+        backend = BlockThomasSolver3D(
+            max_workspace_bytes=int(settings.max_workspace_bytes)
+        )
     try:
         with _preparing(result):
             times, steps = time_grid(dt, T)
@@ -432,7 +463,7 @@ def solve_heat3d(
                 history_storage=history_storage,
             )
             try:
-                if method == "lod":
+                if method in ("lod", "block"):
                     _picard_layer(*args, operator_factory, backend, layer)
                 else:
                     _newton_layer(*args, layer)
@@ -458,6 +489,14 @@ def solve_heat3d(
             result.outer_iterations += layer.outer_iterations
             result.inner_iterations += layer.inner_iterations
             result.preparation_seconds += layer.preparation_seconds
+            for name in (
+                "assembly_seconds",
+                "factorization_seconds",
+                "solve_seconds",
+                "factorizations",
+                "factor_reuses",
+            ):
+                setattr(result, name, getattr(result, name) + getattr(layer, name))
             history_storage = layer.history_storage
             result.workspace_bytes = (
                 storage + history_storage + getsizeof(result.history)

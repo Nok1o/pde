@@ -130,3 +130,8 @@ class HeatRunResult3D:
         None  # full last candidate, never a solution at T
     )
     diagnostic_time: float | None = None  # attempted layer time of diagnostic_field
+    assembly_seconds: float = 0.0  # block extraction, included in preparation_seconds
+    factorization_seconds: float = 0.0  # block LU/Schur setup, included in seconds
+    solve_seconds: float = 0.0  # block forward/back substitution, included in seconds
+    factorizations: int = 0  # completed block factorizations of the whole matrix
+    factor_reuses: int = 0  # solves reusing a previously prepared identical matrix
