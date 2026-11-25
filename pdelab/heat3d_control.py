@@ -46,7 +46,7 @@ def _options(settings):
     defaults.update(settings)
     batch_size = defaults.pop("batch_size")
     for name, value in defaults.items():
-        minimum = 0 if name == "seed" else 2 if name == "walks" else 1
+        minimum = {"seed": 0, "max_transitions": 0, "walks": 2}.get(name, 1)
         maximum = (
             2**32 - 1 if name == "seed" else 2**31 - 1 if name == "walks" else 2**63 - 1
         )
@@ -187,6 +187,36 @@ def solve_controlled_frozen_mc3d(
     fine residual. No exact or fine solve access.
     batch_size selects only the correction kernel; coarse preparation is unchanged.
     """
+    return _controlled_estimate(
+        problem,
+        previous,
+        iterate,
+        t,
+        dt,
+        points,
+        fine=None,
+        coarse_n=coarse_n,
+        coarse_tolerance=coarse_tolerance,
+        coarse_max_iterations=coarse_max_iterations,
+        settings=settings,
+    )
+
+
+def _controlled_estimate(
+    problem,
+    previous,
+    iterate,
+    t,
+    dt,
+    points,
+    *,
+    fine,
+    coarse_n,
+    coarse_tolerance,
+    coarse_max_iterations,
+    settings,
+):
+    """The time driver can supply the snapshot it just built for this iterate."""
     validation_start = perf_counter()
     options = _options(settings)
     coarse_n = _integer(coarse_n, "coarse_n", 4, problem.n - 1)
@@ -220,8 +250,10 @@ def solve_controlled_frozen_mc3d(
     warmup_lines3d()
     warmup_mc3d(batch_size=options["batch_size"])
     start = perf_counter()
-    fine = freeze_heat3d(problem, previous, iterate, t, dt)
-    operator_seconds = perf_counter() - start
+    operator_seconds = 0.0
+    if fine is None:
+        fine = freeze_heat3d(problem, previous, iterate, t, dt)
+        operator_seconds = perf_counter() - start
     fine_axis = np.linspace(0, 1, problem.n + 1)
     coarse_axis = np.linspace(0, 1, coarse_n + 1)
     interpolation_start = perf_counter()

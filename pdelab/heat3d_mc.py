@@ -202,7 +202,8 @@ def solve_frozen_mc3d(
     seed = _integer(seed, "seed", 0, 2**32 - 1)
     max_steps = _integer(max_steps, "max_steps", 1, 2**63 - 1)
     max_walks = _integer(max_walks, "max_walks", 1, 2**63 - 1)
-    max_transitions = _integer(max_transitions, "max_transitions", 1, 2**63 - 1)
+    # A zero remaining allowance still permits paths absorbed at their start.
+    max_transitions = _integer(max_transitions, "max_transitions", 0, 2**63 - 1)
     max_workspace_bytes = _integer(
         max_workspace_bytes, "max_workspace_bytes", 1, 2**63 - 1
     )

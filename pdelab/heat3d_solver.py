@@ -1,4 +1,4 @@
-"""Backward Euler in physical time, with Picard/XYZ or a small Newton reference.
+"""Backward Euler with deterministic or Monte Carlo Picard and a Newton reference.
 
 Only the previous and current full fields are kept. Requested values are returned
 only after the whole time interval has completed; failed layers remain diagnostic.
@@ -6,7 +6,7 @@ only after the whole time interval has completed; failed layers remain diagnosti
 
 import warnings
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from sys import getsizeof
 from time import perf_counter
 
@@ -17,12 +17,14 @@ from .heat import time_grid
 from .heat3d_block import BLOCK_MAX_N, BlockThomasSolver3D, block_workspace_bytes
 from .heat3d_contract import HeatRunResult3D
 from .heat3d_linear import solve_lines3d, warmup_lines3d
+from .heat3d_mc import _integer, warmup_mc3d
 from .heat3d_operator import (
     IncompatibleHeatBoundaryError,
     UnsupportedHeatBoundaryError,
     dirichlet_data3d,
     freeze_heat3d,
 )
+from .heat3d_picard_mc import MC_METHODS, PicardSampler3D
 from .heat3d_reference import (
     newton_residual3d,
     newton_scale3d,
@@ -41,6 +43,35 @@ class HeatSettings3D:
     max_inner: int = 20000
     max_seconds: float = 60.0
     max_workspace_bytes: int = 256 * 1024**2
+    walks: int = 4096  # per free node per update or independent check
+    seed: int = 42
+    coarse_n: int = 4
+    max_walks: int = 8_000_000  # for the entire time history
+    max_transitions: int = 80_000_000
+    max_path_steps: int = 1_000_000
+    mc_tolerance: float | None = None
+    mc_change_tolerance: float | None = None
+
+    @classmethod
+    def for_methods(cls, methods):
+        if any(method in MC_METHODS for method in methods):
+            return cls(mc_tolerance=0.2, mc_change_tolerance=0.1)
+        return cls()
+
+    def for_method(self, method):
+        if method not in MC_METHODS:
+            return self
+        return replace(
+            self,
+            tolerance=(
+                self.tolerance if self.mc_tolerance is None else self.mc_tolerance
+            ),
+            change_tolerance=(
+                self.change_tolerance
+                if self.mc_change_tolerance is None
+                else self.mc_change_tolerance
+            ),
+        )
 
     def validate(self):
         for name in ("tolerance", "change_tolerance", "linear_tolerance"):
@@ -65,6 +96,14 @@ class HeatSettings3D:
                 or not 1 <= value <= maximum
             ):
                 raise ValueError(f"{name}: требуется целое от 1 до {maximum}")
+
+    def validate_mc(self, method):
+        _integer(self.walks, "walks", 2, 2**31 - 1)
+        _integer(self.seed, "seed", 0, 2**32 - 1)
+        for name in ("max_walks", "max_transitions", "max_path_steps"):
+            _integer(getattr(self, name), name, 1, 2**63 - 1)
+        if method == "mc_control":
+            _integer(self.coarse_n, "coarse_n", 4, 64)
 
 
 def _norm(values):
@@ -127,6 +166,7 @@ class _Layer:
     solve_seconds: float = 0.0
     factorizations: int = 0
     factor_reuses: int = 0
+    mc_attempt: dict | None = None
 
 
 @contextmanager
@@ -165,6 +205,9 @@ def _record(
     )
     if relaxation is not None:
         row["relaxation"] = relaxation
+    if layer.mc_attempt is not None:
+        row.update(layer.mc_attempt)
+        layer.mc_attempt = None
     layer.history.append(row)
     layer.history_storage += getsizeof(row) + sum(
         getsizeof(value) for value in row.values()
@@ -184,8 +227,30 @@ def _initial(problem, previous, t):
     return values, fixed, boundary
 
 
+def _deterministic_update(layer, backend, operator, values, settings):
+    linear = backend(
+        operator,
+        values,
+        tolerance=settings.linear_tolerance,
+        max_iterations=int(settings.max_inner),
+    )
+    layer.inner_iterations += linear.iterations
+    for name in (
+        "assembly_seconds",
+        "factorization_seconds",
+        "solve_seconds",
+        "factorizations",
+        "factor_reuses",
+    ):
+        setattr(layer, name, getattr(layer, name) + getattr(linear, name, 0))
+    layer.preparation_seconds += getattr(linear, "assembly_seconds", 0)
+    if linear.status != "completed":
+        layer.status, layer.reason = linear.status, linear.reason
+    return linear
+
+
 def _picard_layer(
-    problem, previous, t, dt, settings, deadline, factory, backend, layer
+    problem, previous, t, dt, settings, deadline, factory, backend, layer, sampler=None
 ):
     with _preparing(layer):
         values, fixed, boundary = _initial(problem, previous, t)
@@ -210,25 +275,29 @@ def _picard_layer(
             _record(layer, outer=outer - 1, residual=residual, scale=scale)
             return layer
         layer.outer_iterations += 1
-        linear = backend(
-            operator,
-            values,
-            tolerance=settings.linear_tolerance,
-            max_iterations=int(settings.max_inner),
-        )
-        layer.inner_iterations += linear.iterations
-        for name in (
-            "assembly_seconds",
-            "factorization_seconds",
-            "solve_seconds",
-            "factorizations",
-            "factor_reuses",
-        ):
-            setattr(layer, name, getattr(layer, name) + getattr(linear, name, 0))
-        layer.preparation_seconds += getattr(linear, "assembly_seconds", 0)
-        candidate = (
-            1 - settings.relaxation
-        ) * values + settings.relaxation * linear.values
+        if sampler is not None:
+            # Keep counters available to the outer failure handler if evaluating
+            # the nonlinear residual fails after a successful batch.
+            layer.mc_attempt = {}
+            estimate = sampler.draw(layer, operator, previous, values, outer)
+            if estimate is None:
+                _record(
+                    layer,
+                    outer=outer,
+                    residual=residual,
+                    scale=scale,
+                )
+                return layer
+            linear_residual = _relative(
+                (operator.apply(estimate) - operator.rhs)[free],
+                _norm(operator.rhs[free]),
+            )
+            linear_ok = True
+        else:
+            linear = _deterministic_update(layer, backend, operator, values, settings)
+            estimate, linear_residual = linear.values, linear.relative_residual
+            linear_ok = linear.status == "completed"
+        candidate = (1 - settings.relaxation) * values + settings.relaxation * estimate
         candidate[fixed] = boundary[fixed]
         layer.values = candidate
         change = _change(candidate, values)
@@ -237,27 +306,63 @@ def _picard_layer(
             (candidate_operator.apply(candidate) - candidate_operator.rhs)[free], scale
         )
         passed = (
-            linear.status == "completed"
+            linear_ok
             and residual <= settings.tolerance
             and change <= settings.change_tolerance
         )
-        row = _record(
+        if passed and sampler is not None:
+            passed = False
+            if perf_counter() < deadline:
+                check = sampler.draw(
+                    layer,
+                    candidate_operator,
+                    previous,
+                    candidate,
+                    outer,
+                    check=True,
+                )
+                if check is not None:
+                    check_operator = freeze(check)
+                    check_residual = _relative(
+                        (check_operator.apply(check) - check_operator.rhs)[free], scale
+                    )
+                    check_change = _change(check, candidate)
+                    layer.mc_attempt.update(
+                        validation_residual=check_residual,
+                        validation_change=check_change,
+                    )
+                    passed = (
+                        check_residual <= settings.tolerance
+                        and check_change <= settings.change_tolerance
+                    )
+        if (
+            sampler is not None
+            and perf_counter() >= deadline
+            and layer.status == "outer_limit"
+        ):
+            layer.status, layer.reason = (
+                "time_limit",
+                "Истёк лимит времени полного запуска MC",
+            )
+            passed = False
+        _record(
             layer,
             outer=outer,
             residual=residual,
             scale=scale,
             change=change,
-            linear=linear.relative_residual,
+            linear=linear_residual,
             accepted=passed,
         )
-        if layer.status == "memory_limit":
-            return layer
-        if linear.status != "completed":
-            layer.status, layer.reason = linear.status, linear.reason
-            row["reason"] = linear.reason
+        if layer.status != "outer_limit":
             return layer
         if passed:
-            layer.status, layer.reason = "completed", "Невязка и изменение поля"
+            layer.status = "completed"
+            layer.reason = (
+                "Независимая проверка MC"
+                if sampler is not None
+                else "Невязка и изменение поля"
+            )
             return layer
         values, operator = candidate, candidate_operator
     return layer
@@ -364,10 +469,16 @@ def solve_heat3d(
     `seconds` includes all data/operator preparation; JIT and any external exact
     solution evaluation are excluded. Newton is limited to n <= 16.
     """
-    settings = HeatSettings3D() if settings is None else settings
+    started = perf_counter()
+    is_mc = method in MC_METHODS
+    if settings is None:
+        settings = HeatSettings3D.for_methods((method,))
+    settings = settings.for_method(method)
     settings.validate()
-    if method not in ("lod", "block", "newton"):
-        raise ValueError("Методы 3D-теплопроводности: lod, block или newton")
+    if is_mc:
+        settings.validate_mc(method)
+    if method not in ("lod", "block", "newton", *MC_METHODS):
+        raise ValueError("Неизвестный метод 3D-теплопроводности")
     points = validate_points3d(
         problem.n, [(problem.n // 2,) * 3] if points_zyx is None else points_zyx
     )
@@ -376,6 +487,7 @@ def solve_heat3d(
         any(face.kind not in (1, 3) for face in problem.faces.values())
         or (method == "newton" and problem.n > DIRECT_MAX_N)
         or (method == "block" and problem.n > BLOCK_MAX_N)
+        or (method == "mc_control" and T > 0 and settings.coarse_n >= problem.n)
     )
     # Count the Cartesian free-node set without allocating a grid or sampling data.
     free_nodes = 1
@@ -391,15 +503,25 @@ def solve_heat3d(
         )
         + time_storage
     )
-    if (
-        method == "lod"
-        and backend is solve_lines3d
-        and T > 0
-        and not unsupported
-        and storage <= settings.max_workspace_bytes
-    ):
-        warmup_lines3d()
-    started = perf_counter()
+    if is_mc and T > 0:
+        # Full-field query indices, the frozen estimator's buffers and, for
+        # control, coarse solve/interpolation. Outer snapshots are in base storage.
+        size = (problem.n + 1) ** 3
+        storage += (
+            768 * size + 512 * (settings.coarse_n + 1) ** 3
+            if method == "mc_control"
+            else 384 * size
+        )
+        storage += 24 * size + getsizeof(set())
+    warmup_seconds = 0.0
+    if T > 0 and not unsupported and storage <= settings.max_workspace_bytes:
+        warm_start = perf_counter()
+        if is_mc:
+            warmup_mc3d()
+        if method == "mc_control" or (method == "lod" and backend is solve_lines3d):
+            warmup_lines3d()
+        warmup_seconds = perf_counter() - warm_start
+        started += warmup_seconds
     deadline = started + settings.max_seconds
     result = HeatRunResult3D(
         method=method,
@@ -419,6 +541,7 @@ def solve_heat3d(
         workspace_bytes=storage,
         peak_rss_bytes=None,
         history=[],
+        warmup_seconds=warmup_seconds,
     )
 
     def finish(status=None, reason=None):
@@ -435,6 +558,8 @@ def solve_heat3d(
             reason = (
                 f"Матричная прогонка ограничена n≤{BLOCK_MAX_N} из-за плотных блоков"
             )
+        elif method == "mc_control":
+            reason = "Для MC с поправкой требуется 4 ≤ coarse_n < n"
         else:
             reason = f"Независимый Ньютон ограничен n≤{DIRECT_MAX_N}"
         return finish("unsupported", reason)
@@ -448,6 +573,11 @@ def solve_heat3d(
         with _preparing(result):
             times, steps = time_grid(dt, T)
             previous = problem.initial_values()
+            sampler = (
+                PicardSampler3D(problem, settings, result)
+                if is_mc and len(steps)
+                else None
+            )
         history_storage = 0
         for index, step in enumerate(steps, 1):
             if perf_counter() >= deadline:
@@ -475,10 +605,10 @@ def solve_heat3d(
                 history_storage=history_storage,
             )
             try:
-                if method in ("lod", "block"):
-                    _picard_layer(*args, operator_factory, backend, layer)
-                else:
+                if method == "newton":
                     _newton_layer(*args, layer)
+                else:
+                    _picard_layer(*args, operator_factory, backend, layer, sampler)
             except (UnsupportedHeatBoundaryError, IncompatibleHeatBoundaryError) as exc:
                 layer.status, layer.reason = "unsupported", str(exc)
             except MemoryError:

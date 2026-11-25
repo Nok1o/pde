@@ -135,3 +135,10 @@ class HeatRunResult3D:
     solve_seconds: float = 0.0  # block forward/back substitution, included in seconds
     factorizations: int = 0  # completed block factorizations of the whole matrix
     factor_reuses: int = 0  # solves reusing a previously prepared identical matrix
+    completed_walks: int = 0
+    warmup_seconds: float = 0.0  # excluded from seconds
+    validation_walks: int = 0  # included in walks
+    coarse_iterations: int = 0  # included in inner_iterations
+    coarse_seconds: float = 0.0  # included in preparation_seconds
+    interpolation_seconds: float = 0.0
+    defect_seconds: float = 0.0

@@ -20,6 +20,7 @@ from .heat3d_experiment import (
     result_archive,
     study_heat3d,
 )
+from .heat3d_picard_mc import MC_METHODS
 from .ui_state import select_section
 
 
@@ -135,6 +136,53 @@ def render_heat3d_app():
             help=f"Матричная прогонка ограничена n ≤ {BLOCK_MAX_N} и общим лимитом рабочей памяти.",
             key="h3_methods",
         )
+        has_mc = any(m in MC_METHODS for m in methods)
+        defaults = HeatSettings3D.for_methods(methods)
+        walks, mc_seed, coarse_n = defaults.walks, defaults.seed, defaults.coarse_n
+        max_walks, max_transitions, max_path_steps = (
+            defaults.max_walks,
+            defaults.max_transitions,
+            defaults.max_path_steps,
+        )
+        if has_mc:
+            with st.expander("Параметры Монте-Карло", expanded=True):
+                walks = st.number_input(
+                    "Путей на свободный узел за оценку",
+                    2,
+                    2**31 - 1,
+                    walks,
+                    key="h3_walks",
+                )
+                mc_seed = st.number_input(
+                    "Seed сравнения", 0, 2**32 - 1, mc_seed, key="h3_mc_seed"
+                )
+                if "mc_control" in methods:
+                    coarse_n = st.number_input(
+                        "Интервалов грубой сетки", 4, 63, coarse_n, key="h3_coarse_n"
+                    )
+                    if coarse_n >= n:
+                        st.info("Для MC с поправкой нужна сетка 4 ≤ coarse_n < n.")
+                max_walks = st.number_input(
+                    "Лимит начатых путей на полный запуск",
+                    min_value=1,
+                    value=max_walks,
+                    key="h3_max_walks",
+                )
+                max_transitions = st.number_input(
+                    "Лимит переходов на полный запуск",
+                    min_value=1,
+                    value=max_transitions,
+                    key="h3_max_moves",
+                )
+                max_path_steps = st.number_input(
+                    "Лимит переходов одного пути",
+                    min_value=1,
+                    value=max_path_steps,
+                    key="h3_max_path_steps",
+                )
+                st.caption(
+                    "Пути расходуются на полное поле, включая независимую проверку кандидата каждого принятого слоя."
+                )
         alpha = st.number_input(
             "α в k(u)=1+αu²", min_value=0.0, max_value=100.0, value=0.5, key="h3_alpha"
         )
@@ -209,18 +257,38 @@ def render_heat3d_app():
             "Независимая проверка Ньютоном (n ≤ 16)", value=False, key="h3_newton"
         )
         with st.expander("Параметры Пикара и прогонок", key="h3_solver_parameters"):
-            tolerance = st.select_slider(
-                "Допуск нелинейной невязки",
-                (1e-3, 1e-5, 1e-7, 1e-9),
-                value=1e-7,
-                key="h3_tol",
+            choices = (0.5, 0.2, 0.1, 0.05, 0.01, 1e-3, 1e-5, 1e-7, 1e-9)
+            tolerance, change = defaults.tolerance, defaults.change_tolerance
+            mc_tolerance, mc_change = (
+                defaults.mc_tolerance,
+                defaults.mc_change_tolerance,
             )
-            change = st.select_slider(
-                "Допуск изменения поля",
-                (1e-3, 1e-5, 1e-7, 1e-9),
-                value=1e-7,
-                key="h3_change",
-            )
+            if any(method not in MC_METHODS for method in methods):
+                tolerance = st.select_slider(
+                    "Допуск нелинейной невязки для прогонок",
+                    choices,
+                    value=tolerance,
+                    key="h3_tol",
+                )
+                change = st.select_slider(
+                    "Допуск изменения поля для прогонок",
+                    choices,
+                    value=change,
+                    key="h3_change",
+                )
+            if has_mc:
+                mc_tolerance = st.select_slider(
+                    "Допуск нелинейной невязки для MC",
+                    choices,
+                    value=mc_tolerance,
+                    key="h3_tol_mc",
+                )
+                mc_change = st.select_slider(
+                    "Допуск изменения поля для MC",
+                    choices,
+                    value=mc_change,
+                    key="h3_change_mc",
+                )
             linear = st.select_slider(
                 "Линейный допуск", (1e-8, 1e-10, 1e-12), value=1e-10, key="h3_linear"
             )
@@ -286,12 +354,20 @@ def render_heat3d_app():
     settings = HeatSettings3D(
         tolerance=tolerance,
         change_tolerance=change,
+        mc_tolerance=mc_tolerance,
+        mc_change_tolerance=mc_change,
         linear_tolerance=linear,
         relaxation=relaxation,
         max_outer=outer,
         max_inner=inner,
         max_seconds=seconds,
         max_workspace_bytes=memory * 1024**2,
+        walks=walks,
+        seed=mc_seed,
+        coarse_n=coarse_n,
+        max_walks=max_walks,
+        max_transitions=max_transitions,
+        max_path_steps=max_path_steps,
     )
     current = dict(configuration=asdict(config), solver_settings=asdict(settings))
     with st.expander("Уравнение, эталон и смысл ошибки", key="h3_explanation"):
@@ -387,6 +463,14 @@ def render_heat3d_app():
                             "Принятых слоёв": row["physical_steps"],
                             "Итераций Пикара": row["outer_iterations"],
                             "Линейных решений / циклов": row["inner_iterations"],
+                            "Начато путей": (
+                                row["walks"] if row["walks_applicable"] else None
+                            ),
+                            "Завершено путей": (
+                                row["completed_walks"]
+                                if row["walks_applicable"]
+                                else None
+                            ),
                             "Рабочие массивы, байт": row["workspace_bytes"],
                         }
                         for row in result["rows"]
@@ -423,7 +507,9 @@ def render_heat3d_app():
                         format_func=METHOD_NAMES.get,
                         key="h3_value_method",
                     )
-                label = {"lod": "ЛОМ", "block": "Матричная прогонка"}[method]
+                label = {"lod": "ЛОМ", "block": "Матричная прогонка"}.get(
+                    method, METHOD_NAMES[method]
+                )
                 arrays = result["arrays"]
                 values = pd.DataFrame(arrays["points_zyx"], columns=["z", "y", "x"])
                 values[label] = arrays[method]
@@ -448,7 +534,7 @@ def render_heat3d_app():
             _downloads(result, "h3_comparison")
     with study_tab:
         st.caption(
-            "Для каждого выбранного метода: подбор с фиксированным запасом → фиксация допуска → одна новая финальная серия. После её неудачи подбор не продолжается. Ньютон используется только как диагностика в сравнении."
+            "Для прогонок подбирается допуск Пикара, для MC — число путей на свободный узел. После выбора бюджета с заданным запасом проводится независимая финальная серия полных запусков."
         )
         repeats = st.number_input(
             "Полных повторов в каждой серии",
@@ -465,7 +551,16 @@ def render_heat3d_app():
             (1e-3, 1e-5, 1e-7, 1e-9),
             default=[1e-3, 1e-5, 1e-7, 1e-9],
             key="h3_budgets",
+            disabled=not any(m not in MC_METHODS for m in methods),
         )
+        walk_budgets = (256, 1024, 4096)
+        if has_mc:
+            walk_budgets = st.multiselect(
+                "Путей на узел для подбора",
+                [32, 64, 256, 1024, 4096, 16384],
+                default=list(walk_budgets),
+                key="h3_walk_budgets",
+            )
         margin = st.slider(
             "Доля цели на предварительной серии",
             min_value=0.1,
@@ -475,15 +570,19 @@ def render_heat3d_app():
             key="h3_margin",
         )
         study_config = replace(config, newton=False)
+        study_settings = replace(settings, seed=seed) if has_mc else settings
         study_parameters = dict(
             repeats=repeats,
             seed=seed,
             budgets=sorted(budgets, reverse=True),
+            walk_budgets=sorted(walk_budgets),
             calibration_fraction=margin,
         )
         if st.button(
             "Проверить 1/5/10% · 3D",
-            disabled=not budgets or not methods,
+            disabled=not methods
+            or (has_mc and not walk_budgets)
+            or (any(m not in MC_METHODS for m in methods) and not budgets),
             key="h3_study_run",
             on_click=select_section,
             args=("h3_sections", "Исследование 1/5/10%"),
@@ -492,7 +591,7 @@ def render_heat3d_app():
             try:
                 st.session_state["h3_study"] = study_heat3d(
                     study_config,
-                    settings,
+                    study_settings,
                     **study_parameters,
                     progress=lambda fraction, text: bar.progress(
                         float(fraction), text=text
@@ -507,7 +606,8 @@ def render_heat3d_app():
             _saved_settings(
                 study,
                 dict(
-                    configuration=asdict(study_config), solver_settings=asdict(settings)
+                    configuration=asdict(study_config),
+                    solver_settings=asdict(study_settings),
                 ),
             )
             if any(
@@ -518,7 +618,7 @@ def render_heat3d_app():
                     "Параметры исследования изменены; таблица и выгрузки относятся к сохранённой серии."
                 )
             st.caption(
-                f"Выполненная серия: R={study['requested_repeats']}, запас={study['calibration_fraction']:g}, seed={study['seed']}. Пути: неприменимо для детерминированного метода."
+                f"Выполненная серия: R={study['requested_repeats']}, запас={study['calibration_fraction']:g}, seed={study['seed']}."
             )
             display = []
             for row in study["rows"]:
@@ -527,7 +627,13 @@ def render_heat3d_app():
                         "Метод": row["method_name"],
                         "Цель, %": row["target_pct"],
                         "Статус": STATUS_LABELS.get(row["status"], row["status"]),
-                        "Допуск": row["budget"],
+                        "Бюджет": row["budget"],
+                        "Единица бюджета": (
+                            "Путей на узел"
+                            if row["walks_applicable"]
+                            else "Допуск Пикара"
+                        ),
+                        "Начато путей в серии": row["total_walks"],
                         "Серия": {
                             "pilot": "Предварительная",
                             "final": "Финальная",

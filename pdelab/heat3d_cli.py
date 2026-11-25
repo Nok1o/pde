@@ -40,8 +40,12 @@ def main(argv=None):
         action="store_true",
         help="Независимая сеточная диагностика для run, n ≤ 16",
     )
-    parser.add_argument("--tol", type=float, default=1e-7)
-    parser.add_argument("--change-tol", type=float, default=1e-7)
+    parser.add_argument("--tol", type=float, help="Допуск нелинейной невязки Пикара")
+    parser.add_argument("--change-tol", type=float, help="Допуск изменения поля Пикара")
+    parser.add_argument("--mc-tol", type=float, help="Отдельный допуск невязки для MC")
+    parser.add_argument(
+        "--mc-change-tol", type=float, help="Отдельный допуск изменения для MC"
+    )
     parser.add_argument("--linear-tol", type=float, default=1e-10)
     parser.add_argument("--relaxation", type=float, default=1.0)
     parser.add_argument("--max-outer", type=int, default=100)
@@ -50,6 +54,22 @@ def main(argv=None):
     parser.add_argument("--max-workspace-bytes", type=int, default=256 * 1024**2)
     parser.add_argument("--repeats", type=int, default=5)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument(
+        "--walks", type=int, default=4096, help="Путей на свободный узел за оценку MC"
+    )
+    parser.add_argument(
+        "--coarse-n", type=int, default=4, help="Интервалы грубой сетки для mc_control"
+    )
+    parser.add_argument("--max-path-steps", type=int, default=1_000_000)
+    parser.add_argument("--max-walks", type=int, default=8_000_000)
+    parser.add_argument("--max-transitions", type=int, default=80_000_000)
+    parser.add_argument(
+        "--walk-budgets",
+        nargs="+",
+        type=int,
+        default=[256, 1024, 4096],
+        help="Бюджеты MC для исследования 1/5/10%%",
+    )
     parser.add_argument(
         "--budgets", nargs="+", type=float, default=[1e-3, 1e-5, 1e-7, 1e-9]
     )
@@ -83,15 +103,34 @@ def main(argv=None):
         methods=tuple(args.methods),
         **boundary_configuration(args),
     )
+    defaults = HeatSettings3D.for_methods(config.methods)
     settings = HeatSettings3D(
-        tolerance=args.tol,
-        change_tolerance=args.change_tol,
+        tolerance=defaults.tolerance if args.tol is None else args.tol,
+        change_tolerance=(
+            defaults.change_tolerance if args.change_tol is None else args.change_tol
+        ),
+        mc_tolerance=(
+            defaults.mc_tolerance
+            if args.mc_tol is None and args.tol is None
+            else args.mc_tol
+        ),
+        mc_change_tolerance=(
+            defaults.mc_change_tolerance
+            if args.mc_change_tol is None and args.change_tol is None
+            else args.mc_change_tol
+        ),
         linear_tolerance=args.linear_tol,
         relaxation=args.relaxation,
         max_outer=args.max_outer,
         max_inner=args.max_inner,
         max_seconds=args.max_seconds,
         max_workspace_bytes=args.max_workspace_bytes,
+        walks=args.walks,
+        seed=args.seed,
+        coarse_n=args.coarse_n,
+        max_walks=args.max_walks,
+        max_transitions=args.max_transitions,
+        max_path_steps=args.max_path_steps,
     )
     try:
         if args.command == "run":
@@ -106,6 +145,7 @@ def main(argv=None):
                 repeats=args.repeats,
                 seed=args.seed,
                 budgets=args.budgets,
+                walk_budgets=args.walk_budgets,
                 calibration_fraction=args.margin,
             )
             success = all(row["status"] == "confirmed" for row in result["rows"])
