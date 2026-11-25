@@ -70,7 +70,8 @@ class BoundaryExperiment:
     metrics: list
 
 
-def boundary_metrics(result, points, reference, grid_reference):
+def boundary_metrics(result, points, reference, grid_reference, *, names=None):
+    names = METHODS_BOUNDARY if names is None else names
     indices = tuple(points.T)
     target = reference[indices]
     value = result.values[indices]
@@ -81,7 +82,7 @@ def boundary_metrics(result, points, reference, grid_reference):
         "scheme": result.extras.get("scheme", "uniform_finite_difference"),
         "data_model": result.extras.get("data_model", "nodal_input_data"),
         "wos_epsilon": result.extras.get("epsilon"),
-        "name": METHODS_BOUNDARY[result.method],
+        "name": names[result.method],
         "value": float(np.mean(value)),
         "reference_value": float(np.mean(target)),
         "seconds": result.elapsed,
@@ -97,17 +98,25 @@ def boundary_metrics(result, points, reference, grid_reference):
         "steps": result.steps,
         "relative_residual": result.relative_residual,
         "converged": result.converged,
+        "batch_size": result.extras.get("batch_size"),
+        "effective_batch_size": result.extras.get("effective_batch_size"),
+        "preparation_seconds": result.extras.get("preparation_seconds"),
+        "path_seconds": result.extras.get("path_seconds"),
+        "workspace_bytes": result.extras.get("workspace_bytes"),
+        "started_walks": result.extras.get("started_walks"),
+        "rng": result.extras.get("rng"),
     }
 
 
-def selected_boundary_methods(operator, methods=None):
+def selected_boundary_methods(operator, methods=None, *, names=None):
+    names = METHODS_BOUNDARY if names is None else names
     if methods is None:
         methods = (
             ["lod_serial"]
             if operator.pure_neumann
             else [
                 m
-                for m in METHODS_BOUNDARY
+                for m in names
                 if m != "wos"
                 or all(c.kind == "dirichlet" for c in operator.problem.sides.values())
             ]
@@ -116,9 +125,9 @@ def selected_boundary_methods(operator, methods=None):
     if (
         not methods
         or len(set(methods)) != len(methods)
-        or any(m not in METHODS_BOUNDARY for m in methods)
+        or any(m not in names for m in methods)
     ):
-        raise ValueError("Выберите ЛОМ и/или обычный MC")
+        raise ValueError("Выберите различные доступные методы")
     if operator.pure_neumann and any(m != "lod_serial" for m in methods):
         raise ValueError("MC для условий только 2-го рода пока не поддерживается")
     if "wos" in methods and any(

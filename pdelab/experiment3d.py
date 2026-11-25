@@ -34,6 +34,7 @@ class Config3D:
     tol: float = 1e-7
     max_iter: int = 20000
     coarse_n: int | None = None
+    batch_size: int = 128
 
 
 @dataclass
@@ -89,6 +90,11 @@ def metrics3d(result, points, reference, grid_reference=None):
         "coarse_n": result.extras.get("coarse_n"),
         "preparation_seconds": result.extras.get("preparation_seconds"),
         "path_seconds": result.extras.get("path_seconds"),
+        "batch_size": result.extras.get("batch_size"),
+        "effective_batch_size": result.extras.get("effective_batch_size"),
+        "workspace_bytes": result.extras.get("workspace_bytes"),
+        "started_walks": result.extras.get("started_walks"),
+        "rng": result.extras.get("rng"),
     }
 
 
@@ -119,6 +125,7 @@ def run_experiment3d(config=None, methods=None):
             tol=config.tol,
             max_iter=config.max_iter,
             coarse_n=config.coarse_n if method == "mc_control" else None,
+            batch_size=config.batch_size,
         )
         if not result.converged:
             raise RuntimeError(

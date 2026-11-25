@@ -2,8 +2,11 @@
 
 The runner performs a complete solve. All candidate selection finishes before
 any final series starts. Final observations never feed back into selection.
-Only scalar trial diagnostics are retained, not full solution histories.
+Trial diagnostics are retained; stationary callers may additionally retain query
+vectors. Full physical solution histories are never copied into this protocol.
 """
+
+from time import perf_counter
 
 import numpy as np
 
@@ -67,10 +70,15 @@ def run_accuracy_study(
     budget_kind="relative_residual_tolerance",
     walks_applicable=False,
     progress=None,
+    seconds_per_phase=None,
+    clock=perf_counter,
+    retain_values=False,
 ):
     """Select by pilots with a fixed margin, then check each frozen candidate once.
 
-    ``runner(budget, seed)`` returns a HeatRunResult3D (or the same attributes).
+    ``runner(budget, seed)`` returns query values, status and full-run costs.
+    Physical-time fields are optional for stationary observations. When supplied,
+    completed_until must equal target_time. Existing heat callers keep their checks.
     The order of budgets is explicit, e.g. loose to strict deterministic tolerance.
     One final series may serve several targets selected at the same budget.
     Failure of any full run makes that entire series incomplete.
@@ -94,15 +102,26 @@ def run_accuracy_study(
         raise ValueError("Цели не должны повторяться")
     if not np.isfinite(calibration_fraction) or not 0 < calibration_fraction < 1:
         raise ValueError("Доля цели при подборе должна быть строго между 0 и 1")
+    if seconds_per_phase is not None and (
+        not np.isfinite(seconds_per_phase) or seconds_per_phase <= 0
+    ):
+        raise ValueError("Лимит каждой фазы должен быть положительным")
     repeats, seed = int(repeats), int(seed)
     reference = np.atleast_1d(np.asarray(reference, dtype=float))
     reference_info = error_metrics(reference, reference)
     trials, series, chosen = [], [], {}
     maximum_runs = 2 * len(budgets) * repeats
+    deadlines = {}
 
     def measure(index, phase):
         records = []
+        timed_out = False
+        if seconds_per_phase is not None and phase not in deadlines:
+            deadlines[phase] = clock() + seconds_per_phase
         for repeat in range(repeats):
+            if seconds_per_phase is not None and clock() >= deadlines[phase]:
+                timed_out = True
+                break
             trial_seed = _seed(seed, 0 if phase == "pilot" else 1, index, repeat)
             if progress:
                 progress(
@@ -119,24 +138,24 @@ def run_accuracy_study(
                 seed=trial_seed,
                 status=result.status,
                 reason=result.reason,
-                target_time=result.target_time,
-                completed_until=result.completed_until,
+                target_time=getattr(result, "target_time", None),
+                completed_until=getattr(result, "completed_until", None),
                 seconds=float(result.seconds),
                 preparation_seconds=float(result.preparation_seconds),
                 workspace_bytes=int(result.workspace_bytes),
                 peak_rss_bytes=result.peak_rss_bytes,
-                physical_steps=int(result.physical_steps),
-                outer_iterations=int(result.outer_iterations),
-                inner_iterations=int(result.inner_iterations),
+                physical_steps=int(getattr(result, "physical_steps", 0)),
+                outer_iterations=int(getattr(result, "outer_iterations", 0)),
+                inner_iterations=int(getattr(result, "inner_iterations", 0)),
                 walks=int(result.walks),
                 transitions=int(result.transitions),
                 relative_error_pct=None,
                 absolute_error=None,
             )
             if result.status == "completed":
-                if (
-                    result.values is None
-                    or result.completed_until != result.target_time
+                if result.values is None or (
+                    record["target_time"] is not None
+                    and record["completed_until"] != record["target_time"]
                 ):
                     record.update(
                         status="invalid_result", reason="Нет решения в целевой момент T"
@@ -152,7 +171,13 @@ def run_accuracy_study(
                         )
                     except (ValueError, IndexError) as exc:
                         record.update(status="nonfinite", reason=str(exc))
-            history = result.history
+            if retain_values:
+                record["values"] = (
+                    np.asarray(result.values).tolist()
+                    if record["status"] == "completed"
+                    else None
+                )
+            history = getattr(result, "history", None)
             if history:
                 for key in (
                     "linear_relative_residual",
@@ -170,6 +195,7 @@ def run_accuracy_study(
             candidate=index,
             budget=budgets[index],
             requested_repeats=repeats,
+            recorded_repeats=len(records),
             completed_repeats=completed,
             complete=full,
             relative_error_pct=(
@@ -181,12 +207,14 @@ def run_accuracy_study(
                 float(np.mean([r["absolute_error"] for r in records])) if full else None
             ),
             elapsed_seconds=sum(r["seconds"] for r in records),
-            mean_seconds=float(np.mean([r["seconds"] for r in records])),
+            mean_seconds=(
+                float(np.mean([r["seconds"] for r in records])) if records else None
+            ),
             preparation_seconds=sum(r["preparation_seconds"] for r in records),
-            workspace_bytes=max(r["workspace_bytes"] for r in records),
+            workspace_bytes=max((r["workspace_bytes"] for r in records), default=0),
             peak_rss_bytes=(
                 max(r["peak_rss_bytes"] for r in records)
-                if all(r["peak_rss_bytes"] is not None for r in records)
+                if records and all(r["peak_rss_bytes"] is not None for r in records)
                 else None
             ),
             physical_steps=sum(r["physical_steps"] for r in records),
@@ -194,12 +222,20 @@ def run_accuracy_study(
             inner_iterations=sum(r["inner_iterations"] for r in records),
             total_walks=sum(r["walks"] for r in records) if walks_applicable else None,
             transitions=sum(r["transitions"] for r in records),
-            solver_status="completed" if full else failed[0]["status"],
+            solver_status=(
+                "completed"
+                if full
+                else ("time_limit" if timed_out else failed[0]["status"])
+            ),
             reason=(
                 ""
                 if full
-                else "; ".join(
-                    dict.fromkeys(r["reason"] or r["status"] for r in failed)
+                else (
+                    "Лимит времени фазы: не все запуски начаты"
+                    if timed_out
+                    else "; ".join(
+                        dict.fromkeys(r["reason"] or r["status"] for r in failed)
+                    )
                 )
             ),
         )
@@ -235,6 +271,8 @@ def run_accuracy_study(
                     ):
                         chosen[target] = index
             if len(chosen) == len(targets):
+                break
+            if pilot["solver_status"] == "time_limit":
                 break
         # No adaptation after this line: the entire candidate map is frozen.
         confirmations = {

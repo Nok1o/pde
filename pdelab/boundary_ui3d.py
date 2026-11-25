@@ -16,8 +16,7 @@ from .boundary_experiment3d import (
     problem_from_config3d,
     run_boundary_experiment3d,
 )
-from .boundary_solvers import METHODS_BOUNDARY
-from .boundary_solvers3d import trace_boundary_walk3d
+from .boundary_solvers3d import METHODS_BOUNDARY_3D, trace_boundary_walk3d
 from .boundary_ui import KIND_LABELS
 from .boundary_views3d import boundary_trace_figure3d
 from .boundary_workload3d import boundary_limit_message3d
@@ -95,6 +94,14 @@ def _controls():
             value=2048,
             key="bc3d_walks",
         )
+        batch_size = st.number_input(
+            "Частиц в группе MC",
+            min_value=1,
+            max_value=65536,
+            value=128,
+            key="bc3d_batch_size",
+            help="Для MC с группами частиц. Общее число путей задаётся отдельно.",
+        )
         tol = st.select_slider(
             "Относительный допуск ЛОМ",
             [1e-3, 1e-5, 1e-7, 1e-8, 1e-10],
@@ -127,6 +134,7 @@ def _controls():
         mode=mode,
         point=point,
         walks=walks,
+        batch_size=int(batch_size),
         seed=seed,
         tol=tol,
         max_iter=max_iter,
@@ -317,7 +325,7 @@ def render_boundary_app3d():
         return
     pure_neumann = operator.pure_neumann
     del operator
-    available = ["lod_serial"] if pure_neumann else list(METHODS_BOUNDARY)
+    available = ["lod_serial"] if pure_neumann else list(METHODS_BOUNDARY_3D)
     if any(kind != "dirichlet" for kind in config.kinds):
         available = [m for m in available if m != "wos"]
     if pure_neumann:
@@ -329,7 +337,7 @@ def render_boundary_app3d():
             "Методы",
             available,
             default=available,
-            format_func=METHODS_BOUNDARY.get,
+            format_func=METHODS_BOUNDARY_3D.get,
             key="bc3d_methods",
         )
         run = st.button(

@@ -13,7 +13,7 @@ from .boundary_experiment3d import (
     export_boundary3d,
     run_boundary_experiment3d,
 )
-from .boundary_solvers import METHODS_BOUNDARY
+from .boundary_solvers3d import METHODS_BOUNDARY_3D
 from .experiment3d import rows_csv
 
 
@@ -51,11 +51,14 @@ def main(argv=None):
     parser.add_argument("--plane", choices=["xy", "xz", "yz"], default="xy")
     parser.add_argument("--index", type=int)
     parser.add_argument("--walks", type=int, default=2048)
+    parser.add_argument(
+        "--batch-size", type=int, default=128, help="Частиц в группе MC: 1–65536"
+    )
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--tol", type=float, default=1e-8)
     parser.add_argument("--max-iter", type=int, default=20000)
     parser.add_argument("--max-steps", type=int)
-    parser.add_argument("--methods", choices=METHODS_BOUNDARY, nargs="+")
+    parser.add_argument("--methods", choices=METHODS_BOUNDARY_3D, nargs="+")
     parser.add_argument("--budgets", nargs="+", type=int, default=[128, 512, 2048])
     parser.add_argument("--repeats", type=int, default=3)
     parser.add_argument("--out", type=Path, default=Path("runs/boundary3d"))
