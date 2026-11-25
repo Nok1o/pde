@@ -1,4 +1,4 @@
-"""Problem data for issue #24; no time or nonlinear solver is implemented here.
+"""Physical data for 3D nonlinear heat conduction and material families.
 
 Coordinates are (x, y, z), arrays [z, y, x]. Boundary kind 3 means
 k(u) * outward_normal_derivative(u) + beta*u = r, not a bare derivative.
@@ -28,6 +28,22 @@ def _time(t):
         raise ValueError("Время должно быть конечным и неотрицательным")
 
 
+def _material_parameter(value, name):
+    if (
+        isinstance(value, (bool, np.bool_))
+        or not np.isscalar(value)
+        or np.iscomplexobj(value)
+    ):
+        raise ValueError(f"{name}: нужен конечный неотрицательный параметр")
+    try:
+        value = float(value)
+    except (TypeError, ValueError, OverflowError) as error:
+        raise ValueError(f"{name}: нужен конечный неотрицательный параметр") from error
+    if not np.isfinite(value) or value < 0:
+        raise ValueError(f"{name}: нужен конечный неотрицательный параметр")
+    return value
+
+
 @dataclass(frozen=True)
 class HeatFace3D:
     kind: Literal[1, 3]
@@ -54,11 +70,15 @@ class HeatProblem3D:
     source: Field3D
     faces: Mapping[str, HeatFace3D]
     exact: Field3D | None = None
+    capacity_gamma: float = 0.0
+    reaction_sigma: float = 0.0
 
     def __post_init__(self):
         object.__setattr__(self, "n", validate_n(self.n))
-        if not np.isfinite(self.alpha) or self.alpha < 0:
-            raise ValueError("alpha должна быть конечной и неотрицательной")
+        for name in ("alpha", "capacity_gamma", "reaction_sigma"):
+            object.__setattr__(
+                self, name, _material_parameter(getattr(self, name), name)
+            )
         if not callable(self.initial) or not callable(self.source):
             raise ValueError("Начальные данные и источник должны быть функциями")
         if self.exact is not None and not callable(self.exact):
@@ -115,6 +135,30 @@ class HeatProblem3D:
             raise ValueError("Проводимость должна быть конечной и положительной")
         return result
 
+    def capacity(self, values):
+        """Positive c(u)=1+gamma*u²; gamma=0 recovers constant capacity."""
+        values = np.asarray(values, dtype=float)
+        if not np.isfinite(values).all():
+            raise ValueError("Температура должна быть конечной")
+        with np.errstate(over="ignore", invalid="ignore"):
+            scaled = np.sqrt(self.capacity_gamma) * values
+            result = 1 + scaled * scaled
+        if not np.isfinite(result).all() or np.any(result <= 0):
+            raise ValueError("Теплоёмкость должна быть конечной и положительной")
+        return result
+
+    def reaction_coefficient(self, values):
+        """Nonnegative frozen loss sigma*v² in sigma*v²*w, not the full loss."""
+        values = np.asarray(values, dtype=float)
+        if not np.isfinite(values).all():
+            raise ValueError("Температура должна быть конечной")
+        with np.errstate(over="ignore", invalid="ignore"):
+            scaled = np.sqrt(self.reaction_sigma) * values
+            result = scaled * scaled
+        if not np.isfinite(result).all():
+            raise ValueError("Коэффициент реакции должен быть конечным")
+        return result
+
 
 def _manufactured_fields(kind, x, y, z, t):
     """Return u, u_t, gradient in xyz order, and Laplacian for test data."""
@@ -139,10 +183,22 @@ def _manufactured_fields(kind, x, y, z, t):
     raise ValueError("Проверочные случаи: sine, polynomial")
 
 
-def make_heat_problem3d(kind="sine", n=8, alpha=0.5, kinds=None, beta=1.0):
+def make_heat_problem3d(
+    kind="sine",
+    n=8,
+    alpha=0.5,
+    kinds=None,
+    beta=1.0,
+    *,
+    capacity_gamma=0.0,
+    reaction_sigma=0.0,
+):
     """Manufacture F and face data; beta is a scalar or a six-face mapping."""
     if kind not in ("sine", "polynomial"):
         raise ValueError("Проверочные случаи: sine, polynomial")
+    alpha = _material_parameter(alpha, "alpha")
+    capacity_gamma = _material_parameter(capacity_gamma, "capacity_gamma")
+    reaction_sigma = _material_parameter(reaction_sigma, "reaction_sigma")
     kinds = dict.fromkeys(FACES, 1) if kinds is None else dict(kinds)
     if set(kinds) != set(FACES):
         raise ValueError("Укажите тип всех шести граней")
@@ -158,7 +214,9 @@ def make_heat_problem3d(kind="sine", n=8, alpha=0.5, kinds=None, beta=1.0):
         divergence = (1 + alpha * u * u) * laplacian + 2 * alpha * u * sum(
             g * g for g in gradient
         )
-        return ut - divergence
+        return (
+            (1 + capacity_gamma * u * u) * ut - divergence + reaction_sigma * u * u * u
+        )
 
     def boundary_data(face):
         component = "xyz".index(face[0])
@@ -178,4 +236,6 @@ def make_heat_problem3d(kind="sine", n=8, alpha=0.5, kinds=None, beta=1.0):
         )
         for face in FACES
     }
-    return HeatProblem3D(kind, n, alpha, exact, source, faces, exact)
+    return HeatProblem3D(
+        kind, n, alpha, exact, source, faces, exact, capacity_gamma, reaction_sigma
+    )

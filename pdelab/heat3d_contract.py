@@ -75,10 +75,10 @@ class HeatOperatorFactory3D(Protocol):
         t: float,
         dt: float,
     ) -> FrozenHeatOperator3D:
-        """Freeze k(iterate) for the layer ending at t, using actual final dt.
+        """Freeze k, c and sigma*iterate² for the layer ending at t.
 
-        No exact solution access. Includes physical face data at t.
-        Implemented by #25 (all kind 1), then #27 (mixed boundaries).
+        Uses actual final dt and physical face data, with no exact solution access.
+        The time term is c(iterate)*(w-previous)/dt, not an enthalpy difference.
         """
         ...
 
