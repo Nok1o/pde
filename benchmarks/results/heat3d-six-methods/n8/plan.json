@@ -1,0 +1,127 @@
+{
+  "description": "Six-method accuracy study with B=128 chosen before measurement",
+  "baseline": "131dda6",
+  "repeats": 5,
+  "seed": 31026,
+  "budgets": [
+    0.001,
+    1e-06
+  ],
+  "walk_budgets": [
+    256,
+    1024
+  ],
+  "calibration_fraction": 0.8,
+  "settings": {
+    "mc_tolerance": 0.2,
+    "mc_change_tolerance": 0.1,
+    "coarse_n": 4,
+    "max_outer": 8,
+    "max_seconds": 5,
+    "max_walks": 12000000,
+    "max_transitions": 40000000,
+    "max_path_steps": 100000,
+    "max_workspace_bytes": 268435456
+  },
+  "configuration": {
+    "n": 8,
+    "alpha": 0.5,
+    "dt": 0.002,
+    "T": 0.004,
+    "mode": "point"
+  },
+  "variants": [
+    {
+      "id": "lod",
+      "method": "lod"
+    },
+    {
+      "id": "block",
+      "method": "block"
+    },
+    {
+      "id": "mc",
+      "method": "mc"
+    },
+    {
+      "id": "mc_control",
+      "method": "mc_control"
+    },
+    {
+      "id": "mc_grouped",
+      "method": "mc_grouped",
+      "settings": {
+        "batch_size": 128
+      }
+    },
+    {
+      "id": "mc_control_grouped",
+      "method": "mc_control_grouped",
+      "settings": {
+        "batch_size": 128
+      }
+    }
+  ],
+  "cases": [
+    {
+      "id": "sine-centre-kind1",
+      "configuration": {
+        "case": "sine",
+        "point": [
+          4,
+          4,
+          4
+        ]
+      }
+    },
+    {
+      "id": "polynomial-kind1",
+      "configuration": {
+        "case": "polynomial",
+        "point": [
+          2,
+          4,
+          6
+        ]
+      }
+    },
+    {
+      "id": "polynomial-one-kind3",
+      "configuration": {
+        "case": "polynomial",
+        "point": [
+          2,
+          4,
+          6
+        ],
+        "kinds": [
+          3,
+          1,
+          1,
+          1,
+          1,
+          1
+        ]
+      }
+    },
+    {
+      "id": "polynomial-all-kind3",
+      "configuration": {
+        "case": "polynomial",
+        "point": [
+          2,
+          4,
+          6
+        ],
+        "kinds": [
+          3,
+          3,
+          3,
+          3,
+          3,
+          3
+        ]
+      }
+    }
+  ]
+}
