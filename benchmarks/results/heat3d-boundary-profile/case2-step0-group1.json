@@ -1,0 +1,139 @@
+{
+  "trials": [
+    {
+      "case_index": 2,
+      "kind3_faces": [
+        "x0",
+        "y0",
+        "z0"
+      ],
+      "dt": 0.002,
+      "method": "mc_grouped",
+      "batch_size": 128,
+      "repeat": 1,
+      "seed": 3742324397,
+      "status": "completed",
+      "reason": "fixed_sample_budget_completed",
+      "setup_seconds": 0.0007481250067939982,
+      "coefficients_seconds": 1.5415993402712047e-05,
+      "sampling_and_result_seconds": 0.015440625007613562,
+      "full_seconds": 0.016369042001315393,
+      "walks": 262144,
+      "completed_walks": 262144,
+      "transitions": 572565,
+      "workspace_bytes": 227465,
+      "peak_rss_bytes": 154730496,
+      "relative_l2_error_pct": 3.6570888870383924
+    },
+    {
+      "case_index": 2,
+      "kind3_faces": [
+        "x0",
+        "y0",
+        "z0"
+      ],
+      "dt": 0.002,
+      "method": "mc_grouped",
+      "batch_size": 128,
+      "repeat": 2,
+      "seed": 249362324,
+      "status": "completed",
+      "reason": "fixed_sample_budget_completed",
+      "setup_seconds": 0.000806416996056214,
+      "coefficients_seconds": 1.5875004464760423e-05,
+      "sampling_and_result_seconds": 0.015450874998350628,
+      "full_seconds": 0.016435917001217604,
+      "walks": 262144,
+      "completed_walks": 262144,
+      "transitions": 572609,
+      "workspace_bytes": 227465,
+      "peak_rss_bytes": 154779648,
+      "relative_l2_error_pct": 3.6417805163277306
+    },
+    {
+      "case_index": 2,
+      "kind3_faces": [
+        "x0",
+        "y0",
+        "z0"
+      ],
+      "dt": 0.002,
+      "method": "mc_grouped",
+      "batch_size": 128,
+      "repeat": 3,
+      "seed": 3415633641,
+      "status": "completed",
+      "reason": "fixed_sample_budget_completed",
+      "setup_seconds": 0.0008165829931385815,
+      "coefficients_seconds": 1.5708996215835214e-05,
+      "sampling_and_result_seconds": 0.015685375008615665,
+      "full_seconds": 0.016689916999894194,
+      "walks": 262144,
+      "completed_walks": 262144,
+      "transitions": 575210,
+      "workspace_bytes": 227465,
+      "peak_rss_bytes": 154779648,
+      "relative_l2_error_pct": 3.88479759947756
+    },
+    {
+      "case_index": 2,
+      "kind3_faces": [
+        "x0",
+        "y0",
+        "z0"
+      ],
+      "dt": 0.002,
+      "method": "mc_grouped",
+      "batch_size": 128,
+      "repeat": 4,
+      "seed": 3281427048,
+      "status": "completed",
+      "reason": "fixed_sample_budget_completed",
+      "setup_seconds": 0.0008139999990817159,
+      "coefficients_seconds": 1.4374993043020368e-05,
+      "sampling_and_result_seconds": 0.015664834005292505,
+      "full_seconds": 0.0166646660072729,
+      "walks": 262144,
+      "completed_walks": 262144,
+      "transitions": 572814,
+      "workspace_bytes": 227465,
+      "peak_rss_bytes": 154812416,
+      "relative_l2_error_pct": 3.777593600609168
+    },
+    {
+      "case_index": 2,
+      "kind3_faces": [
+        "x0",
+        "y0",
+        "z0"
+      ],
+      "dt": 0.002,
+      "method": "mc_grouped",
+      "batch_size": 128,
+      "repeat": 5,
+      "seed": 3215666451,
+      "status": "completed",
+      "reason": "fixed_sample_budget_completed",
+      "setup_seconds": 0.0009067920036613941,
+      "coefficients_seconds": 2.170799416489899e-05,
+      "sampling_and_result_seconds": 0.015941292003844865,
+      "full_seconds": 0.017051292001269758,
+      "walks": 262144,
+      "completed_walks": 262144,
+      "transitions": 572461,
+      "workspace_bytes": 227465,
+      "peak_rss_bytes": 154861568,
+      "relative_l2_error_pct": 3.62316001798976
+    }
+  ],
+  "expected": {
+    "expected_interior_visits": 630904.1427975777,
+    "expected_face_visits": 184712.86732216802,
+    "expected_edge_visits": 19617.221184713315,
+    "expected_corner_visits": 753.4928540069285,
+    "expected_boundary_visit_fraction": 0.24531889097693685,
+    "expected_transitions": 573843.724158466,
+    "expected_moves_per_path": 2.189040085443367,
+    "paths": 262144
+  }
+}

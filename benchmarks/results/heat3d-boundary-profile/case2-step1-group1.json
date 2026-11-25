@@ -1,0 +1,139 @@
+{
+  "trials": [
+    {
+      "case_index": 2,
+      "kind3_faces": [
+        "x0",
+        "y0",
+        "z0"
+      ],
+      "dt": 0.02,
+      "method": "mc_grouped",
+      "batch_size": 128,
+      "repeat": 1,
+      "seed": 876632806,
+      "status": "completed",
+      "reason": "fixed_sample_budget_completed",
+      "setup_seconds": 0.0008006249991012737,
+      "coefficients_seconds": 1.5832993085496128e-05,
+      "sampling_and_result_seconds": 0.05879362499399576,
+      "full_seconds": 0.05977083400648553,
+      "walks": 262144,
+      "completed_walks": 262144,
+      "transitions": 3011697,
+      "workspace_bytes": 227465,
+      "peak_rss_bytes": 154828800,
+      "relative_l2_error_pct": 4.383424469015219
+    },
+    {
+      "case_index": 2,
+      "kind3_faces": [
+        "x0",
+        "y0",
+        "z0"
+      ],
+      "dt": 0.02,
+      "method": "mc_grouped",
+      "batch_size": 128,
+      "repeat": 2,
+      "seed": 177769931,
+      "status": "completed",
+      "reason": "fixed_sample_budget_completed",
+      "setup_seconds": 0.0009529160015517846,
+      "coefficients_seconds": 2.195900015067309e-05,
+      "sampling_and_result_seconds": 0.05844529099704232,
+      "full_seconds": 0.059656957993865944,
+      "walks": 262144,
+      "completed_walks": 262144,
+      "transitions": 3008080,
+      "workspace_bytes": 227465,
+      "peak_rss_bytes": 154861568,
+      "relative_l2_error_pct": 4.180488104055415
+    },
+    {
+      "case_index": 2,
+      "kind3_faces": [
+        "x0",
+        "y0",
+        "z0"
+      ],
+      "dt": 0.02,
+      "method": "mc_grouped",
+      "batch_size": 128,
+      "repeat": 3,
+      "seed": 573621685,
+      "status": "completed",
+      "reason": "fixed_sample_budget_completed",
+      "setup_seconds": 0.0008962920110207051,
+      "coefficients_seconds": 1.604200224392116e-05,
+      "sampling_and_result_seconds": 0.05789120799454395,
+      "full_seconds": 0.05899512500036508,
+      "walks": 262144,
+      "completed_walks": 262144,
+      "transitions": 3005286,
+      "workspace_bytes": 227465,
+      "peak_rss_bytes": 154877952,
+      "relative_l2_error_pct": 4.315725035911098
+    },
+    {
+      "case_index": 2,
+      "kind3_faces": [
+        "x0",
+        "y0",
+        "z0"
+      ],
+      "dt": 0.02,
+      "method": "mc_grouped",
+      "batch_size": 128,
+      "repeat": 4,
+      "seed": 92102045,
+      "status": "completed",
+      "reason": "fixed_sample_budget_completed",
+      "setup_seconds": 0.0009752500045578927,
+      "coefficients_seconds": 1.7541999113745987e-05,
+      "sampling_and_result_seconds": 0.0584934580110712,
+      "full_seconds": 0.059692625000025146,
+      "walks": 262144,
+      "completed_walks": 262144,
+      "transitions": 3000129,
+      "workspace_bytes": 227465,
+      "peak_rss_bytes": 154877952,
+      "relative_l2_error_pct": 4.306440463257914
+    },
+    {
+      "case_index": 2,
+      "kind3_faces": [
+        "x0",
+        "y0",
+        "z0"
+      ],
+      "dt": 0.02,
+      "method": "mc_grouped",
+      "batch_size": 128,
+      "repeat": 5,
+      "seed": 3159714667,
+      "status": "completed",
+      "reason": "fixed_sample_budget_completed",
+      "setup_seconds": 0.0009780830005183816,
+      "coefficients_seconds": 2.0875013433396816e-05,
+      "sampling_and_result_seconds": 0.05891729200084228,
+      "full_seconds": 0.060136916988994926,
+      "walks": 262144,
+      "completed_walks": 262144,
+      "transitions": 3006157,
+      "workspace_bytes": 227465,
+      "peak_rss_bytes": 154877952,
+      "relative_l2_error_pct": 4.33826931633982
+    }
+  ],
+  "expected": {
+    "expected_interior_visits": 2563742.935279809,
+    "expected_face_visits": 646382.2256265688,
+    "expected_edge_visits": 56237.1912394234,
+    "expected_corner_visits": 1726.5480887193798,
+    "expected_boundary_visit_fraction": 0.21552227814370878,
+    "expected_transitions": 3005944.9002345204,
+    "expected_moves_per_path": 11.466769791544039,
+    "paths": 262144
+  }
+}
