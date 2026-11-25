@@ -16,6 +16,7 @@ from .study_protocol import (
     METRIC_DESCRIPTION,
     METRIC_ID,
     PROTOCOL_ID,
+    error_metrics,
 )
 
 TARGETS_3D = (1.0, 5.0, 10.0)
@@ -126,6 +127,7 @@ def timing_rows3d(study):
 
 
 def study_payload3d(study):
+    reference_info = error_metrics(study.reference_value, study.reference_value)
     row = study.rows[0] if study.rows else {}
     metric = row.get("accuracy_metric", "relative_rmse_v1")
     protocol = row.get(
@@ -164,8 +166,8 @@ def study_payload3d(study):
             "absolute_metric", ABSOLUTE_METRIC_ID if metric == METRIC_ID else None
         ),
         "calibration_fraction": row.get("calibration_fraction"),
-        "relative_applicable": bool(np.linalg.norm(study.reference_value)),
-        "reference_norm": float(np.linalg.norm(study.reference_value)),
+        "relative_applicable": reference_info["relative_applicable"],
+        "reference_norm": reference_info["reference_norm"],
         "seconds_per_phase": study.settings.seconds_per_method,
         "timing": "Mean wall time of complete final runs after warmup; search and reference excluded",
     }

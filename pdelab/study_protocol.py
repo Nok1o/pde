@@ -10,6 +10,8 @@ from time import perf_counter
 
 import numpy as np
 
+from .measurement_protocol import query_error
+
 PROTOCOL_ID = "fixed_candidate_independent_final_v1"
 METRIC_ID = "mean_run_relative_l2_v1"
 ABSOLUTE_METRIC_ID = "mean_run_absolute_l2_v1"
@@ -30,15 +32,13 @@ def error_metrics(values, reference):
         values = values.reshape(-1, 1) if reference.size == 1 else values[None, :]
     if values.ndim != 2 or values.shape[1] != reference.size or not len(values):
         raise ValueError("Нужны значения формы [повтор, точка Q]")
-    if not np.isfinite(values).all() or not np.isfinite(reference).all():
-        raise ValueError("Значения и эталон должны быть конечными")
-    scale = float(np.linalg.norm(reference))
-    absolute = float(np.mean(np.linalg.norm(values - reference, axis=1)))
-    relative = 100 * absolute / scale if scale else None
-    if not np.isfinite(absolute) or (
-        relative is not None and not np.isfinite(relative)
-    ):
-        raise ValueError("Неконечная оценка ошибки")
+    absolute, relative = query_error(values, reference)
+    # Reuse #31's scaled metric; squaring tiny reference values can turn a
+    # nonzero reference into zero and incorrectly disable percentage targets.
+    with np.errstate(over="ignore"):
+        scale = float(np.hypot.reduce(reference))
+    if not np.isfinite(scale):
+        raise ValueError("Норма эталона выходит за конечный диапазон float")
     return dict(
         accuracy_metric=METRIC_ID,
         absolute_metric=ABSOLUTE_METRIC_ID,
