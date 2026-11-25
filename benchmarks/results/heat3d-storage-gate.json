@@ -1,0 +1,60 @@
+{
+  "schema": "heat3d_storage_gate_v1",
+  "purpose": "Exploratory memory-only entry criterion for issue33, not a final before/after campaign",
+  "source_commit": "b81c243b23e01e3f641c06f087af02619d25a752",
+  "python": "3.13.14",
+  "numpy": "2.5.4",
+  "scipy": "1.18.1",
+  "numba": "0.68.0",
+  "platform": "macOS-26.7.2-arm64-arm-64bit-Mach-O",
+  "case": "polynomial",
+  "n": 4,
+  "alpha": 0.5,
+  "T": 0.1,
+  "method": "lod",
+  "query_zyx": [
+    2,
+    2,
+    2
+  ],
+  "settings": {
+    "tolerance": 1e-07,
+    "change_tolerance": 1e-07,
+    "linear_tolerance": 1e-10,
+    "max_seconds": 60
+  },
+  "memory_scope": "tracemalloc starts after line-kernel warmup and problem construction; times not measured; history_estimate is conservative sys.getsizeof rows/values/list",
+  "reproduction": "docs/heat3d-storage.md#\u0438\u0441\u0445\u043e\u0434\u043d\u044b\u0439-\u043f\u0440\u043e\u0444\u0438\u043b\u044c",
+  "rows": [
+    {
+      "layers": 20,
+      "status": "completed",
+      "outer_iterations": 80,
+      "history_rows": 80,
+      "history_estimate": 67752,
+      "workspace_estimate": 108320,
+      "traced_peak": 163905,
+      "traced_retained": 104788
+    },
+    {
+      "layers": 200,
+      "status": "completed",
+      "outer_iterations": 600,
+      "history_rows": 600,
+      "history_estimate": 505032,
+      "workspace_estimate": 549920,
+      "traced_peak": 483473,
+      "traced_retained": 421456
+    },
+    {
+      "layers": 1000,
+      "status": "completed",
+      "outer_iterations": 2000,
+      "history_rows": 2000,
+      "history_estimate": 1664184,
+      "workspace_estimate": 1728272,
+      "traced_peak": 1259465,
+      "traced_retained": 1184656
+    }
+  ]
+}
