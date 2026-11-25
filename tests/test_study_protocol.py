@@ -48,6 +48,19 @@ def test_area_metric_is_l2_not_l1_rmse_or_pointwise_percentages():
     assert metric["absolute_error"] == pytest.approx(np.sqrt(5))
 
 
+@pytest.mark.parametrize("scale", [1e-200, 1e200])
+def test_relative_metric_does_not_underflow_or_overflow_when_squaring(scale):
+    metric = error_metrics([[1.1 * scale]], [scale])
+    assert metric["relative_applicable"]
+    assert metric["reference_norm"] == scale
+    assert metric["relative_error_pct"] == pytest.approx(10)
+    study = run_accuracy_study(
+        lambda *args: outcome([1.005 * scale]), [64], [scale], repeats=2
+    )
+    assert all(row["status"] == "confirmed" for row in study["rows"])
+    assert {trial["phase"] for trial in study["trials"]} == {"pilot", "final"}
+
+
 def test_zero_reference_preserves_absolute_l2_and_no_percent_claim():
     metric = error_metrics([[3, 4], [0, 0]], [0, 0])
     assert metric["absolute_error"] == 2.5

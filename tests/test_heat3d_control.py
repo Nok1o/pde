@@ -1,5 +1,6 @@
 """PDE-28 stage 2: residual identity, coarse construction and complete costs."""
 
+import csv
 import json
 from dataclasses import replace
 
@@ -8,6 +9,7 @@ import pytest
 from scipy.sparse.linalg import spsolve
 
 from pdelab import heat3d_control as module
+from pdelab import heat3d_mc_cli as cli
 from pdelab.control3d import _interpolate3d
 from pdelab.heat3d_control import (
     solve_controlled_frozen_mc3d,
@@ -312,3 +314,93 @@ def test_cli_exports_coarse_costs_and_failed_coarse_status(tmp_path):
     data = json.loads((out / "result.json").read_text(encoding="utf-8"))
     assert data["result"]["status"] == "linear_limit"
     assert data["result"]["values"] is None and data["result"]["walks"] == 0
+
+
+@pytest.mark.parametrize(
+    "settings,status",
+    [
+        ({}, "completed"),
+        ({"max_workspace_bytes": 1}, "memory_limit"),
+        ({"max_walks": 1}, "walk_budget"),
+        ({"coarse_max_iterations": 1, "coarse_tolerance": 1e-14}, "linear_limit"),
+    ],
+)
+def test_fresh_control_method_identifier_on_success_and_failures(settings, status):
+    p, previous, _ = context()
+    result = solve_controlled_frozen_mc3d(
+        p, previous, previous, 0.013, 0.013, walks=4, **settings
+    )
+    assert result.status == status
+    assert result.method == "mc_control" and result.batch_size is None
+
+
+@pytest.mark.parametrize(
+    "settings,status",
+    [
+        ({}, "completed"),
+        ({"max_workspace_bytes": 1}, "memory_limit"),
+        ({"max_walks": 1}, "walk_budget"),
+    ],
+)
+def test_supplied_control_method_identifier_on_success_and_failures(settings, status):
+    _, _, op = context()
+    result = solve_frozen_correction_mc3d(op, np.zeros(op.shape), walks=4, **settings)
+    assert result.status == status
+    assert result.method == "mc_control" and result.batch_size is None
+    nonfinite = solve_frozen_correction_mc3d(op, np.full(op.shape, 1e308), walks=4)
+    assert nonfinite.status == "nonfinite" and nonfinite.method == "mc_control"
+
+
+@pytest.mark.parametrize("method", ["mc", "mc_grouped", "mc_control"])
+@pytest.mark.parametrize("limited", [False, True])
+def test_all_cli_modes_keep_settings_warmup_and_export_consistent(
+    tmp_path, monkeypatch, method, limited
+):
+    warmed = []
+    warmup = cli.warmup_mc3d
+
+    def spy(*, batch_size=None):
+        warmed.append(batch_size)
+        return warmup(batch_size=batch_size)
+
+    monkeypatch.setattr(cli, "warmup_mc3d", spy)
+    args = [
+        "--n",
+        "8",
+        "--method",
+        method,
+        "--batch-size",
+        "7",
+        "--coarse-n",
+        "4",
+        "--walks",
+        "17",
+        "--out",
+        str(tmp_path),
+    ]
+    if limited:
+        args.extend(["--max-walks", "3"])
+        with pytest.raises(SystemExit) as error:
+            cli.main(args)
+        assert error.value.code == 2
+    else:
+        assert cli.main(args) == 0
+    data = json.loads((tmp_path / "result.json").read_text(encoding="utf-8"))
+    expected_batch = 7 if method == "mc_grouped" else None
+    assert warmed == [expected_batch]
+    assert (
+        data["metadata"]["configuration"]["method"]
+        == data["result"]["method"]
+        == method
+    )
+    assert (
+        data["metadata"]["configuration"]["batch_size"]
+        == data["result"]["batch_size"]
+        == expected_batch
+    )
+    assert data["result"]["status"] == ("walk_budget" if limited else "completed")
+    assert data["result"]["walks"] == (3 if limited else 17)
+    with (tmp_path / "points.csv").open(encoding="utf-8-sig") as stream:
+        row = next(csv.DictReader(stream))
+    assert row["method"] == method
+    assert row["batch_size"] == ("7" if method == "mc_grouped" else "")

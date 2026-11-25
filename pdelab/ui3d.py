@@ -149,6 +149,15 @@ def _research_tab(config):
         format_func=METHODS_3D.get,
         key="study3d_methods",
     )
+    batch_size = st.number_input(
+        "Частиц в группе MC",
+        min_value=1,
+        max_value=65536,
+        value=config.batch_size,
+        key="study3d_batch_size",
+        disabled="mc_grouped" not in methods,
+        help="Размер одновременно обрабатываемой группы; общее число путей задаётся отдельно.",
+    )
     coarse_n = _control_grid(n, "study3d_coarse") if "mc_control" in methods else None
     settings = StudySettings3D(
         Config3D(
@@ -161,6 +170,7 @@ def _research_tab(config):
             seed=config.seed,
             max_iter=config.max_iter,
             coarse_n=coarse_n,
+            batch_size=int(batch_size),
         ),
         int(repeats),
         maximum,
@@ -203,13 +213,14 @@ def _research_tab(config):
     )
     with st.expander("Детали исследования", key="cube_research_raw_details"):
         st.write(
-            "MC проходит три предварительные серии с двукратным запасом по ошибке и проверку на новых данных. При неудаче число путей увеличивается в пределах заданных лимитов. Все попытки сохраняются в экспорте."
+            "Бюджеты выбираются по предварительным сериям с ошибкой не выше 80% целевого порога. Затем выбранные бюджеты проверяются на новых независимых запусках и больше не меняются. Ошибка — средняя относительная L2-ошибка отдельных запусков; все серии сохраняются в экспорте."
         )
         st.dataframe(pd.DataFrame(study.rows), hide_index=True, width="stretch")
         payload = {
             **study_payload3d(study),
             "thresholds": study.rows,
             "trials": study.trials,
+            "series": study.series,
         }
         st.download_button(
             "Скачать все замеры JSON",
@@ -298,6 +309,15 @@ def render_3d_app():
             value=2048,
             key="cube_walks",
         )
+        batch_size = st.number_input(
+            "Частиц в группе MC",
+            min_value=1,
+            max_value=65536,
+            value=128,
+            key="cube_batch_size",
+            disabled="mc_grouped" not in methods,
+            help="Размер одновременно обрабатываемой группы; общее число путей задаётся отдельно.",
+        )
         with st.expander("Точность и воспроизводимость", key="cube_solver_controls"):
             tol = st.select_slider(
                 "Относительный допуск ЛОМ",
@@ -309,7 +329,17 @@ def render_3d_app():
                 "Seed", min_value=0, max_value=2**32 - 1, value=42, key="cube_seed"
             )
         config = Config3D(
-            problem, n, mode, point, plane, index, walks, seed, tol, coarse_n=coarse_n
+            problem,
+            n,
+            mode,
+            point,
+            plane,
+            index,
+            walks,
+            seed,
+            tol,
+            coarse_n=coarse_n,
+            batch_size=int(batch_size),
         )
         limit_message = interactive_mc_limit_message(config, methods)
         if limit_message:

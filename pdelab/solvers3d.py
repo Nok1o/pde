@@ -6,12 +6,14 @@ import numpy as np
 from numba import njit
 
 from .control3d import prepare_control3d, validate_coarse3d
+from .grouped_solver3d import GROUPED_NAME, solve_grouped3d
 from .problem3d import blank_field3d, laplacian3d, make_problem3d, validate_points3d
 from .solvers import NUMBA_LOCK, Result
 
 METHODS_3D = {
     "lod_serial": "ЛОМ",
     "mc": "Монте-Карло",
+    "mc_grouped": GROUPED_NAME,
     "mc_control": "MC с контрольным приближением",
     "graded": "MC · сгущённая сетка",
     "wos": "WoS · 1-й род",
@@ -194,6 +196,7 @@ def solve3d(
     tau=None,
     coarse_n=None,
     control=None,
+    batch_size=128,
 ):
     points = validate_points3d(problem.n, points)
     if method != "mc_control" and (coarse_n is not None or control is not None):
@@ -229,6 +232,15 @@ def solve3d(
     limit = 100 * problem.n**2 if max_steps is None else max_steps
     if not np.isfinite(limit) or int(limit) != limit or limit < 1:
         raise ValueError("max_steps должно быть положительным целым")
+    if method == "mc_grouped":
+        return solve_grouped3d(
+            problem,
+            points,
+            walks=walks,
+            seed=seed,
+            max_steps=limit,
+            batch_size=batch_size,
+        )
     with NUMBA_LOCK:
         started = perf_counter()
         if method == "lod_serial":

@@ -18,6 +18,7 @@ from .problem3d import validate_points3d
 
 @dataclass
 class ControlledFrozenMCResult3D(FrozenMCResult3D):
+    method: str = "mc_control"
     coarse_n: int | None = None
     coarse_iterations: int = 0
     coarse_relative_residual: float | None = None
@@ -67,6 +68,8 @@ def _failure(points, options, workspace, status, reason, seconds):
         seconds,
         seconds,
         workspace,
+        method="mc_control",
+        batch_size=None,
     )
 
 
@@ -147,6 +150,8 @@ def solve_frozen_correction_mc3d(operator, control, points=None, **settings):
             "seconds": perf_counter() - start,
             "preparation_seconds": defect_seconds + estimate.preparation_seconds,
             "workspace_bytes": workspace,
+            "method": "mc_control",
+            "batch_size": None,
         },
         defect_seconds=defect_seconds,
     )

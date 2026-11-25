@@ -27,8 +27,11 @@ def main(argv=None):
     parser.add_argument("--alpha", type=float, default=0.5)
     parser.add_argument("--dt", type=float, default=0.01)
     parser.add_argument("--point", nargs=3, type=int, metavar=("X", "Y", "Z"))
+    parser.add_argument(
+        "--method", choices=("mc", "mc_grouped", "mc_control"), default="mc"
+    )
+    parser.add_argument("--batch-size", type=int, default=128)
     parser.add_argument("--walks", type=int, default=4096)
-    parser.add_argument("--method", choices=("mc", "mc_control"), default="mc")
     parser.add_argument("--coarse-n", type=int, default=4)
     parser.add_argument("--coarse-tol", type=float, default=1e-8)
     parser.add_argument("--coarse-max-iterations", type=int, default=20000)
@@ -42,6 +45,7 @@ def main(argv=None):
     )
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args(argv)
+    batch_size = args.batch_size if args.method == "mc_grouped" else None
     if args.out.exists() and any(args.out.iterdir()):
         parser.error(
             "Папка результата должна быть пустой: предыдущие попытки не перезаписываются"
@@ -50,7 +54,7 @@ def main(argv=None):
         parser.error("Прямая диагностика ограничена n<=16")
     try:
         warm_start = perf_counter()
-        warmup_mc3d()
+        warmup_mc3d(batch_size=batch_size)
         if args.method == "mc_control":
             warmup_lines3d()
         warm_seconds = perf_counter() - warm_start
@@ -83,6 +87,8 @@ def main(argv=None):
             )
             construction_seconds = context_seconds + result.operator_seconds
         else:
+            if args.method == "mc_grouped":
+                settings["batch_size"] = batch_size
             operator = freeze_heat3d(problem, previous, previous, args.dt, args.dt)
             construction_seconds = perf_counter() - start
             result = solve_frozen_mc3d(operator, points, **settings)
@@ -112,7 +118,10 @@ def main(argv=None):
     metadata = dict(
         schema_version="frozen_heat_mc3d_v1",
         scenario="diagnostic_frozen_first_layer",
-        configuration={k: v for k, v in vars(args).items() if k != "out"},
+        configuration={
+            **{k: v for k, v in vars(args).items() if k != "out"},
+            "batch_size": batch_size,
+        },
         commit=commit,
         dirty=dirty,
         python=platform.python_version(),
@@ -123,6 +132,9 @@ def main(argv=None):
                 Path(__file__),
                 root / "pdelab/heat3d_mc.py",
                 root / "pdelab/heat3d_control.py",
+                root / "pdelab/heat3d_grouped_mc.py",
+                root / "pdelab/heat3d_operator.py",
+                root / "pdelab/heat3d_problem.py",
             )
         },
         coordinate_order="xyz",
@@ -144,6 +156,8 @@ def main(argv=None):
                 y=int(y),
                 z=int(z),
                 status=result.status,
+                method=result.method,
+                batch_size=result.batch_size,
                 value=None if result.values is None else result.values[index],
                 stderr=None if result.stderr is None else result.stderr[index],
                 direct_reference=None if reference is None else reference[index],

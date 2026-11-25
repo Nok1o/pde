@@ -10,6 +10,7 @@ from time import perf_counter
 import numpy as np
 from numba import njit
 
+from .heat3d_grouped_mc import _grouped_frozen_paths, warmup_grouped_mc3d
 from .heat3d_operator import HeatOperator3D
 from .problem3d import validate_points3d
 from .solvers import NUMBA_LOCK
@@ -32,6 +33,8 @@ class FrozenMCResult3D:
     preparation_seconds: float
     workspace_bytes: int
     peak_rss_bytes: int | None = None
+    method: str = "mc"
+    batch_size: int | None = None
 
 
 def frozen_mc_coefficients(operator):
@@ -132,9 +135,13 @@ def _frozen_paths(
 _warmed = False
 
 
-def warmup_mc3d():
+def warmup_mc3d(batch_size=None):
     """Compile production signatures outside the solve timer."""
     global _warmed
+    if batch_size is not None:
+        _integer(batch_size, "batch_size", 1, 65536)
+        warmup_grouped_mc3d()
+        return
     with NUMBA_LOCK:
         if _warmed:
             return
@@ -178,6 +185,7 @@ def solve_frozen_mc3d(
     max_walks=1000000,
     max_transitions=10000000,
     max_workspace_bytes=256 * 1024**2,
+    batch_size=None,
 ):
     """Estimate requested nodes of a fixed system with independent complete paths.
 
@@ -186,6 +194,7 @@ def solve_frozen_mc3d(
     All paths started (including an unfinished one) and moves executed are counted.
     Operator construction is caller-owned and excluded from seconds. Known queries
     cost zero paths. A full-field query must explicitly list all desired free nodes.
+    batch_size=None keeps sequential paths; a positive size selects packed groups.
     """
     if not isinstance(operator, HeatOperator3D):
         raise ValueError("Ожидается HeatOperator3D")
@@ -197,6 +206,8 @@ def solve_frozen_mc3d(
     max_workspace_bytes = _integer(
         max_workspace_bytes, "max_workspace_bytes", 1, 2**63 - 1
     )
+    if batch_size is not None:
+        batch_size = _integer(batch_size, "batch_size", 1, 65536)
     points = validate_points3d(
         operator.n, [[operator.n // 2] * 3] if points is None else points
     )
@@ -215,6 +226,9 @@ def solve_frozen_mc3d(
         + 96 * operator.rhs.size
         + 128 * len(points)
     )
+    if batch_size is not None:
+        # Five eight-byte particle arrays; coefficients and outputs are above.
+        workspace += 40 * min(batch_size, walks)
     started = perf_counter()
 
     def result(
@@ -243,16 +257,18 @@ def solve_frozen_mc3d(
             perf_counter() - started,
             preparation,
             workspace,
+            method="mc" if batch_size is None else "mc_grouped",
+            batch_size=batch_size,
         )
 
     if workspace > max_workspace_bytes:
         return result("memory_limit", "estimated_workspace_exceeds_limit")
-    warmup_mc3d()
+    warmup_mc3d(batch_size=batch_size)
     started = perf_counter()
     probabilities, reward, killing = frozen_mc_coefficients(operator)
     prepared = perf_counter() - started
     with NUMBA_LOCK:
-        means, m2, counts, total_walks, steps, code = _frozen_paths(
+        arguments = (
             probabilities,
             reward,
             killing,
@@ -264,6 +280,12 @@ def solve_frozen_mc3d(
             max_walks,
             max_transitions,
         )
+        if batch_size is None:
+            means, m2, counts, total_walks, steps, code = _frozen_paths(*arguments)
+        else:
+            means, m2, counts, total_walks, steps, code = _grouped_frozen_paths(
+                *arguments, batch_size
+            )
     known = operator.fixed[tuple(points.T)]
     means[known] = reward[tuple(points.T)][known]
     # Rows not visited before a failure must not look like zero-valued estimates.

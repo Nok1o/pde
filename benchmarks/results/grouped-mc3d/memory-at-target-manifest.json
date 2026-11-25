@@ -1,0 +1,927 @@
+{
+  "source": {
+    "commit": "32e4b71a516485cdea133bf52ade0fb0bf7f4aad",
+    "dirty_before_outputs": "?? benchmarks/results/grouped-mc3d/fixed_n1024.csv\n?? benchmarks/results/grouped-mc3d/manifest.json\n?? benchmarks/results/grouped-mc3d/memory.csv\n?? benchmarks/results/grouped-mc3d/memory.json\n?? benchmarks/results/grouped-mc3d/planned_seeds.csv\n?? benchmarks/results/grouped-mc3d/raw_sha256.json\n?? benchmarks/results/grouped-mc3d/results.csv\n?? benchmarks/results/grouped-mc3d/results.json\n?? benchmarks/results/grouped-mc3d/series.csv\n?? benchmarks/results/grouped-mc3d/trials.csv\n?? benchmarks/results/grouped-mc3d/verification.json\n?? benchmarks/results/grouped-mc3d/verify_results.py",
+    "source_sha256": {
+      "pdelab/__init__.py": "a0e232b45ef26e1ad05463f2bdd8eab86fccc05021835770c5097db6064fda4e",
+      "pdelab/__main__.py": "6d8b7d7846a845059d7a3107143f11131f63c5511d669b44085b15ec5e3d2279",
+      "pdelab/boundary.py": "ab7c341d4d7dbeac5336c8e71736c40695e590192241cf7d1e15626baa1476e8",
+      "pdelab/boundary3d.py": "81c3769148433ed3317b306f3094292ceadd3b4530b61818f0f8a6194cfe26f5",
+      "pdelab/boundary_audit3d.py": "94859f46d93a15dbd0e6e5172080a332fed96b27aa052ac6b44062562b96fbb4",
+      "pdelab/boundary_audit_report.py": "958e085d6fab14ed21f696a58df47517cc1695affe6a6dcd92b7667606a7ecd3",
+      "pdelab/boundary_cli.py": "2f439bfe63eb8a7a65c8db37894a9210f7b2d156a001275618a3d8578901f145",
+      "pdelab/boundary_cli3d.py": "a3099f82fa983047cdddea6f4b901e7cd8b4bc8fa8a33d97c123ac379b853c6b",
+      "pdelab/boundary_experiment.py": "1789bc475aac512fe16341655039d6caa56971195a4777b2a3d08d1493f74a20",
+      "pdelab/boundary_experiment3d.py": "1e7692a9934c45925101bba2d18a60a0da27e9d80ac2d9e775f66ecb317f281d",
+      "pdelab/boundary_research.py": "cceff7dc8a3735a61a4f9ada27e4f6f54616b6c358c1e6437dac837a94ebb641",
+      "pdelab/boundary_solvers.py": "6ba5655646b28eff71a0b3c3aa7cf1b574506c1c88b338efa26f528b94eba20d",
+      "pdelab/boundary_solvers3d.py": "5554c93a9fb1c2c04670eae45b72946566929d3cd675f965f89c0fd26818ecb1",
+      "pdelab/boundary_ui.py": "3e4e8498d586112af007a24a72c519d44119b56b0762d21ec4482e3e03a16271",
+      "pdelab/boundary_ui3d.py": "5f39390c1e9b55d11ff3fd55449b5695415e9a23c9d47080ffc23dc3fa10874e",
+      "pdelab/boundary_views.py": "e7ec2238d5d63e5f01b7a1bdec0db36a879793dd2ef89032699bba2de3e81e06",
+      "pdelab/boundary_views3d.py": "338f1f83228d95c7596180ad8d1496867b9122d3aa02c7ed2f171f9cfedca2d0",
+      "pdelab/boundary_workload3d.py": "7a406590ce00bc5b0394e883336fafc63d718ddd063e3e37fd61c646cc8cfc8d",
+      "pdelab/cli.py": "f48f449f51135ff1f1762f7c3576cc164e9296be14f44d9bfbebba11c9dbed0f",
+      "pdelab/cli3d.py": "ded2e783f95e381f01a19d8023451d7c0114dd9c007cb821a17b4b41b7cdad12",
+      "pdelab/control.py": "0156ef092dfd987e48e7bde191bab213a734e1f9f9dd6008da4a13f4266972d4",
+      "pdelab/control3d.py": "a0df4edb1b0b25ddfc179e6ffb7674b7ace982a72f3dad0c9e2256fcebcdf843",
+      "pdelab/experiment.py": "3edd1e123d5a60cd8bf28966333ba249c800e6ee5dad33ce3d53390fde1eab0c",
+      "pdelab/experiment3d.py": "a7fb64a90ee21c8bd00ea3a356cde354d7b27736a6f1368db4ad8ac97347898d",
+      "pdelab/frozen_solvers.py": "55c26e1aa0fac2e36247aa51316069340a030c45982d7c12e5f205651a1d9d4b",
+      "pdelab/graded.py": "995ba17a81c60799412a867f8b0cc22af60e258e7a70ffb8f59460871076eef9",
+      "pdelab/grouped_mc3d.py": "db918a8b0d46c4a0647f2719a39a8ad347f727fb600f169ce44ad1fbe11bafcc",
+      "pdelab/grouped_solver3d.py": "30ccafbb8a07b55edd3b0f4cd6ff03a57679778f4825ca4888320d75d8871e19",
+      "pdelab/heat.py": "423c101349549ad0071bb4ef23be95bad943a433a91d221915b8694f43942a8d",
+      "pdelab/heat3d_block.py": "1e0836f5f65348166f3485a8626b9909bb85818389ac90dca980807f2996b849",
+      "pdelab/heat3d_cli.py": "81e5962888374a86bfded810256e450e18354536ad6a08956807cce0d8f3bc73",
+      "pdelab/heat3d_contract.py": "39f3ddfc19088723b95fc5c4fb4fc26d7c265f7c19aaf783463e83c6820b60eb",
+      "pdelab/heat3d_experiment.py": "e19195909b02de24a5bcae4717e0491179e2e714cf4981ccef792cd2f5fa71a8",
+      "pdelab/heat3d_linear.py": "dbf9493973fdb45bb1950a3425a291d047e4a7aed744ceaafd68c4ad31bacb13",
+      "pdelab/heat3d_operator.py": "38b4bbbfd4e603642d83028ef1e58f6fda77d66de67b6eb429115104ee28acba",
+      "pdelab/heat3d_problem.py": "eff71e13bcc5041e1e2305e1f058d16b73c62d3dcec856f52fe2753e7c043316",
+      "pdelab/heat3d_reference.py": "167a7575daf51d959297086b97c8a8df670f525da71a336c51746c8e51ff5feb",
+      "pdelab/heat3d_solver.py": "29a10b98a0a17f4f8339351f41a5d6ef9b29fcaab8807e94813330904a2f793f",
+      "pdelab/heat3d_ui.py": "0c02a7248117e62a8594b9caccbc1d34d4aaa8d8f9d1b2cd54772c99d99a1826",
+      "pdelab/heat_mc.py": "80cc36ca1b8f41fdf7526913502a0146784ee2dd9fab3802913e62ea8296eba5",
+      "pdelab/heat_mc_study.py": "9c75d8a85e2a6f6aee38028524e47fd3cbc24e1d0315d20df776592ea62aac2a",
+      "pdelab/heat_mc_ui.py": "8082606e3a8f83e822af87b6e19130bb602d9c4d16f946b6ce2da0f2370f8947",
+      "pdelab/heat_mc_views.py": "4b9559535dfa5e09f53ee646897dc98af8d9f854f6671b80b19f81187b79d973",
+      "pdelab/heat_study.py": "af4953a271297ebef240193af98c8b9c5a1c995d55997fb631f5ffa31035b282",
+      "pdelab/heat_ui.py": "77c9bb55974a805de913a753184e377a9f67966483c8aa6b6f9eec41968991a8",
+      "pdelab/heat_views.py": "617373c9255c07604eb705cee8a0c4127d31d1886987c4853bd2bd2d2f68c9b3",
+      "pdelab/measurement_protocol.py": "252641a06b8106f999dbc5613dc883bec0c1ac809e86feb6d180568543f535bc",
+      "pdelab/nonlinear.py": "d786bba2f7243205bbf683b370cd314934620e9217213f94eef0a43db10e9dea",
+      "pdelab/nonlinear_cli.py": "cbb1603b65ef863684922f940769108ddbd4bc64089f20b87109eb76daa1550a",
+      "pdelab/nonlinear_io.py": "f5aaa09e82f63d39d974feaee1d75f33c47a518629f4288de8394cb46bd0f76a",
+      "pdelab/nonlinear_study.py": "3d6c55d58b0cc1264089dfb4e64034998f4adc64c56e2d5fc12a040427002df5",
+      "pdelab/nonlinear_ui.py": "b11e55e53e77013e579943e674344cf12ffa5b11af5e6f89dcb31c897ffdd34c",
+      "pdelab/operator.py": "b44c6332eb91c428c4e6627612b323e9313a0c1f61513df2de6774eb72f8f5c9",
+      "pdelab/problem.py": "016f3b26062a81be3b6c9be3de490f133ca20f9f37cb1585b2d46a2b1641db3e",
+      "pdelab/problem3d.py": "48d1a488d526842839f3ab35ffe34bc245d04d925cb0a52e24fcc070a644c996",
+      "pdelab/problem_info.py": "7a7c7d4945513177a39bf25fc66118de83b226cfe0f1d59a852e961bc13da984",
+      "pdelab/reference.py": "13121360b11b660e8e2bd5f18b1c21a7b9655dffb1106d114206e29d7ad7471a",
+      "pdelab/research.py": "ccac41e98c8c5d57ab15bd2b129d290e1f703ae8216df24d1467d3b1a4b5ddbc",
+      "pdelab/research3d.py": "4ef88cfcb6ea6c9df3ab74b5521ee8408a0c1a73e7df6f4b0fb60ff1cdec464b",
+      "pdelab/research_ui.py": "213631e4bb28fea1fd8d3daf8926d971d2e78f10f73132e18016f6e3b36e1bff",
+      "pdelab/solvers.py": "e9804009afff7587b983c94a74c5f7eef76c77793679efa221ea73e7c987f229",
+      "pdelab/solvers3d.py": "49f1b712a9c4d389feb69a675deae5fb8d470aae1ced662aefc0a8996a997ddc",
+      "pdelab/stationary_extensions.py": "efdb3d8f0293d79c2a14ee4a59be7babfba968826046b96ce047cdbc3c55fecd",
+      "pdelab/stationary_study3d.py": "97af84db1a8a9cf9fcae8db0dc5386954c8c6e0d8a49f2fa37a657f6af8ef2ef",
+      "pdelab/study_policy.py": "6f8472ad8ed9993bf7deabea0fdfc15adddf4b6cc4245d5ccf809307cf26f50e",
+      "pdelab/study_protocol.py": "a04ea9c67f8c37dd7e0368b1abacd7db095f4ef69cbc1bf8a61c781ea3407eab",
+      "pdelab/ui3d.py": "e17d6d6bb68d45172b407165764bef185a3b247520f6d43010132b3864e5e88a",
+      "pdelab/ui_state.py": "518018ff8adc55292bf19645f9865f22863842441b01d37901c8b609d6c8d48a",
+      "pdelab/views.py": "98b79b6f5b1c8e6cb97f71b3a4598da8f666c29db52293be2d1e24459c25315b",
+      "pdelab/views3d.py": "4ecbe99c5707621945ff0f24a6b9d6a5528ce9516e3f73022acc156240ff4bd9",
+      "pdelab/workload3d.py": "cee75af394624ae762451f8d9acd5da0d60e83e52bbaa81bb19994bbedfce479",
+      "pdelab/wos.py": "5ac192e539b3710fc90feb723dcddef8cd47ec3204ea796a1497590c1259fae0",
+      "benchmarks/grouped_mc3d.py": "7a0696b40a4565c52f67649ea0dc599d320ab75cb96ea3d87cbeca1ebb740020"
+    },
+    "combined_sha256": "0411537893a70e873a1056d8c8c2ae5db5ff686962b8af52bef5f966bf4eaefc"
+  },
+  "script_sha256": "669b1838ab4b67dc644b9dd0c61c173333ae926623597265207b7f95443ee5b1",
+  "input_results_sha256": "f7b5af7f4581890e3b4c1109aed4c4227e4ce8ced6cbd47453a64d448c7f715e",
+  "sampling": "first repeat of every distinct frozen final series; no reselection",
+  "scope": "whole fresh worker RSS including imports and warmup; no subtraction",
+  "plan": [
+    {
+      "case_id": "dirichlet-16-center",
+      "variant": "lod_serial",
+      "candidate": 1,
+      "budget": 0.01,
+      "seed": 3290008951
+    },
+    {
+      "case_id": "dirichlet-16-center",
+      "variant": "mc",
+      "candidate": 0,
+      "budget": 64,
+      "seed": 30943749
+    },
+    {
+      "case_id": "dirichlet-16-center",
+      "variant": "mc",
+      "candidate": 1,
+      "budget": 256,
+      "seed": 167319568
+    },
+    {
+      "case_id": "dirichlet-16-center",
+      "variant": "mc",
+      "candidate": 4,
+      "budget": 16384,
+      "seed": 1497930402
+    },
+    {
+      "case_id": "dirichlet-16-center",
+      "variant": "mc_grouped-b1",
+      "candidate": 0,
+      "budget": 64,
+      "seed": 402946761
+    },
+    {
+      "case_id": "dirichlet-16-center",
+      "variant": "mc_grouped-b1",
+      "candidate": 1,
+      "budget": 256,
+      "seed": 708729797
+    },
+    {
+      "case_id": "dirichlet-16-center",
+      "variant": "mc_grouped-b1",
+      "candidate": 3,
+      "budget": 4096,
+      "seed": 3149462636
+    },
+    {
+      "case_id": "dirichlet-16-center",
+      "variant": "mc_grouped-b32",
+      "candidate": 0,
+      "budget": 64,
+      "seed": 4291945963
+    },
+    {
+      "case_id": "dirichlet-16-center",
+      "variant": "mc_grouped-b32",
+      "candidate": 1,
+      "budget": 256,
+      "seed": 1066382790
+    },
+    {
+      "case_id": "dirichlet-16-center",
+      "variant": "mc_grouped-b32",
+      "candidate": 4,
+      "budget": 16384,
+      "seed": 2635594270
+    },
+    {
+      "case_id": "dirichlet-16-center",
+      "variant": "mc_grouped-b128",
+      "candidate": 0,
+      "budget": 64,
+      "seed": 2156973186
+    },
+    {
+      "case_id": "dirichlet-16-center",
+      "variant": "mc_grouped-b128",
+      "candidate": 2,
+      "budget": 1024,
+      "seed": 2584750726
+    },
+    {
+      "case_id": "dirichlet-16-center",
+      "variant": "mc_grouped-b128",
+      "candidate": 4,
+      "budget": 16384,
+      "seed": 1814783020
+    },
+    {
+      "case_id": "dirichlet-16-center",
+      "variant": "mc_grouped-b512",
+      "candidate": 0,
+      "budget": 64,
+      "seed": 1897813283
+    },
+    {
+      "case_id": "dirichlet-16-center",
+      "variant": "mc_grouped-b512",
+      "candidate": 2,
+      "budget": 1024,
+      "seed": 3360881294
+    },
+    {
+      "case_id": "dirichlet-16-center",
+      "variant": "mc_grouped-b512",
+      "candidate": 3,
+      "budget": 4096,
+      "seed": 3754476952
+    },
+    {
+      "case_id": "dirichlet-16-center",
+      "variant": "mc_grouped-b2048",
+      "candidate": 0,
+      "budget": 64,
+      "seed": 3509869765
+    },
+    {
+      "case_id": "dirichlet-16-center",
+      "variant": "mc_grouped-b2048",
+      "candidate": 2,
+      "budget": 1024,
+      "seed": 2272526570
+    },
+    {
+      "case_id": "dirichlet-16-center",
+      "variant": "mc_grouped-b2048",
+      "candidate": 4,
+      "budget": 16384,
+      "seed": 2196681474
+    },
+    {
+      "case_id": "dirichlet-32-center",
+      "variant": "lod_serial",
+      "candidate": 1,
+      "budget": 0.01,
+      "seed": 622518536
+    },
+    {
+      "case_id": "dirichlet-32-center",
+      "variant": "lod_serial",
+      "candidate": 2,
+      "budget": 0.001,
+      "seed": 2824928784
+    },
+    {
+      "case_id": "dirichlet-32-center",
+      "variant": "mc",
+      "candidate": 0,
+      "budget": 64,
+      "seed": 4004834577
+    },
+    {
+      "case_id": "dirichlet-32-center",
+      "variant": "mc",
+      "candidate": 1,
+      "budget": 256,
+      "seed": 988575765
+    },
+    {
+      "case_id": "dirichlet-32-center",
+      "variant": "mc",
+      "candidate": 3,
+      "budget": 4096,
+      "seed": 2064772351
+    },
+    {
+      "case_id": "dirichlet-32-center",
+      "variant": "mc_grouped-b1",
+      "candidate": 0,
+      "budget": 64,
+      "seed": 2927495908
+    },
+    {
+      "case_id": "dirichlet-32-center",
+      "variant": "mc_grouped-b1",
+      "candidate": 2,
+      "budget": 1024,
+      "seed": 2774282663
+    },
+    {
+      "case_id": "dirichlet-32-center",
+      "variant": "mc_grouped-b1",
+      "candidate": 4,
+      "budget": 16384,
+      "seed": 3742919604
+    },
+    {
+      "case_id": "dirichlet-32-center",
+      "variant": "mc_grouped-b32",
+      "candidate": 0,
+      "budget": 64,
+      "seed": 697683122
+    },
+    {
+      "case_id": "dirichlet-32-center",
+      "variant": "mc_grouped-b32",
+      "candidate": 2,
+      "budget": 1024,
+      "seed": 2760263341
+    },
+    {
+      "case_id": "dirichlet-32-center",
+      "variant": "mc_grouped-b32",
+      "candidate": 4,
+      "budget": 16384,
+      "seed": 3336850260
+    },
+    {
+      "case_id": "dirichlet-32-center",
+      "variant": "mc_grouped-b128",
+      "candidate": 0,
+      "budget": 64,
+      "seed": 1220969449
+    },
+    {
+      "case_id": "dirichlet-32-center",
+      "variant": "mc_grouped-b128",
+      "candidate": 1,
+      "budget": 256,
+      "seed": 3156764757
+    },
+    {
+      "case_id": "dirichlet-32-center",
+      "variant": "mc_grouped-b128",
+      "candidate": 3,
+      "budget": 4096,
+      "seed": 235320160
+    },
+    {
+      "case_id": "dirichlet-32-center",
+      "variant": "mc_grouped-b512",
+      "candidate": 0,
+      "budget": 64,
+      "seed": 210790094
+    },
+    {
+      "case_id": "dirichlet-32-center",
+      "variant": "mc_grouped-b512",
+      "candidate": 1,
+      "budget": 256,
+      "seed": 656738667
+    },
+    {
+      "case_id": "dirichlet-32-center",
+      "variant": "mc_grouped-b512",
+      "candidate": 3,
+      "budget": 4096,
+      "seed": 4207104242
+    },
+    {
+      "case_id": "dirichlet-32-center",
+      "variant": "mc_grouped-b2048",
+      "candidate": 0,
+      "budget": 64,
+      "seed": 2652577858
+    },
+    {
+      "case_id": "dirichlet-32-center",
+      "variant": "mc_grouped-b2048",
+      "candidate": 2,
+      "budget": 1024,
+      "seed": 2177506287
+    },
+    {
+      "case_id": "dirichlet-32-center",
+      "variant": "mc_grouped-b2048",
+      "candidate": 3,
+      "budget": 4096,
+      "seed": 1007160348
+    },
+    {
+      "case_id": "dirichlet-32-offcenter",
+      "variant": "lod_serial",
+      "candidate": 1,
+      "budget": 0.01,
+      "seed": 1551874229
+    },
+    {
+      "case_id": "dirichlet-32-offcenter",
+      "variant": "lod_serial",
+      "candidate": 2,
+      "budget": 0.001,
+      "seed": 3739390728
+    },
+    {
+      "case_id": "dirichlet-32-offcenter",
+      "variant": "mc",
+      "candidate": 1,
+      "budget": 256,
+      "seed": 3090744171
+    },
+    {
+      "case_id": "dirichlet-32-offcenter",
+      "variant": "mc",
+      "candidate": 2,
+      "budget": 1024,
+      "seed": 1301411500
+    },
+    {
+      "case_id": "dirichlet-32-offcenter",
+      "variant": "mc",
+      "candidate": 5,
+      "budget": 65536,
+      "seed": 3875336938
+    },
+    {
+      "case_id": "dirichlet-32-offcenter",
+      "variant": "mc_grouped-b1",
+      "candidate": 1,
+      "budget": 256,
+      "seed": 610665703
+    },
+    {
+      "case_id": "dirichlet-32-offcenter",
+      "variant": "mc_grouped-b1",
+      "candidate": 3,
+      "budget": 4096,
+      "seed": 628765524
+    },
+    {
+      "case_id": "dirichlet-32-offcenter",
+      "variant": "mc_grouped-b1",
+      "candidate": 4,
+      "budget": 16384,
+      "seed": 4207106789
+    },
+    {
+      "case_id": "dirichlet-32-offcenter",
+      "variant": "mc_grouped-b32",
+      "candidate": 1,
+      "budget": 256,
+      "seed": 2463792576
+    },
+    {
+      "case_id": "dirichlet-32-offcenter",
+      "variant": "mc_grouped-b32",
+      "candidate": 5,
+      "budget": 65536,
+      "seed": 2663948758
+    },
+    {
+      "case_id": "dirichlet-32-offcenter",
+      "variant": "mc_grouped-b128",
+      "candidate": 1,
+      "budget": 256,
+      "seed": 1141379547
+    },
+    {
+      "case_id": "dirichlet-32-offcenter",
+      "variant": "mc_grouped-b128",
+      "candidate": 2,
+      "budget": 1024,
+      "seed": 1358311151
+    },
+    {
+      "case_id": "dirichlet-32-offcenter",
+      "variant": "mc_grouped-b128",
+      "candidate": 5,
+      "budget": 65536,
+      "seed": 2596337324
+    },
+    {
+      "case_id": "dirichlet-32-offcenter",
+      "variant": "mc_grouped-b512",
+      "candidate": 1,
+      "budget": 256,
+      "seed": 1821069511
+    },
+    {
+      "case_id": "dirichlet-32-offcenter",
+      "variant": "mc_grouped-b512",
+      "candidate": 3,
+      "budget": 4096,
+      "seed": 3458783488
+    },
+    {
+      "case_id": "dirichlet-32-offcenter",
+      "variant": "mc_grouped-b512",
+      "candidate": 4,
+      "budget": 16384,
+      "seed": 3668977865
+    },
+    {
+      "case_id": "dirichlet-32-offcenter",
+      "variant": "mc_grouped-b2048",
+      "candidate": 1,
+      "budget": 256,
+      "seed": 3472694828
+    },
+    {
+      "case_id": "dirichlet-32-offcenter",
+      "variant": "mc_grouped-b2048",
+      "candidate": 2,
+      "budget": 1024,
+      "seed": 555938055
+    },
+    {
+      "case_id": "dirichlet-32-offcenter",
+      "variant": "mc_grouped-b2048",
+      "candidate": 4,
+      "budget": 16384,
+      "seed": 1840475292
+    },
+    {
+      "case_id": "mixed-16-center",
+      "variant": "lod_serial",
+      "candidate": 2,
+      "budget": 0.001,
+      "seed": 1366271197
+    },
+    {
+      "case_id": "mixed-16-center",
+      "variant": "lod_serial",
+      "candidate": 3,
+      "budget": 1e-06,
+      "seed": 3832919091
+    },
+    {
+      "case_id": "mixed-16-center",
+      "variant": "mc",
+      "candidate": 0,
+      "budget": 64,
+      "seed": 2537073118
+    },
+    {
+      "case_id": "mixed-16-center",
+      "variant": "mc",
+      "candidate": 3,
+      "budget": 4096,
+      "seed": 2153620729
+    },
+    {
+      "case_id": "mixed-16-center",
+      "variant": "mc_grouped-b1",
+      "candidate": 0,
+      "budget": 64,
+      "seed": 872737017
+    },
+    {
+      "case_id": "mixed-16-center",
+      "variant": "mc_grouped-b1",
+      "candidate": 1,
+      "budget": 256,
+      "seed": 391856964
+    },
+    {
+      "case_id": "mixed-16-center",
+      "variant": "mc_grouped-b1",
+      "candidate": 3,
+      "budget": 4096,
+      "seed": 227461049
+    },
+    {
+      "case_id": "mixed-16-center",
+      "variant": "mc_grouped-b32",
+      "candidate": 0,
+      "budget": 64,
+      "seed": 1282360344
+    },
+    {
+      "case_id": "mixed-16-center",
+      "variant": "mc_grouped-b32",
+      "candidate": 1,
+      "budget": 256,
+      "seed": 453283068
+    },
+    {
+      "case_id": "mixed-16-center",
+      "variant": "mc_grouped-b32",
+      "candidate": 3,
+      "budget": 4096,
+      "seed": 699439581
+    },
+    {
+      "case_id": "mixed-16-center",
+      "variant": "mc_grouped-b128",
+      "candidate": 0,
+      "budget": 64,
+      "seed": 3719437331
+    },
+    {
+      "case_id": "mixed-16-center",
+      "variant": "mc_grouped-b128",
+      "candidate": 2,
+      "budget": 1024,
+      "seed": 462360329
+    },
+    {
+      "case_id": "mixed-16-center",
+      "variant": "mc_grouped-b512",
+      "candidate": 0,
+      "budget": 64,
+      "seed": 588311048
+    },
+    {
+      "case_id": "mixed-16-center",
+      "variant": "mc_grouped-b512",
+      "candidate": 1,
+      "budget": 256,
+      "seed": 92169699
+    },
+    {
+      "case_id": "mixed-16-center",
+      "variant": "mc_grouped-b512",
+      "candidate": 2,
+      "budget": 1024,
+      "seed": 3546655970
+    },
+    {
+      "case_id": "mixed-16-center",
+      "variant": "mc_grouped-b2048",
+      "candidate": 0,
+      "budget": 64,
+      "seed": 945187501
+    },
+    {
+      "case_id": "mixed-16-center",
+      "variant": "mc_grouped-b2048",
+      "candidate": 3,
+      "budget": 4096,
+      "seed": 2358538077
+    },
+    {
+      "case_id": "mixed-32-center",
+      "variant": "lod_serial",
+      "candidate": 3,
+      "budget": 1e-06,
+      "seed": 2832931217
+    },
+    {
+      "case_id": "mixed-32-center",
+      "variant": "mc",
+      "candidate": 0,
+      "budget": 64,
+      "seed": 1000484946
+    },
+    {
+      "case_id": "mixed-32-center",
+      "variant": "mc",
+      "candidate": 1,
+      "budget": 256,
+      "seed": 490553864
+    },
+    {
+      "case_id": "mixed-32-center",
+      "variant": "mc",
+      "candidate": 3,
+      "budget": 4096,
+      "seed": 2060385812
+    },
+    {
+      "case_id": "mixed-32-center",
+      "variant": "mc_grouped-b1",
+      "candidate": 0,
+      "budget": 64,
+      "seed": 2523946610
+    },
+    {
+      "case_id": "mixed-32-center",
+      "variant": "mc_grouped-b1",
+      "candidate": 3,
+      "budget": 4096,
+      "seed": 409786794
+    },
+    {
+      "case_id": "mixed-32-center",
+      "variant": "mc_grouped-b32",
+      "candidate": 0,
+      "budget": 64,
+      "seed": 2395603754
+    },
+    {
+      "case_id": "mixed-32-center",
+      "variant": "mc_grouped-b32",
+      "candidate": 3,
+      "budget": 4096,
+      "seed": 2303526975
+    },
+    {
+      "case_id": "mixed-32-center",
+      "variant": "mc_grouped-b128",
+      "candidate": 0,
+      "budget": 64,
+      "seed": 3644559150
+    },
+    {
+      "case_id": "mixed-32-center",
+      "variant": "mc_grouped-b128",
+      "candidate": 3,
+      "budget": 4096,
+      "seed": 903471518
+    },
+    {
+      "case_id": "mixed-32-center",
+      "variant": "mc_grouped-b512",
+      "candidate": 0,
+      "budget": 64,
+      "seed": 825013705
+    },
+    {
+      "case_id": "mixed-32-center",
+      "variant": "mc_grouped-b512",
+      "candidate": 1,
+      "budget": 256,
+      "seed": 3584326529
+    },
+    {
+      "case_id": "mixed-32-center",
+      "variant": "mc_grouped-b512",
+      "candidate": 3,
+      "budget": 4096,
+      "seed": 4279686971
+    },
+    {
+      "case_id": "mixed-32-center",
+      "variant": "mc_grouped-b2048",
+      "candidate": 0,
+      "budget": 64,
+      "seed": 57582688
+    },
+    {
+      "case_id": "mixed-32-center",
+      "variant": "mc_grouped-b2048",
+      "candidate": 3,
+      "budget": 4096,
+      "seed": 1997558124
+    },
+    {
+      "case_id": "mixed-32-offcenter",
+      "variant": "lod_serial",
+      "candidate": 3,
+      "budget": 1e-06,
+      "seed": 3391546637
+    },
+    {
+      "case_id": "mixed-32-offcenter",
+      "variant": "mc",
+      "candidate": 0,
+      "budget": 64,
+      "seed": 3268521910
+    },
+    {
+      "case_id": "mixed-32-offcenter",
+      "variant": "mc",
+      "candidate": 4,
+      "budget": 16384,
+      "seed": 1621223625
+    },
+    {
+      "case_id": "mixed-32-offcenter",
+      "variant": "mc_grouped-b1",
+      "candidate": 0,
+      "budget": 64,
+      "seed": 4125526806
+    },
+    {
+      "case_id": "mixed-32-offcenter",
+      "variant": "mc_grouped-b1",
+      "candidate": 1,
+      "budget": 256,
+      "seed": 3747827148
+    },
+    {
+      "case_id": "mixed-32-offcenter",
+      "variant": "mc_grouped-b1",
+      "candidate": 4,
+      "budget": 16384,
+      "seed": 2174339555
+    },
+    {
+      "case_id": "mixed-32-offcenter",
+      "variant": "mc_grouped-b32",
+      "candidate": 0,
+      "budget": 64,
+      "seed": 1778098360
+    },
+    {
+      "case_id": "mixed-32-offcenter",
+      "variant": "mc_grouped-b32",
+      "candidate": 1,
+      "budget": 256,
+      "seed": 68122526
+    },
+    {
+      "case_id": "mixed-32-offcenter",
+      "variant": "mc_grouped-b32",
+      "candidate": 3,
+      "budget": 4096,
+      "seed": 3114084530
+    },
+    {
+      "case_id": "mixed-32-offcenter",
+      "variant": "mc_grouped-b128",
+      "candidate": 0,
+      "budget": 64,
+      "seed": 3699105353
+    },
+    {
+      "case_id": "mixed-32-offcenter",
+      "variant": "mc_grouped-b128",
+      "candidate": 1,
+      "budget": 256,
+      "seed": 3826947091
+    },
+    {
+      "case_id": "mixed-32-offcenter",
+      "variant": "mc_grouped-b128",
+      "candidate": 3,
+      "budget": 4096,
+      "seed": 1195689682
+    },
+    {
+      "case_id": "mixed-32-offcenter",
+      "variant": "mc_grouped-b512",
+      "candidate": 0,
+      "budget": 64,
+      "seed": 2393491470
+    },
+    {
+      "case_id": "mixed-32-offcenter",
+      "variant": "mc_grouped-b512",
+      "candidate": 1,
+      "budget": 256,
+      "seed": 3306827973
+    },
+    {
+      "case_id": "mixed-32-offcenter",
+      "variant": "mc_grouped-b512",
+      "candidate": 4,
+      "budget": 16384,
+      "seed": 2770595637
+    },
+    {
+      "case_id": "mixed-32-offcenter",
+      "variant": "mc_grouped-b2048",
+      "candidate": 0,
+      "budget": 64,
+      "seed": 1476943204
+    },
+    {
+      "case_id": "mixed-32-offcenter",
+      "variant": "mc_grouped-b2048",
+      "candidate": 1,
+      "budget": 256,
+      "seed": 537162431
+    },
+    {
+      "case_id": "mixed-32-offcenter",
+      "variant": "mc_grouped-b2048",
+      "candidate": 3,
+      "budget": 4096,
+      "seed": 3751968035
+    }
+  ],
+  "completed": true,
+  "source_after": {
+    "commit": "32e4b71a516485cdea133bf52ade0fb0bf7f4aad",
+    "dirty_before_outputs": " M README.md\n M docs/grouped-mc3d.md\n?? benchmarks/results/grouped-mc3d/README.md\n?? benchmarks/results/grouped-mc3d/fixed_n1024.csv\n?? benchmarks/results/grouped-mc3d/manifest.json\n?? benchmarks/results/grouped-mc3d/memory.csv\n?? benchmarks/results/grouped-mc3d/memory.json\n?? benchmarks/results/grouped-mc3d/planned_seeds.csv\n?? benchmarks/results/grouped-mc3d/raw_sha256.json\n?? benchmarks/results/grouped-mc3d/results.csv\n?? benchmarks/results/grouped-mc3d/results.json\n?? benchmarks/results/grouped-mc3d/series.csv\n?? benchmarks/results/grouped-mc3d/trials.csv\n?? benchmarks/results/grouped-mc3d/verification.json\n?? benchmarks/results/grouped-mc3d/verify_results.py",
+    "source_sha256": {
+      "pdelab/__init__.py": "a0e232b45ef26e1ad05463f2bdd8eab86fccc05021835770c5097db6064fda4e",
+      "pdelab/__main__.py": "6d8b7d7846a845059d7a3107143f11131f63c5511d669b44085b15ec5e3d2279",
+      "pdelab/boundary.py": "ab7c341d4d7dbeac5336c8e71736c40695e590192241cf7d1e15626baa1476e8",
+      "pdelab/boundary3d.py": "81c3769148433ed3317b306f3094292ceadd3b4530b61818f0f8a6194cfe26f5",
+      "pdelab/boundary_audit3d.py": "94859f46d93a15dbd0e6e5172080a332fed96b27aa052ac6b44062562b96fbb4",
+      "pdelab/boundary_audit_report.py": "958e085d6fab14ed21f696a58df47517cc1695affe6a6dcd92b7667606a7ecd3",
+      "pdelab/boundary_cli.py": "2f439bfe63eb8a7a65c8db37894a9210f7b2d156a001275618a3d8578901f145",
+      "pdelab/boundary_cli3d.py": "a3099f82fa983047cdddea6f4b901e7cd8b4bc8fa8a33d97c123ac379b853c6b",
+      "pdelab/boundary_experiment.py": "1789bc475aac512fe16341655039d6caa56971195a4777b2a3d08d1493f74a20",
+      "pdelab/boundary_experiment3d.py": "1e7692a9934c45925101bba2d18a60a0da27e9d80ac2d9e775f66ecb317f281d",
+      "pdelab/boundary_research.py": "cceff7dc8a3735a61a4f9ada27e4f6f54616b6c358c1e6437dac837a94ebb641",
+      "pdelab/boundary_solvers.py": "6ba5655646b28eff71a0b3c3aa7cf1b574506c1c88b338efa26f528b94eba20d",
+      "pdelab/boundary_solvers3d.py": "5554c93a9fb1c2c04670eae45b72946566929d3cd675f965f89c0fd26818ecb1",
+      "pdelab/boundary_ui.py": "3e4e8498d586112af007a24a72c519d44119b56b0762d21ec4482e3e03a16271",
+      "pdelab/boundary_ui3d.py": "5f39390c1e9b55d11ff3fd55449b5695415e9a23c9d47080ffc23dc3fa10874e",
+      "pdelab/boundary_views.py": "e7ec2238d5d63e5f01b7a1bdec0db36a879793dd2ef89032699bba2de3e81e06",
+      "pdelab/boundary_views3d.py": "338f1f83228d95c7596180ad8d1496867b9122d3aa02c7ed2f171f9cfedca2d0",
+      "pdelab/boundary_workload3d.py": "7a406590ce00bc5b0394e883336fafc63d718ddd063e3e37fd61c646cc8cfc8d",
+      "pdelab/cli.py": "f48f449f51135ff1f1762f7c3576cc164e9296be14f44d9bfbebba11c9dbed0f",
+      "pdelab/cli3d.py": "ded2e783f95e381f01a19d8023451d7c0114dd9c007cb821a17b4b41b7cdad12",
+      "pdelab/control.py": "0156ef092dfd987e48e7bde191bab213a734e1f9f9dd6008da4a13f4266972d4",
+      "pdelab/control3d.py": "a0df4edb1b0b25ddfc179e6ffb7674b7ace982a72f3dad0c9e2256fcebcdf843",
+      "pdelab/experiment.py": "3edd1e123d5a60cd8bf28966333ba249c800e6ee5dad33ce3d53390fde1eab0c",
+      "pdelab/experiment3d.py": "a7fb64a90ee21c8bd00ea3a356cde354d7b27736a6f1368db4ad8ac97347898d",
+      "pdelab/frozen_solvers.py": "55c26e1aa0fac2e36247aa51316069340a030c45982d7c12e5f205651a1d9d4b",
+      "pdelab/graded.py": "995ba17a81c60799412a867f8b0cc22af60e258e7a70ffb8f59460871076eef9",
+      "pdelab/grouped_mc3d.py": "db918a8b0d46c4a0647f2719a39a8ad347f727fb600f169ce44ad1fbe11bafcc",
+      "pdelab/grouped_solver3d.py": "30ccafbb8a07b55edd3b0f4cd6ff03a57679778f4825ca4888320d75d8871e19",
+      "pdelab/heat.py": "423c101349549ad0071bb4ef23be95bad943a433a91d221915b8694f43942a8d",
+      "pdelab/heat3d_block.py": "1e0836f5f65348166f3485a8626b9909bb85818389ac90dca980807f2996b849",
+      "pdelab/heat3d_cli.py": "81e5962888374a86bfded810256e450e18354536ad6a08956807cce0d8f3bc73",
+      "pdelab/heat3d_contract.py": "39f3ddfc19088723b95fc5c4fb4fc26d7c265f7c19aaf783463e83c6820b60eb",
+      "pdelab/heat3d_experiment.py": "e19195909b02de24a5bcae4717e0491179e2e714cf4981ccef792cd2f5fa71a8",
+      "pdelab/heat3d_linear.py": "dbf9493973fdb45bb1950a3425a291d047e4a7aed744ceaafd68c4ad31bacb13",
+      "pdelab/heat3d_operator.py": "38b4bbbfd4e603642d83028ef1e58f6fda77d66de67b6eb429115104ee28acba",
+      "pdelab/heat3d_problem.py": "eff71e13bcc5041e1e2305e1f058d16b73c62d3dcec856f52fe2753e7c043316",
+      "pdelab/heat3d_reference.py": "167a7575daf51d959297086b97c8a8df670f525da71a336c51746c8e51ff5feb",
+      "pdelab/heat3d_solver.py": "29a10b98a0a17f4f8339351f41a5d6ef9b29fcaab8807e94813330904a2f793f",
+      "pdelab/heat3d_ui.py": "0c02a7248117e62a8594b9caccbc1d34d4aaa8d8f9d1b2cd54772c99d99a1826",
+      "pdelab/heat_mc.py": "80cc36ca1b8f41fdf7526913502a0146784ee2dd9fab3802913e62ea8296eba5",
+      "pdelab/heat_mc_study.py": "9c75d8a85e2a6f6aee38028524e47fd3cbc24e1d0315d20df776592ea62aac2a",
+      "pdelab/heat_mc_ui.py": "8082606e3a8f83e822af87b6e19130bb602d9c4d16f946b6ce2da0f2370f8947",
+      "pdelab/heat_mc_views.py": "4b9559535dfa5e09f53ee646897dc98af8d9f854f6671b80b19f81187b79d973",
+      "pdelab/heat_study.py": "af4953a271297ebef240193af98c8b9c5a1c995d55997fb631f5ffa31035b282",
+      "pdelab/heat_ui.py": "77c9bb55974a805de913a753184e377a9f67966483c8aa6b6f9eec41968991a8",
+      "pdelab/heat_views.py": "617373c9255c07604eb705cee8a0c4127d31d1886987c4853bd2bd2d2f68c9b3",
+      "pdelab/measurement_protocol.py": "252641a06b8106f999dbc5613dc883bec0c1ac809e86feb6d180568543f535bc",
+      "pdelab/nonlinear.py": "d786bba2f7243205bbf683b370cd314934620e9217213f94eef0a43db10e9dea",
+      "pdelab/nonlinear_cli.py": "cbb1603b65ef863684922f940769108ddbd4bc64089f20b87109eb76daa1550a",
+      "pdelab/nonlinear_io.py": "f5aaa09e82f63d39d974feaee1d75f33c47a518629f4288de8394cb46bd0f76a",
+      "pdelab/nonlinear_study.py": "3d6c55d58b0cc1264089dfb4e64034998f4adc64c56e2d5fc12a040427002df5",
+      "pdelab/nonlinear_ui.py": "b11e55e53e77013e579943e674344cf12ffa5b11af5e6f89dcb31c897ffdd34c",
+      "pdelab/operator.py": "b44c6332eb91c428c4e6627612b323e9313a0c1f61513df2de6774eb72f8f5c9",
+      "pdelab/problem.py": "016f3b26062a81be3b6c9be3de490f133ca20f9f37cb1585b2d46a2b1641db3e",
+      "pdelab/problem3d.py": "48d1a488d526842839f3ab35ffe34bc245d04d925cb0a52e24fcc070a644c996",
+      "pdelab/problem_info.py": "7a7c7d4945513177a39bf25fc66118de83b226cfe0f1d59a852e961bc13da984",
+      "pdelab/reference.py": "13121360b11b660e8e2bd5f18b1c21a7b9655dffb1106d114206e29d7ad7471a",
+      "pdelab/research.py": "ccac41e98c8c5d57ab15bd2b129d290e1f703ae8216df24d1467d3b1a4b5ddbc",
+      "pdelab/research3d.py": "4ef88cfcb6ea6c9df3ab74b5521ee8408a0c1a73e7df6f4b0fb60ff1cdec464b",
+      "pdelab/research_ui.py": "213631e4bb28fea1fd8d3daf8926d971d2e78f10f73132e18016f6e3b36e1bff",
+      "pdelab/solvers.py": "e9804009afff7587b983c94a74c5f7eef76c77793679efa221ea73e7c987f229",
+      "pdelab/solvers3d.py": "49f1b712a9c4d389feb69a675deae5fb8d470aae1ced662aefc0a8996a997ddc",
+      "pdelab/stationary_extensions.py": "efdb3d8f0293d79c2a14ee4a59be7babfba968826046b96ce047cdbc3c55fecd",
+      "pdelab/stationary_study3d.py": "97af84db1a8a9cf9fcae8db0dc5386954c8c6e0d8a49f2fa37a657f6af8ef2ef",
+      "pdelab/study_policy.py": "6f8472ad8ed9993bf7deabea0fdfc15adddf4b6cc4245d5ccf809307cf26f50e",
+      "pdelab/study_protocol.py": "a04ea9c67f8c37dd7e0368b1abacd7db095f4ef69cbc1bf8a61c781ea3407eab",
+      "pdelab/ui3d.py": "e17d6d6bb68d45172b407165764bef185a3b247520f6d43010132b3864e5e88a",
+      "pdelab/ui_state.py": "518018ff8adc55292bf19645f9865f22863842441b01d37901c8b609d6c8d48a",
+      "pdelab/views.py": "98b79b6f5b1c8e6cb97f71b3a4598da8f666c29db52293be2d1e24459c25315b",
+      "pdelab/views3d.py": "4ecbe99c5707621945ff0f24a6b9d6a5528ce9516e3f73022acc156240ff4bd9",
+      "pdelab/workload3d.py": "cee75af394624ae762451f8d9acd5da0d60e83e52bbaa81bb19994bbedfce479",
+      "pdelab/wos.py": "5ac192e539b3710fc90feb723dcddef8cd47ec3204ea796a1497590c1259fae0",
+      "benchmarks/grouped_mc3d.py": "7a0696b40a4565c52f67649ea0dc599d320ab75cb96ea3d87cbeca1ebb740020"
+    },
+    "combined_sha256": "0411537893a70e873a1056d8c8c2ae5db5ff686962b8af52bef5f966bf4eaefc"
+  },
+  "source_unchanged": true,
+  "all_replays_match": true
+}

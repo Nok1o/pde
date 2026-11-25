@@ -277,10 +277,14 @@ def readable_status(row):
         "timeout": "Лимит времени подбора",
         "time_limit": "Лимит времени подбора",
         "zero_reference": "Нулевой эталон: процент не определён",
+        "relative_target_not_applicable": "Нулевой эталон: процент не определён",
+        "pilot_incomplete": "Подбор не завершён",
         "solver_failed": "Решатель не завершён",
     }
     if status == "validation_incomplete":
         return row.get("status_detail", row["status"])
+    if status == "pilot_incomplete" and row.get("reason"):
+        return "Подбор не завершён: " + row["reason"]
     if status == "solver_failed":
         reason = row.get("reason") or row.get("status_detail") or row["status"]
         for code, label in {
@@ -319,7 +323,12 @@ def budget_label(row):
 def error_label(row):
     error = row.get("relative_error_pct", row.get("validation_error_pct"))
     if error is not None:
-        return f"проверка {error:.3g}%"
+        phase = (
+            "подбор"
+            if row.get("phase") in ("pilot", "absolute_diagnostic")
+            else "проверка"
+        )
+        return f"{phase} {error:.3g}%"
     error = row.get("calibration_error_pct")
     return f"подбор {error:.3g}%" if error is not None else "ошибка ещё не измерена"
 
@@ -350,7 +359,14 @@ def render_accuracy_results(rows, names=None, *, key):
     import streamlit as st
 
     names = {} if names is None else names
-    if any(r.get("selection_policy") != SELECTION_POLICY for r in rows):
+    from .study_protocol import PROTOCOL_ID
+
+    if rows and all(r.get("selection_policy") == PROTOCOL_ID for r in rows):
+        st.caption(
+            "Средняя относительная L2-ошибка отдельных запусков. Подбор с запасом 0.8 → "
+            "фиксированный бюджет → новая финальная серия. Неудача проверки не запускает повторный подбор."
+        )
+    elif any(r.get("selection_policy") != SELECTION_POLICY for r in rows):
         st.info(
             "Показано исследование по прежнему протоколу. Запустите заново для устойчивого подбора с повторными попытками."
         )
@@ -381,6 +397,8 @@ def render_accuracy_results(rows, names=None, *, key):
             continue
         pilot = row.get("calibration_error_pct")
         check = row.get("relative_error_pct", row.get("validation_error_pct"))
+        if row.get("phase") in ("pilot", "absolute_diagnostic"):
+            check = None
         search_seconds = row.get("search_seconds")
         status = readable_status(row)
         if row.get("calibration_margin_relaxed"):
@@ -399,6 +417,14 @@ def render_accuracy_results(rows, names=None, *, key):
                 "Подбор, %": f"{pilot:.3g}" if pilot is not None else "нет данных",
                 "Проверка, %": f"{check:.3g}" if check is not None else "нет данных",
                 "Попыток проверки": str(row.get("validation_attempts", "нет данных")),
+                "Завершено повторов": (
+                    f"{row['completed_repeats']}/{row['requested_repeats']}"
+                    if "completed_repeats" in row
+                    else "нет данных"
+                ),
+                "Завершено путей": row.get("total_walks"),
+                "Начато путей": row.get("started_walks"),
+                "Абсолютная L2-ошибка": row.get("absolute_error"),
                 "Подбор и проверки, с": (
                     f"{search_seconds:.3g}"
                     if search_seconds is not None

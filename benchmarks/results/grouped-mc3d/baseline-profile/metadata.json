@@ -1,0 +1,93 @@
+{
+  "python": "3.15.2 (main, Oct 25 2026, 16:57:51) [Clang 21.0.0 (clang-2100.3.34.2)]",
+  "numpy": "2.5.4",
+  "numba": "0.68.1",
+  "scipy": "1.18.1",
+  "platform": "macOS-26.7.2-arm64-arm-64bit-Mach-O",
+  "processor": "arm",
+  "numba_cache_dir": "/private/tmp/issue29-audit/numba-cache",
+  "import_seconds": 0.34339475000160746,
+  "git_commit": "3bcd7836e4291f101794b9017fa72d254dae9d1a",
+  "seeds": [
+    86683157,
+    193992790,
+    3768708464,
+    1327245372,
+    367197305
+  ],
+  "functions": {
+    "solvers3d._mc3d": {
+      "file": "/Users/mogilinns/BMSTU/1sem/pde-issue29/pdelab/solvers3d.py",
+      "line": 125,
+      "sha256": "912a35d7e82a107208546584c86f2912d99ae5dc5c117b38d5728cd830b38380"
+    },
+    "boundary_solvers3d._walks": {
+      "file": "/Users/mogilinns/BMSTU/1sem/pde-issue29/pdelab/boundary_solvers3d.py",
+      "line": 130,
+      "sha256": "f4b8ca46a1e90ab0027b93021c0037e8a95b48fffb45d1038ba3131315e4a44f"
+    }
+  },
+  "expected_steps": [
+    {
+      "family": "dirichlet",
+      "n": 16,
+      "center": 85.83321418511613,
+      "offcenter": 55.56264673888762,
+      "residual_inf": 4.172215994913131e-08,
+      "cg_iterations": 45,
+      "seconds": 0.004074625001521781
+    },
+    {
+      "family": "dirichlet",
+      "n": 32,
+      "center": 344.8587021681738,
+      "offcenter": 223.3197785627216,
+      "residual_inf": 2.1973391994833946e-07,
+      "cg_iterations": 93,
+      "seconds": 0.039504542000941
+    },
+    {
+      "family": "mixed",
+      "n": 16,
+      "center": 96.61277461125873,
+      "offcenter": 79.05134522377129,
+      "residual_inf": 8.187635103240609e-08,
+      "cg_iterations": 73,
+      "seconds": 0.006431082991184667
+    },
+    {
+      "family": "mixed",
+      "n": 32,
+      "center": 387.66497470998286,
+      "offcenter": 316.8765775685878,
+      "residual_inf": 7.397611625492573e-07,
+      "cg_iterations": 149,
+      "seconds": 0.06294008299300913
+    },
+    {
+      "family": "mixed_dnr",
+      "n": 32,
+      "center": 663.7784985199302,
+      "offcenter": 830.403098299053,
+      "residual_inf": 4.021567292511463e-07,
+      "cg_iterations": 215,
+      "seconds": 0.088240584009327
+    }
+  ],
+  "checks": {
+    "probability_sum_max_error": 1.1102230246251565e-16,
+    "polynomial_equation_residual_inf": 2.8421709430404007e-13,
+    "probabilities_min": 0.0,
+    "killing_min_max": [
+      0.0,
+      0.14285714285714285
+    ],
+    "direction_probability_max_error": 5.551115123125783e-17,
+    "dirichlet_seed_repeat_equal": true,
+    "dirichlet_fixed_zero_work": true,
+    "dirichlet_limit_raises": true,
+    "mixed_seed_repeat_equal": true,
+    "mixed_fixed_zero_work": true,
+    "mixed_limit_raises": true
+  }
+}

@@ -167,8 +167,8 @@ def test_large_fine_grid_coarse_limit_and_independent_study(tmp_path):
         )
     )
     assert all(row["seconds"] is not None for row in study.rows)
-    pilot_seeds = {t["seed"] for t in study.trials if t["phase"] != "validation"}
-    check_seeds = {t["seed"] for t in study.trials if t["phase"] == "validation"}
+    pilot_seeds = {t["seed"] for t in study.trials if t["phase"] == "pilot"}
+    check_seeds = {t["seed"] for t in study.trials if t["phase"] == "final"}
     assert check_seeds and pilot_seeds.isdisjoint(check_seeds)
     assert all(
         t["coarse_n"] == 5 and t["preparation_seconds"] > 0 for t in study.trials

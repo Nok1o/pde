@@ -10,9 +10,10 @@ from .boundary3d import BoundaryOperator3D
 from .boundary_experiment import problem_from_config, selected_boundary_methods
 from .boundary_experiment3d import BoundaryConfig3D, problem_from_config3d
 from .boundary_solvers import select_boundary_points, solve_boundary, warmup_boundary
-from .boundary_solvers3d import solve_boundary3d, warmup_boundary3d
+from .boundary_solvers3d import METHODS_BOUNDARY_3D, solve_boundary3d, warmup_boundary3d
 from .problem3d import DIRECT_MAX_N
 from .research import LOD_SEARCH_TOLERANCES, TARGETS_PCT
+from .stationary_study3d import study_stationary3d
 from .study_policy import (
     ACCURACY_DESCRIPTION,
     ACCURACY_METRIC,
@@ -31,8 +32,9 @@ def boundary_accuracy_study(
     budgets=(64, 256, 1024, 4096),
     tolerances=LOD_SEARCH_TOLERANCES,
     seconds_per_method=60.0,
+    progress=None,
 ):
-    """Select on stable pilot batches; retry unconfirmed targets at larger budgets."""
+    """Fixed pilot/final protocol in 3D; preserve legacy 2D study semantics."""
     if isinstance(repeats, bool) or int(repeats) != repeats or repeats < 2:
         raise ValueError("Нужно минимум два независимых повтора")
     if not np.isfinite(seconds_per_method) or seconds_per_method <= 0:
@@ -45,7 +47,9 @@ def boundary_accuracy_study(
     problem = make(config)
     operator = operator_type(problem)
     operator.check_compatibility()
-    methods = selected_boundary_methods(operator, methods)
+    methods = selected_boundary_methods(
+        operator, methods, names=METHODS_BOUNDARY_3D if is3d else None
+    )
     if not tolerances and "lod_serial" in methods:
         raise ValueError("Выберите допуски ЛОМ")
     if not budgets and any(m != "lod_serial" for m in methods):
@@ -67,6 +71,35 @@ def boundary_accuracy_study(
     )
     target = float(reference[tuple(points[0])])
     (warmup_boundary3d if is3d else warmup_boundary)()
+    if is3d:
+        study = study_stationary3d(
+            problem,
+            points,
+            reference[tuple(points.T)],
+            methods,
+            repeats=repeats,
+            seed=config.seed,
+            batch_size=config.batch_size,
+            walk_budgets=budgets,
+            tolerances=tolerances,
+            max_iter=config.max_iter,
+            max_steps=config.max_steps,
+            seconds_per_phase=seconds_per_method,
+            solver=solver,
+            clock=perf_counter,
+            progress=progress,
+        )
+        for row in study["rows"]:
+            row["status"] = row["status_code"]
+        return dict(
+            **study,
+            config=asdict(config),
+            repeats=repeats,
+            budgets=list(budgets),
+            tolerances=list(tolerances),
+            reference_kind="grid" if problem.exact is None else "analytic",
+            reference_value=target,
+        )
     trials, rows = [], []
 
     def measure(method, budget, budget_index, phase, deadline):
@@ -186,6 +219,7 @@ def render_boundary_research(config, methods, key):
     from .experiment3d import rows_csv
 
     dimension = 3 if isinstance(config, BoundaryConfig3D) else 2
+    names = METHODS_BOUNDARY_3D if dimension == 3 else METHODS_BOUNDARY
     n = st.select_slider(
         "Сетка исследования",
         [4, 8, 12, 16, 24, 32, 48, 64],
@@ -220,16 +254,35 @@ def render_boundary_research(config, methods, key):
         key=key + "_seconds",
     )
     selected = replace(config, n=n, point=point, mode="point")
+    if dimension == 3 and "mc_grouped" in methods:
+        batch_size = st.number_input(
+            "Размер группы частиц исследования",
+            min_value=1,
+            max_value=65536,
+            value=config.batch_size,
+            key=key + "_batch_size",
+        )
+        selected = replace(selected, batch_size=int(batch_size))
     signature = (asdict(selected), methods, repeats, budgets, seconds)
     if st.button("Запустить исследование", key=key + "_run", disabled=not methods):
+        progress_bar = st.progress(0.0)
         try:
             with st.spinner("Подбор и независимая проверка…"):
                 result = boundary_accuracy_study(
-                    selected, methods, repeats, budgets, seconds_per_method=seconds
+                    selected,
+                    methods,
+                    repeats,
+                    budgets,
+                    seconds_per_method=seconds,
+                    progress=lambda fraction, text: progress_bar.progress(
+                        fraction, text=text
+                    ),
                 )
                 st.session_state[key] = (signature, result)
         except (ValueError, RuntimeError) as exc:
             st.error(str(exc))
+        finally:
+            progress_bar.empty()
     saved = st.session_state.get(key)
     if saved is None:
         return
@@ -237,8 +290,8 @@ def render_boundary_research(config, methods, key):
         st.info("Настройки изменены. Запустите исследование заново.")
     result = saved[1]
     rows = pd.DataFrame(result["rows"])
-    rows["Метод"] = rows.method.map(METHODS_BOUNDARY)
-    render_accuracy_results(result["rows"], METHODS_BOUNDARY, key=key + "_results")
+    rows["Метод"] = rows.method.map(names)
+    render_accuracy_results(result["rows"], names, key=key + "_results")
     st.plotly_chart(
         px.scatter(
             rows,
