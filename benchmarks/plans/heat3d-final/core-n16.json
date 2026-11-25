@@ -1,0 +1,118 @@
+{
+  "description": "Cost-gated n=16 extension of the two extreme extended-model cases",
+  "readiness": "Requires integrated #30/#33/#34, shared review and an exclusive timing window; see benchmarks/heat3d-final-plan.md",
+  "repeats": 5,
+  "seed": 31031,
+  "settings": {
+    "tolerance": 1e-06,
+    "change_tolerance": 1e-06,
+    "linear_tolerance": 1e-10,
+    "mc_tolerance": 0.2,
+    "mc_change_tolerance": 0.1,
+    "coarse_n": 8,
+    "batch_size": 128,
+    "history_mode": "full",
+    "max_outer": 8,
+    "max_inner": 20000,
+    "max_seconds": 5,
+    "max_walks": 96000000,
+    "max_transitions": 320000000,
+    "max_path_steps": 100000,
+    "max_workspace_bytes": 268435456,
+    "relaxation": 1.0,
+    "conductivity_refresh_layers": 1
+  },
+  "configuration": {
+    "n": 16,
+    "alpha": 0.5,
+    "capacity_gamma": 0.5,
+    "reaction_sigma": 1.0,
+    "dt": 0.002,
+    "T": 0.004,
+    "mode": "point",
+    "newton": false,
+    "kinds": [
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+    ],
+    "betas": [
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ]
+  },
+  "variants": [
+    {
+      "id": "lod",
+      "method": "lod"
+    },
+    {
+      "id": "block",
+      "method": "block"
+    },
+    {
+      "id": "mc",
+      "method": "mc"
+    },
+    {
+      "id": "mc_control",
+      "method": "mc_control"
+    },
+    {
+      "id": "mc_grouped",
+      "method": "mc_grouped"
+    },
+    {
+      "id": "mc_control_grouped",
+      "method": "mc_control_grouped"
+    }
+  ],
+  "cases": [
+    {
+      "id": "sine-centre-kind1",
+      "configuration": {
+        "case": "sine",
+        "point": [
+          8,
+          8,
+          8
+        ]
+      }
+    },
+    {
+      "id": "polynomial-all-kind3",
+      "configuration": {
+        "case": "polynomial",
+        "point": [
+          4,
+          8,
+          12
+        ],
+        "kinds": [
+          3,
+          3,
+          3,
+          3,
+          3,
+          3
+        ]
+      }
+    }
+  ],
+  "budgets": [
+    0.001,
+    1e-06
+  ],
+  "walk_budgets": [
+    256,
+    1024
+  ],
+  "calibration_fraction": 0.8
+}
