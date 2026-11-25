@@ -2,4 +2,5 @@
 benchmarks/results/grouped-mc3d/**/*.csv -text whitespace=cr-at-eol linguist-generated=true
 benchmarks/results/grouped-mc3d/**/*.json -text linguist-generated=true
 benchmarks/results/heat3d-time-mc/*.csv -text whitespace=cr-at-eol linguist-generated=true
+benchmarks/results/heat3d-boundary-profile/*.csv -text whitespace=cr-at-eol linguist-generated=true
 benchmarks/results/heat3d-pilot/*.csv -text whitespace=cr-at-eol linguist-generated=true
