@@ -25,6 +25,8 @@ def main(argv=None):
     parser.add_argument("--alpha", type=float, default=0.5)
     parser.add_argument("--dt", type=float, default=0.01)
     parser.add_argument("--point", nargs=3, type=int, metavar=("X", "Y", "Z"))
+    parser.add_argument("--method", choices=("mc", "mc_grouped"), default="mc")
+    parser.add_argument("--batch-size", type=int, default=128)
     parser.add_argument("--walks", type=int, default=4096)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--max-steps", type=int, default=1000000)
@@ -36,6 +38,7 @@ def main(argv=None):
     )
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args(argv)
+    batch_size = args.batch_size if args.method == "mc_grouped" else None
     if args.out.exists() and any(args.out.iterdir()):
         parser.error(
             "Папка результата должна быть пустой: предыдущие попытки не перезаписываются"
@@ -44,7 +47,7 @@ def main(argv=None):
         parser.error("Прямая диагностика ограничена n<=16")
     try:
         warm_start = perf_counter()
-        warmup_mc3d()
+        warmup_mc3d(batch_size=batch_size)
         warm_seconds = perf_counter() - warm_start
         start = perf_counter()
         problem = make_heat_problem3d(args.case, args.n, args.alpha)
@@ -61,6 +64,7 @@ def main(argv=None):
             max_walks=args.max_walks,
             max_transitions=args.max_transitions,
             max_workspace_bytes=args.max_workspace_bytes,
+            batch_size=batch_size,
         )
         full_seconds = perf_counter() - start
         reference, reference_seconds = None, 0.0
@@ -86,14 +90,23 @@ def main(argv=None):
     metadata = dict(
         schema_version="frozen_heat_mc3d_v1",
         scenario="diagnostic_frozen_first_layer",
-        configuration={k: v for k, v in vars(args).items() if k != "out"},
+        configuration={
+            **{k: v for k, v in vars(args).items() if k != "out"},
+            "batch_size": batch_size,
+        },
         commit=commit,
         dirty=dirty,
         python=platform.python_version(),
         numpy=np.__version__,
         source_sha256={
             p.name: hashlib.sha256(p.read_bytes()).hexdigest()
-            for p in (Path(__file__), root / "pdelab/heat3d_mc.py")
+            for p in (
+                Path(__file__),
+                root / "pdelab/heat3d_mc.py",
+                root / "pdelab/heat3d_grouped_mc.py",
+                root / "pdelab/heat3d_operator.py",
+                root / "pdelab/heat3d_problem.py",
+            )
         },
         coordinate_order="xyz",
         array_order="zyx",
