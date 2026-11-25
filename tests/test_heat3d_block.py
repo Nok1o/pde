@@ -149,6 +149,26 @@ def test_nonuniform_nonsymmetric_matrix_and_eliminated_fixed_rows():
     )
 
 
+def test_array_like_initial_allocation_failure_returns_status_and_releases_cache():
+    operator = variable_operator()
+    solver = BlockThomasSolver3D()
+    assert run(solver, operator).status == "completed"
+
+    class UnavailableArray:
+        shape = operator.rhs.shape
+
+        def __array__(self, *args, **kwargs):
+            raise MemoryError("Cannot materialize initial field")
+
+    result = run(solver, operator, initial=UnavailableArray())
+    assert result.status == "memory_limit"
+    assert result.reason == "block_allocation_failed"
+    assert result.iterations == result.factorizations == result.factor_reuses == 0
+    next_result = run(solver, operator)
+    assert next_result.status == "completed"
+    assert next_result.factorizations == 1 and next_result.factor_reuses == 0
+
+
 def test_actual_plane_lu_and_multiple_rhs_solves_without_inverse_or_sparse_lu(
     monkeypatch,
 ):

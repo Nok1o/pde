@@ -247,9 +247,9 @@ class BlockThomasSolver3D:
             self._factors = None
             result.status, result.reason = "memory_limit", "block_workspace_limit"
             return result
-        if np.shape(initial) != operator.rhs.shape or np.iscomplexobj(initial):
-            raise ValueError("Начальное приближение должно иметь форму оператора")
         try:
+            if np.shape(initial) != operator.rhs.shape or np.iscomplexobj(initial):
+                raise ValueError("Начальное приближение должно иметь форму оператора")
             values = np.array(initial, dtype=float, order="C", copy=True)
             finite_initial = np.isfinite(values).all()
             values[operator.fixed] = operator.fixed_values[operator.fixed]
