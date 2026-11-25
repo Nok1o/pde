@@ -32,6 +32,8 @@ def test_ui_executes_full_history_and_reproduces_through_cli(tmp_path, monkeypat
     app.selectbox(key="h3_case").set_value("polynomial")
     app.selectbox(key="h3_kind_x0").set_value(3)
     app.number_input(key="h3_x").set_value(0)
+    app.number_input(key="h3_capacity_gamma").set_value(0.4)
+    app.number_input(key="h3_reaction_sigma").set_value(0.25)
     app.number_input(key="h3_T").set_value(0.003)
     app.number_input(key="h3_dt").set_value(0.002)
     app.number_input(key="h3_walks").set_value(1024)
@@ -39,6 +41,8 @@ def test_ui_executes_full_history_and_reproduces_through_cli(tmp_path, monkeypat
     app.button(key="h3_run").click().run()
     assert not app.error and not app.exception
     run = app.session_state["h3_comparison"]
+    assert run["metadata"]["configuration"]["capacity_gamma"] == 0.4
+    assert run["metadata"]["configuration"]["reaction_sigma"] == 0.25
     assert run["metadata"]["points_zyx"][0][2] == 0
     with zipfile.ZipFile(io.BytesIO(downloads["h3_comparison_zip"])) as archive:
         saved = json.loads(archive.read("result.json"))
