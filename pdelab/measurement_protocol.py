@@ -48,9 +48,27 @@ def query_error(values, reference):
         raise ValueError("Expected reference[query] and values[repeat, query]")
     if not np.isfinite(reference).all() or not np.isfinite(values).all():
         raise ValueError("Values and reference must be finite")
-    absolute = float(np.linalg.norm(values - reference, axis=1).mean())
-    scale = float(np.linalg.norm(reference))
-    return absolute, 100 * absolute / scale if scale else None
+    # Scale before subtraction/squaring. hypot preserves tiny components without
+    # the overflow/underflow of sum(x*x), including nonzero subnormal references.
+    scale = float(max(np.max(np.abs(values)), np.max(np.abs(reference))))
+    if scale == 0:
+        return 0.0, None
+    with np.errstate(over="ignore", invalid="ignore", divide="ignore", under="ignore"):
+        normalized = np.hypot.reduce(values / scale - reference / scale, axis=1)
+        mean_norm = float(normalized.mean())
+        absolute = mean_norm * scale
+        reference_norm = float(np.hypot.reduce(reference / scale))
+        zero_reference = not np.any(reference)
+        relative = (
+            None
+            if zero_reference
+            else 100 * (mean_norm / reference_norm) if reference_norm else float("inf")
+        )
+    if not np.isfinite(absolute) or (
+        relative is not None and not np.isfinite(relative)
+    ):
+        raise ValueError("Error metric is outside the finite float range")
+    return absolute, relative
 
 
 @dataclass(frozen=True)
@@ -113,7 +131,7 @@ class Trial:
             raise ValueError("Invalid completed time")
 
 
-def summarize(trials, reference, *, requested_repeats, target_pct, phase):
+def summarize(trials, reference, *, requested_repeats, target_pct, phase, stochastic):
     """Summarize one frozen budget, retaining partial/failing series costs.
 
     A pilot can never confirm a target. Caller must persist the choice before
@@ -121,6 +139,8 @@ def summarize(trials, reference, *, requested_repeats, target_pct, phase):
     """
     if phase not in PHASES:
         raise ValueError("Unknown phase")
+    if type(stochastic) is not bool:
+        raise ValueError("Explicit boolean stochastic flag required")
     if type(requested_repeats) is not int or requested_repeats < 1:
         raise ValueError("Need a positive requested repeat count")
     if not np.isfinite(target_pct) or target_pct <= 0:
@@ -133,9 +153,7 @@ def summarize(trials, reference, *, requested_repeats, target_pct, phase):
         raise ValueError("Repeat index outside the requested series")
     if len({t.paths_per_estimate for t in trials}) > 1:
         raise ValueError("A series must use one frozen paths-per-estimate budget")
-    if any(t.paths_per_estimate is not None for t in trials) and len(
-        {t.seed for t in trials}
-    ) != len(trials):
+    if stochastic and len({t.seed for t in trials}) != len(trials):
         raise ValueError("Stochastic repeats need distinct seeds")
     reference = np.asarray(reference, dtype=float)
     # Validate Q even when no solve has completed.
@@ -165,6 +183,7 @@ def summarize(trials, reference, *, requested_repeats, target_pct, phase):
         accuracy_metric=ACCURACY_METRIC,
         selection_policy=SELECTION_POLICY,
         phase=phase,
+        stochastic=stochastic,
         target_pct=target_pct,
         status=status,
         reason=reason,

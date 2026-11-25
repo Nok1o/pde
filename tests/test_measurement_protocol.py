@@ -40,7 +40,12 @@ def trial(repeat=0, values=None):
 
 def summary(trials, reference=(10,), repeats=2, phase="control", target=5):
     return summarize(
-        trials, reference, requested_repeats=repeats, target_pct=target, phase=phase
+        trials,
+        reference,
+        requested_repeats=repeats,
+        target_pct=target,
+        phase=phase,
+        stochastic=True,
     )
 
 
@@ -96,7 +101,7 @@ def test_failed_runs_are_not_filtered_out_and_their_cost_is_retained():
 def test_failed_holdout_keeps_actual_error_and_cost_without_success_time():
     result = summary([trial(0, [11]), trial(1, [11])])
     assert result["status"] == "not_reached"
-    assert result["relative_error_pct"] == 10
+    assert result["relative_error_pct"] == pytest.approx(10)
     assert result["spent_seconds"] == 4
     assert result["seconds_to_target"] is None
 
@@ -170,6 +175,7 @@ def test_export_preserves_failure_details_large_seed_and_null_memory():
         requested_repeats=2,
         target_pct=5,
         phase="control",
+        stochastic=True,
     )
     payload = json.loads(files["series.json"])
     assert payload["trials"][0]["seed"] == good.seed
@@ -180,3 +186,36 @@ def test_export_preserves_failure_details_large_seed_and_null_memory():
     assert rows[1]["values_json"] == "null"
     with pytest.raises(ValueError, match="Missing metadata"):
         export_series({}, [], [10], requested_repeats=2, target_pct=5, phase="control")
+
+
+def test_adaptive_mc_needs_distinct_seeds_even_without_fixed_path_budget():
+    trials = [replace(trial(r), seed=42, paths_per_estimate=None) for r in range(2)]
+    with pytest.raises(ValueError, match="distinct seeds"):
+        summary(trials)
+    result = summarize(
+        trials,
+        [10],
+        requested_repeats=2,
+        target_pct=1,
+        phase="control",
+        stochastic=False,
+    )
+    assert result["status"] == "confirmed"
+    assert result["stochastic"] is False
+    trials[1] = replace(trials[1], seed=43)
+    assert summary(trials)["status"] == "confirmed"
+
+
+@pytest.mark.parametrize("scale", [1e200, 1e-200, 1e-310])
+def test_metric_preserves_large_and_tiny_nonzero_references(scale):
+    absolute, relative = query_error([[2 * scale]], [scale])
+    assert absolute / scale == pytest.approx(1)
+    assert relative == pytest.approx(100)
+    absolute, relative = query_error([[2 * scale, 0], [0, 2 * scale]], [scale, 0])
+    assert absolute / scale == pytest.approx((1 + np.sqrt(5)) / 2)
+    assert relative == pytest.approx(50 * (1 + np.sqrt(5)))
+
+
+def test_unrepresentable_metric_is_rejected_before_json_export():
+    with pytest.raises(ValueError, match="finite float range"):
+        query_error([[-1e308]], [1e308])
