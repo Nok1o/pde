@@ -27,12 +27,13 @@ def context(n=8, alpha=0.5):
     return p, previous, freeze_heat3d(p, previous, previous, 0.013, 0.013)
 
 
-def test_zero_control_reproduces_ordinary_mc_exactly():
+@pytest.mark.parametrize("batch_size", [None, 7])
+def test_zero_control_reproduces_ordinary_mc_exactly(batch_size):
     _, _, op = context()
     points = [[0, 1, 1], [4, 4, 4]]
-    plain = solve_frozen_mc3d(op, points, walks=256, seed=51)
+    plain = solve_frozen_mc3d(op, points, walks=256, seed=51, batch_size=batch_size)
     corrected = solve_frozen_correction_mc3d(
-        op, np.zeros(op.shape), points, walks=256, seed=51
+        op, np.zeros(op.shape), points, walks=256, seed=51, batch_size=batch_size
     )
     np.testing.assert_array_equal(plain.values, corrected.values)
     np.testing.assert_array_equal(plain.stderr, corrected.stderr)
@@ -40,12 +41,15 @@ def test_zero_control_reproduces_ordinary_mc_exactly():
     assert corrected.control_origin == "supplied_construction_excluded"
 
 
-def test_exact_discrete_control_gives_zero_variance_without_reference_access():
+@pytest.mark.parametrize("batch_size", [None, 7])
+def test_exact_discrete_control_gives_zero_variance_without_reference_access(
+    batch_size,
+):
     _, _, op = context(8)
     field = np.random.default_rng(12).normal(size=op.shape)
     manufactured = op.with_rhs(op.apply(field))
     result = solve_frozen_correction_mc3d(
-        manufactured, field, [[0, 1, 1], [4, 4, 4]], walks=128
+        manufactured, field, [[0, 1, 1], [4, 4, 4]], walks=128, batch_size=batch_size
     )
     np.testing.assert_array_equal(
         result.values, field[tuple(np.array([[0, 1, 1], [4, 4, 4]]).T)]
@@ -53,7 +57,8 @@ def test_exact_discrete_control_gives_zero_variance_without_reference_access():
     np.testing.assert_array_equal(result.stderr, 0)
 
 
-def test_rhs_contains_full_defect_including_nonzero_boundary(monkeypatch):
+@pytest.mark.parametrize("batch_size", [None, 7])
+def test_rhs_contains_full_defect_including_nonzero_boundary(monkeypatch, batch_size):
     _, _, op = context()
     control = np.full(op.shape, 0.25)
     original_rhs = op.rhs.copy()
@@ -75,7 +80,7 @@ def test_rhs_contains_full_defect_including_nonzero_boundary(monkeypatch):
 
     monkeypatch.setattr(module, "solve_frozen_mc3d", checked)
     result = solve_frozen_correction_mc3d(
-        op, control, [[0, 1, 1], [4, 4, 4]], walks=20000, seed=1
+        op, control, [[0, 1, 1], [4, 4, 4]], walks=20000, seed=1, batch_size=batch_size
     )
     assert result.values[0] == op.fixed_values[0, 1, 1]
     assert abs(result.values[1] - exact[4, 4, 4]) < 5 * result.stderr[1]
@@ -139,7 +144,10 @@ def test_good_coarse_field_reduces_variance_without_claiming_universal_speed():
     assert np.std(controlled, ddof=1) < 0.2 * np.std(plain, ddof=1)
 
 
-def test_coarse_solve_reads_only_known_data_and_restricted_caller_fields(monkeypatch):
+@pytest.mark.parametrize("batch_size", [None, 7])
+def test_coarse_solve_reads_only_known_data_and_restricted_caller_fields(
+    monkeypatch, batch_size
+):
     p, previous, _ = context(10)
 
     def forbidden(*args, **kwargs):
@@ -170,7 +178,7 @@ def test_coarse_solve_reads_only_known_data_and_restricted_caller_fields(monkeyp
     monkeypatch.setattr(module, "freeze_heat3d", check_freeze)
     monkeypatch.setattr(module, "solve_lines3d", check_solve)
     result = solve_controlled_frozen_mc3d(
-        p, previous, iterate, 0.013, 0.013, walks=64, coarse_n=4
+        p, previous, iterate, 0.013, 0.013, walks=64, coarse_n=4, batch_size=batch_size
     )
     assert result.status == "completed" and observed == [4]
 
@@ -351,7 +359,9 @@ def test_supplied_control_method_identifier_on_success_and_failures(settings, st
     assert nonfinite.status == "nonfinite" and nonfinite.method == "mc_control"
 
 
-@pytest.mark.parametrize("method", ["mc", "mc_grouped", "mc_control"])
+@pytest.mark.parametrize(
+    "method", ["mc", "mc_grouped", "mc_control", "mc_control_grouped"]
+)
 @pytest.mark.parametrize("limited", [False, True])
 def test_all_cli_modes_keep_settings_warmup_and_export_consistent(
     tmp_path, monkeypatch, method, limited
@@ -386,7 +396,7 @@ def test_all_cli_modes_keep_settings_warmup_and_export_consistent(
     else:
         assert cli.main(args) == 0
     data = json.loads((tmp_path / "result.json").read_text(encoding="utf-8"))
-    expected_batch = 7 if method == "mc_grouped" else None
+    expected_batch = 7 if method in ("mc_grouped", "mc_control_grouped") else None
     assert warmed == [expected_batch]
     assert (
         data["metadata"]["configuration"]["method"]
@@ -403,4 +413,4 @@ def test_all_cli_modes_keep_settings_warmup_and_export_consistent(
     with (tmp_path / "points.csv").open(encoding="utf-8-sig") as stream:
         row = next(csv.DictReader(stream))
     assert row["method"] == method
-    assert row["batch_size"] == ("7" if method == "mc_grouped" else "")
+    assert row["batch_size"] == ("7" if expected_batch is not None else "")

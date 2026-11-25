@@ -68,7 +68,7 @@ python -m pdelab.heat3d_cli study --case polynomial --n 6 --dt .002 --T .003 --x
 
 [Короткая проверка смещения и влияния остановки против Ньютона](../benchmarks/results/heat3d-time-mc/README.md).
 [Схема граничных потоков](heat3d-boundaries.md). Далее описан отдельный
-диагностический режим одной замороженной системы, включая группировку #29.
+диагностический режим одной замороженной системы, включая группировку обычных путей и путей поправки из #29.
 
 ## Та же система, что у прогонок и матричного backend
 
@@ -177,16 +177,18 @@ CLI дополнительно измеряет полную подготовк�
 
 ## Диагностический CLI и экспорт
 
-Один параметр `--method` выбирает `mc`, `mc_grouped` или `mc_control`.
-`--batch-size` передаётся только групповому ядру; у остальных режимов
-batch_size=null, включая экспорт. Группировка с контрольным полем не объединена.
-Контрольный результат всегда имеет method=mc_control, в том числе при отказе.
+Один параметр `--method` выбирает `mc`, `mc_grouped`, `mc_control`
+или `mc_control_grouped`. `--batch-size` передаётся двум групповым вариантам;
+у остальных режимов batch_size=null, включая экспорт. Контрольный результат
+имеет method=mc_control или mc_control_grouped соответственно, в том числе
+при отказе грубой подготовки или исчерпании лимитов.
 
 ```sh
 python -m pdelab.heat3d_mc_cli --n 8 --alpha .5 --dt .013 --walks 16384 --seed 42 --direct --out runs/frozen-mc3d
 python -m pdelab.heat3d_mc_cli --method mc_control --n 8 --coarse-n 4 --alpha .5 --dt .013 --walks 16384 --seed 42 --direct --out runs/frozen-control3d
 python -m pdelab.heat3d_mc_cli --method mc_grouped --batch-size 128 --n 8 --alpha .5 --dt .013 --walks 16384 --seed 42 --direct --out runs/frozen-grouped-mc3d
 python -m pdelab.heat3d_mc_cli --method mc_control --n 8 --coarse-n 4 --x0 3 --y0 3 --z0 3 --beta-x0 2 --point 0 0 0 --direct --out runs/frozen-control3d-mixed
+python -m pdelab.heat3d_mc_cli --method mc_control_grouped --batch-size 128 --n 8 --coarse-n 4 --x0 3 --y0 3 --z0 3 --beta-x0 2 --point 0 0 0 --direct --out runs/frozen-grouped-control3d
 ```
 
 CLI берёт заданное начальное поле как известный предыдущий слой, замораживает
@@ -195,7 +197,8 @@ k на начальном приближении и решает одну A w=b.
 `physical_layers_accepted=0`; вычисленные значения нельзя выдавать за решение
 нелинейной задачи в T. Сохраняются настройки, commit/dirty, хеши файлов MC,
 seed, фактические бюджеты, счётчики, затраты, причины отказа, CSV точек и JSON.
-По умолчанию `--method mc`; размер группы применяется только к `mc_grouped`.
+По умолчанию `--method mc`; размер группы применяется к `mc_grouped`
+и `mc_control_grouped`.
 `--direct` добавляет независимую сеточную диагностику для n<=16. При отказе
 данные сохраняются, CLI завершается кодом 2. Непустой каталог не перезаписывается.
 
@@ -203,7 +206,7 @@ seed, фактические бюджеты, счётчики, затраты, �
 
 ```sh
 python -m pytest tests/test_heat3d_mc.py tests/test_heat3d_operator.py tests/test_heat3d_linear.py tests/test_heat3d_block.py -q
-python -m pytest tests/test_heat3d_control.py tests/test_heat3d_control_robin.py -q
+python -m pytest tests/test_heat3d_control.py tests/test_heat3d_control_robin.py tests/test_heat3d_grouped_control.py -q
 python -m pytest tests/test_heat3d_picard_mc.py tests/test_heat3d_picard_mc_interface.py -q
 python -m pytest tests/test_heat3d_robin_mc.py -q
 python -m pytest tests/test_heat_mc.py -q -k 'one_step_uses or complete_space_time or constant_data or seed_reproducibility or transition_limit_never or invalid_mc_settings or bad_previous'
@@ -279,3 +282,34 @@ result.seconds двух API: обычный принимает уже готов
 уже входят в полный дефект; повторно добавлять r или g в MC нельзя.
 Статус `completed` отдельной замороженной системы подтверждает завершение
 запрошенных путей. Приёмка физического слоя описана выше.
+
+## Групповая обработка контрольной поправки
+
+Оба входа `solve_controlled_frozen_mc3d` и `solve_frozen_correction_mc3d`
+принимают `batch_size=None` для обычных путей или целое B от 1 до 65536
+для групп. Грубая сетка, интерполяция и дефект остаются теми же; меняется
+только обработка путей уже подготовленной системы `A e=b-A v`.
+Используется существующее групповое ядро, без отдельной сборки вероятностей.
+
+Размер группы — число одновременно активных частиц, а walks — общее число
+путей на свободную оценку. Последняя группа может быть неполной. При B=1
+совпадают значения, стандартные ошибки, порядок случайных выборов и счётчики
+обычной поправки, включая отказы. При B>1 порядок выборов меняется, но закон
+полных независимых путей остаётся прежним. Само объединение в группы не
+уменьшает дисперсию и не гарантирует ускорения.
+
+Пять массивов частиц добавляют `40 * min(B, walks)` байт к оценке памяти
+обоих контрольных входов. Проверка общего лимита выполняется до подготовки
+и прогрева; выбранное MC-ядро прогревается до измеряемого расчёта. При свежем
+контроле в seconds входят обе сетки, прогонки, интерполяция, дефект и все
+пути. Значения workspace_bytes остаются оценкой буферов, не измеренным RSS.
+
+Лимиты путей, переходов и длины пути сохраняются. Незавершённые оценки не
+выдаются за решение; сохраняются счётчики начатых/завершённых путей,
+диагностические значения, method и batch_size. При отказе грубого решателя
+пути не запускаются. Известные точки 1 рода возвращают g без путей.
+
+В диагностическом CLI каждая из четырёх конфигураций сохраняет
+`physical_layers_accepted=0`. Во временном сравнении #28 обычный MC и
+поправка используют последовательные пути. Сравнение вариантов группировки
+при одинаковой достигнутой точности относится к #31.

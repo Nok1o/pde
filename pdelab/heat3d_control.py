@@ -37,18 +37,23 @@ def _options(settings):
         max_walks=1000000,
         max_transitions=10000000,
         max_workspace_bytes=256 * 1024**2,
+        batch_size=None,
     )
     if settings.keys() - defaults.keys():
         raise ValueError(
             f"Неизвестные настройки MC: {sorted(settings.keys()-defaults.keys())}"
         )
     defaults.update(settings)
+    batch_size = defaults.pop("batch_size")
     for name, value in defaults.items():
         minimum = 0 if name == "seed" else 2 if name == "walks" else 1
         maximum = (
             2**32 - 1 if name == "seed" else 2**31 - 1 if name == "walks" else 2**63 - 1
         )
         defaults[name] = _integer(value, name, minimum, maximum)
+    defaults["batch_size"] = (
+        None if batch_size is None else _integer(batch_size, "batch_size", 1, 65536)
+    )
     return defaults
 
 
@@ -68,8 +73,8 @@ def _failure(points, options, workspace, status, reason, seconds):
         seconds,
         seconds,
         workspace,
-        method="mc_control",
-        batch_size=None,
+        method="mc_control" if options["batch_size"] is None else "mc_control_grouped",
+        batch_size=options["batch_size"],
     )
 
 
@@ -78,6 +83,7 @@ def solve_frozen_correction_mc3d(operator, control, points=None, **settings):
 
     Fixed rows contain g-v (not zero unless v satisfies the fine boundary).
     Operator and supplied v construction are excluded, explicitly in origin.
+    batch_size=None uses ordinary paths; a positive size groups the same paths.
     """
     validation_start = perf_counter()
     if not isinstance(operator, HeatOperator3D):
@@ -95,6 +101,8 @@ def solve_frozen_correction_mc3d(operator, control, points=None, **settings):
         + 160 * operator.rhs.size
         + 256 * len(points)
     )
+    if options["batch_size"] is not None:
+        workspace += 40 * min(options["batch_size"], options["walks"])
     if workspace > options["max_workspace_bytes"]:
         return _failure(
             points,
@@ -104,7 +112,7 @@ def solve_frozen_correction_mc3d(operator, control, points=None, **settings):
             "control_workspace_exceeds_limit",
             perf_counter() - validation_start,
         )
-    warmup_mc3d()
+    warmup_mc3d(batch_size=options["batch_size"])
     start = perf_counter()
     control = np.array(control, dtype=float, copy=True)
     with np.errstate(over="ignore", invalid="ignore"):
@@ -150,8 +158,9 @@ def solve_frozen_correction_mc3d(operator, control, points=None, **settings):
             "seconds": perf_counter() - start,
             "preparation_seconds": defect_seconds + estimate.preparation_seconds,
             "workspace_bytes": workspace,
-            "method": "mc_control",
-            "batch_size": None,
+            "method": (
+                "mc_control" if options["batch_size"] is None else "mc_control_grouped"
+            ),
         },
         defect_seconds=defect_seconds,
     )
@@ -176,6 +185,7 @@ def solve_controlled_frozen_mc3d(
     coarse coordinates with the same face kinds and beta, freeze once, solve
     coarse lines, prolong v without overwriting its boundary, and pay the full
     fine residual. No exact or fine solve access.
+    batch_size selects only the correction kernel; coarse preparation is unchanged.
     """
     return _controlled_estimate(
         problem,
@@ -225,6 +235,8 @@ def _controlled_estimate(
     workspace = 512 * (np.prod(problem.shape).item() + (coarse_n + 1) ** 3) + 256 * len(
         points
     )
+    if options["batch_size"] is not None:
+        workspace += 40 * min(options["batch_size"], options["walks"])
     if workspace > options["max_workspace_bytes"]:
         result = _failure(
             points,
@@ -236,7 +248,7 @@ def _controlled_estimate(
         )
         return replace(result, coarse_n=coarse_n, control_origin="fresh_coarse_grid")
     warmup_lines3d()
-    warmup_mc3d()
+    warmup_mc3d(batch_size=options["batch_size"])
     start = perf_counter()
     operator_seconds = 0.0
     if fine is None:

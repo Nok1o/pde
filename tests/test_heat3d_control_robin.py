@@ -25,8 +25,9 @@ def boundary_problem(n, alpha, all_kind3):
 @pytest.mark.parametrize("n,coarse_n", [(8, 4), (9, 4)])
 @pytest.mark.parametrize("alpha", [0.0, 0.5])
 @pytest.mark.parametrize("all_kind3", [False, True])
+@pytest.mark.parametrize("batch_size", [None, 7])
 def test_coarse_correction_matches_direct_at_faces_edges_and_corners(
-    n, coarse_n, alpha, all_kind3
+    n, coarse_n, alpha, all_kind3, batch_size
 ):
     problem = boundary_problem(n, alpha, all_kind3)
     previous = problem.initial_values()
@@ -46,6 +47,7 @@ def test_coarse_correction_matches_direct_at_faces_edges_and_corners(
             coarse_n=coarse_n,
             walks=1024,
             seed=seed,
+            batch_size=batch_size,
         )
         for seed in range(12)
     ]
@@ -57,7 +59,10 @@ def test_coarse_correction_matches_direct_at_faces_edges_and_corners(
     )
     free_queries = np.count_nonzero(~operator.fixed[tuple(points.T)])
     for run in runs:
-        assert run.method == "mc_control" and run.batch_size is None
+        assert run.method == (
+            "mc_control" if batch_size is None else "mc_control_grouped"
+        )
+        assert run.batch_size == batch_size
         assert run.walks == free_queries * 1024
         assert run.coarse_relative_residual <= 1e-8
         assert run.seconds >= run.preparation_seconds >= run.coarse_seconds > 0
@@ -88,7 +93,9 @@ def test_coarse_grid_preserves_face_data_and_does_not_read_exact(monkeypatch):
     assert result.status == "completed" and len(coarse_problems) == 1
 
 
-@pytest.mark.parametrize("method", ["mc", "mc_grouped", "mc_control"])
+@pytest.mark.parametrize(
+    "method", ["mc", "mc_grouped", "mc_control", "mc_control_grouped"]
+)
 @pytest.mark.parametrize("all_kind3", [False, True])
 def test_cli_exports_each_method_with_physical_boundary_settings(
     tmp_path, method, all_kind3
@@ -129,7 +136,8 @@ def test_cli_exports_each_method_with_physical_boundary_settings(
     assert config["betas"] == [3.5, 2, 2, 2, 2, 2]
     assert config["method"] == result["method"] == method
     assert result["status"] == "completed" and result["walks"] == 128
-    assert result["batch_size"] == (7 if method == "mc_grouped" else None)
+    expected_batch = 7 if method in ("mc_grouped", "mc_control_grouped") else None
+    assert config["batch_size"] == result["batch_size"] == expected_batch
     assert payload["metadata"]["physical_layers_accepted"] == 0
     assert payload["rows"][0]["direct_reference"] is not None
     with (tmp_path / "points.csv").open(encoding="utf-8-sig") as stream:
