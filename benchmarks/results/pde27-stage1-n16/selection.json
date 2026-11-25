@@ -1,0 +1,242 @@
+[
+  {
+    "case": "sine-all_dirichlet",
+    "method": "lod_serial",
+    "selected": {
+      "5.0": {
+        "budget": 0.001,
+        "budget_index": 1
+      },
+      "10.0": {
+        "budget": 0.001,
+        "budget_index": 1
+      },
+      "1.0": {
+        "budget": 0.0001,
+        "budget_index": 2
+      }
+    },
+    "status": "frozen_before_control",
+    "pilot_seconds": 0.119377099967096
+  },
+  {
+    "case": "sine-all_dirichlet",
+    "method": "mc",
+    "selected": {
+      "10.0": {
+        "budget": 64,
+        "budget_index": 0
+      },
+      "5.0": {
+        "budget": 256,
+        "budget_index": 1
+      },
+      "1.0": {
+        "budget": 16384,
+        "budget_index": 4
+      }
+    },
+    "status": "frozen_before_control",
+    "pilot_seconds": 0.29146650002803653
+  },
+  {
+    "case": "sine-y0_robin",
+    "method": "lod_serial",
+    "selected": {
+      "5.0": {
+        "budget": 0.001,
+        "budget_index": 1
+      },
+      "10.0": {
+        "budget": 0.001,
+        "budget_index": 1
+      },
+      "1.0": {
+        "budget": 0.0001,
+        "budget_index": 2
+      }
+    },
+    "status": "frozen_before_control",
+    "pilot_seconds": 0.17672980000497773
+  },
+  {
+    "case": "sine-y0_robin",
+    "method": "mc",
+    "selected": {
+      "10.0": {
+        "budget": 64,
+        "budget_index": 0
+      },
+      "1.0": {
+        "budget": 1024,
+        "budget_index": 2
+      },
+      "5.0": {
+        "budget": 1024,
+        "budget_index": 2
+      }
+    },
+    "status": "frozen_before_control",
+    "pilot_seconds": 0.07408979994943365
+  },
+  {
+    "case": "sine-all_robin",
+    "method": "lod_serial",
+    "selected": {
+      "5.0": {
+        "budget": 0.01,
+        "budget_index": 0
+      },
+      "10.0": {
+        "budget": 0.01,
+        "budget_index": 0
+      },
+      "1.0": {
+        "budget": 0.001,
+        "budget_index": 1
+      }
+    },
+    "status": "frozen_before_control",
+    "pilot_seconds": 0.13607010000851005
+  },
+  {
+    "case": "sine-all_robin",
+    "method": "mc",
+    "selected": {
+      "10.0": {
+        "budget": 256,
+        "budget_index": 1
+      },
+      "5.0": {
+        "budget": 1024,
+        "budget_index": 2
+      },
+      "1.0": {
+        "budget": 65536,
+        "budget_index": 5
+      }
+    },
+    "status": "frozen_before_control",
+    "pilot_seconds": 3.7769641999620944
+  },
+  {
+    "case": "polynomial-all_dirichlet",
+    "method": "lod_serial",
+    "selected": {
+      "5.0": {
+        "budget": 0.001,
+        "budget_index": 1
+      },
+      "10.0": {
+        "budget": 0.001,
+        "budget_index": 1
+      },
+      "1.0": {
+        "budget": 0.0001,
+        "budget_index": 2
+      }
+    },
+    "status": "frozen_before_control",
+    "pilot_seconds": 0.08408600004622713
+  },
+  {
+    "case": "polynomial-all_dirichlet",
+    "method": "mc",
+    "selected": {
+      "5.0": {
+        "budget": 64,
+        "budget_index": 0
+      },
+      "10.0": {
+        "budget": 64,
+        "budget_index": 0
+      },
+      "1.0": {
+        "budget": 16384,
+        "budget_index": 4
+      }
+    },
+    "status": "frozen_before_control",
+    "pilot_seconds": 0.2795217001112178
+  },
+  {
+    "case": "polynomial-y0_robin",
+    "method": "lod_serial",
+    "selected": {
+      "10.0": {
+        "budget": 0.001,
+        "budget_index": 1
+      },
+      "1.0": {
+        "budget": 0.0001,
+        "budget_index": 2
+      },
+      "5.0": {
+        "budget": 0.0001,
+        "budget_index": 2
+      }
+    },
+    "status": "frozen_before_control",
+    "pilot_seconds": 0.233202799980063
+  },
+  {
+    "case": "polynomial-y0_robin",
+    "method": "mc",
+    "selected": {
+      "10.0": {
+        "budget": 64,
+        "budget_index": 0
+      },
+      "5.0": {
+        "budget": 256,
+        "budget_index": 1
+      },
+      "1.0": {
+        "budget": 4096,
+        "budget_index": 3
+      }
+    },
+    "status": "frozen_before_control",
+    "pilot_seconds": 0.17469750001328066
+  },
+  {
+    "case": "polynomial-all_robin",
+    "method": "lod_serial",
+    "selected": {
+      "1.0": {
+        "budget": 0.01,
+        "budget_index": 0
+      },
+      "5.0": {
+        "budget": 0.01,
+        "budget_index": 0
+      },
+      "10.0": {
+        "budget": 0.01,
+        "budget_index": 0
+      }
+    },
+    "status": "frozen_before_control",
+    "pilot_seconds": 0.05205339996609837
+  },
+  {
+    "case": "polynomial-all_robin",
+    "method": "mc",
+    "selected": {
+      "5.0": {
+        "budget": 1024,
+        "budget_index": 2
+      },
+      "10.0": {
+        "budget": 1024,
+        "budget_index": 2
+      },
+      "1.0": {
+        "budget": 16384,
+        "budget_index": 4
+      }
+    },
+    "status": "frozen_before_control",
+    "pilot_seconds": 1.4656899999827147
+  }
+]
