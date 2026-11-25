@@ -173,7 +173,12 @@ class HeatOperator3D:
 
 
 def freeze_heat3d(problem, previous, iterate, t, dt, *, conductivity=None):
-    """Freeze k, c and cubic loss for one implicit physical-time layer."""
+    """Freeze k, c and cubic loss for one implicit physical-time layer.
+
+    Optional positive conductivity is a trial from an older iterate. Capacity
+    and reaction still use iterate. Nonlinear acceptance must build a separate
+    operator without this override; this function alone is not a solve.
+    """
     if not np.isfinite(dt) or dt <= 0:
         raise ValueError("Длина слоя dt должна быть конечной и положительной")
     previous = _field(previous, problem.shape, "previous")
