@@ -1,0 +1,141 @@
+{
+  "description": "Pre-registered comparison of actual nodal transport, not packed individual paths",
+  "readiness": "Run only after integration, independent review, clean commit and an exclusive timing window",
+  "repeats": 5,
+  "seed": 290102,
+  "budgets": [
+    0.001,
+    1e-06
+  ],
+  "walk_budgets": [
+    256,
+    1024,
+    4096
+  ],
+  "calibration_fraction": 0.8,
+  "configuration": {
+    "n": 8,
+    "alpha": 0.5,
+    "capacity_gamma": 0.5,
+    "reaction_sigma": 1.0,
+    "dt": 0.002,
+    "T": 0.004,
+    "mode": "point",
+    "newton": false,
+    "kinds": [
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+    ],
+    "betas": [
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ]
+  },
+  "settings": {
+    "tolerance": 1e-06,
+    "change_tolerance": 1e-06,
+    "linear_tolerance": 1e-10,
+    "mc_tolerance": 0.2,
+    "mc_change_tolerance": 0.1,
+    "coarse_n": 4,
+    "batch_size": 128,
+    "history_mode": "full",
+    "conductivity_refresh_layers": 1,
+    "max_outer": 8,
+    "max_inner": 20000,
+    "max_seconds": 5,
+    "max_walks": 12000000,
+    "max_transitions": 40000000,
+    "max_path_steps": 100000,
+    "max_workspace_bytes": 268435456,
+    "relaxation": 1.0
+  },
+  "variants": [
+    {
+      "id": "lod",
+      "method": "lod"
+    },
+    {
+      "id": "mc",
+      "method": "mc"
+    },
+    {
+      "id": "mc_counts",
+      "method": "mc_counts"
+    },
+    {
+      "id": "mass_transport",
+      "method": "mass_transport"
+    }
+  ],
+  "cases": [
+    {
+      "id": "sine-centre-kind1",
+      "configuration": {
+        "case": "sine",
+        "point": [
+          4,
+          4,
+          4
+        ]
+      }
+    },
+    {
+      "id": "polynomial-kind1",
+      "configuration": {
+        "case": "polynomial",
+        "point": [
+          2,
+          4,
+          6
+        ]
+      }
+    },
+    {
+      "id": "polynomial-one-kind3",
+      "configuration": {
+        "case": "polynomial",
+        "point": [
+          2,
+          4,
+          6
+        ],
+        "kinds": [
+          3,
+          1,
+          1,
+          1,
+          1,
+          1
+        ]
+      }
+    },
+    {
+      "id": "polynomial-all-kind3",
+      "configuration": {
+        "case": "polynomial",
+        "point": [
+          2,
+          4,
+          6
+        ],
+        "kinds": [
+          3,
+          3,
+          3,
+          3,
+          3,
+          3
+        ]
+      }
+    }
+  ]
+}

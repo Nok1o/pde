@@ -194,8 +194,15 @@ def test_run_limits_include_validation_and_preserve_only_accepted_time(method):
         T=0.003,
         settings=replace(SETTINGS, max_transitions=1),
     )
-    assert limited.status == "walk_budget" and limited.transitions == 1
-    capacity = min(SETTINGS.walks, limited.batch_size or 1)
+    assert limited.status == "walk_budget"
+    if method == "mc_counts":
+        # An entire node's transfer is atomic: exceeding the remaining budget
+        # rejects it before any of its particle moves is performed.
+        assert 0 <= limited.transitions <= 1
+        capacity = SETTINGS.walks
+    else:
+        assert limited.transitions == 1
+        capacity = min(SETTINGS.walks, limited.batch_size or 1)
     assert 1 <= limited.walks - limited.completed_walks <= capacity
     assert limited.values is None and limited.physical_steps == 0
     path = solve_heat3d(
@@ -244,7 +251,7 @@ def test_workspace_and_t_zero():
         assert bad.method == method
 
 
-@pytest.mark.parametrize("method", METHODS)
+@pytest.mark.parametrize("method", [m for m in METHODS if m != "mc_counts"])
 def test_validation_can_absorb_every_path_after_the_last_allowed_move(method):
     p = problem(5, alpha=0, faces=())
     settings = replace(SETTINGS, seed=0, walks=16)
@@ -253,6 +260,33 @@ def test_validation_can_absorb_every_path_after_the_last_allowed_move(method):
     limited = solve_heat3d(p, **kwargs, settings=replace(settings, max_transitions=1))
     assert reference.transitions == limited.transitions == 1
     assert limited.status == "completed" and limited.validation_walks == 1024
+    assert limited.completed_walks == limited.walks == reference.walks == 2048
+    np.testing.assert_array_equal(limited.values, reference.values)
+
+
+def test_count_validation_can_absorb_with_zero_remaining_move_allowance(monkeypatch):
+    import pdelab.heat3d_picard_mc as mc
+
+    p = problem(5, alpha=0, faces=())
+    # This fixed stream covers one update move followed by an entirely absorbed
+    # independent check. It is branch-coverage data, not a performance seed.
+    settings = replace(SETTINGS, seed=19, walks=16)
+    kwargs = dict(method="mc_counts", dt=5e-6, T=5e-6)
+    reference = solve_heat3d(p, **kwargs, settings=settings)
+    original = mc.solve_frozen_counts3d
+    calls = []
+
+    def record_allowance(*args, **options):
+        sampled = original(*args, **options)
+        calls.append((options["max_transitions"], sampled.transitions))
+        return sampled
+
+    monkeypatch.setattr(mc, "solve_frozen_counts3d", record_allowance)
+    limited = solve_heat3d(p, **kwargs, settings=replace(settings, max_transitions=1))
+    assert calls == [(1, 1), (0, 0)]
+    assert reference.status == limited.status == "completed"
+    assert reference.transitions == limited.transitions == 1
+    assert limited.validation_walks == 1024
     assert limited.completed_walks == limited.walks == reference.walks == 2048
     np.testing.assert_array_equal(limited.values, reference.values)
 

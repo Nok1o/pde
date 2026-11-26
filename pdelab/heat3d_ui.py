@@ -96,6 +96,9 @@ def _optimization_diagnostics(rows):
         "conductivity_refresh_layers": "Максимальный возраст k, слоёв",
         "conductivity_reuses": "Проб с прежней проводимостью",
         "conductivity_fallbacks": "Возвратов к свежей проводимости",
+        "node_updates": "Обработок узлов переноса",
+        "transport_sweeps": "Шагов переноса",
+        "edge_transfers": "Обработок направлений переноса",
     }
     st.dataframe(
         pd.DataFrame(
@@ -302,7 +305,9 @@ def render_heat3d_app():
         newton = st.checkbox(
             "Независимая проверка Ньютоном (n ≤ 16)", value=False, key="h3_newton"
         )
-        with st.expander("Параметры Пикара и прогонок", key="h3_solver_parameters"):
+        with st.expander(
+            "Параметры Пикара и линейных решателей", key="h3_solver_parameters"
+        ):
             choices = (0.5, 0.2, 0.1, 0.05, 0.01, 1e-3, 1e-5, 1e-6, 1e-7, 1e-9)
             tolerance, change = defaults.tolerance, defaults.change_tolerance
             mc_tolerance, mc_change = (
@@ -311,13 +316,13 @@ def render_heat3d_app():
             )
             if any(method not in MC_METHODS for method in methods):
                 tolerance = st.select_slider(
-                    "Допуск нелинейной невязки для прогонок",
+                    "Допуск невязки для детерминированных методов",
                     choices,
                     value=tolerance,
                     key="h3_tol",
                 )
                 change = st.select_slider(
-                    "Допуск изменения поля для прогонок",
+                    "Допуск изменения для детерминированных методов",
                     choices,
                     value=change,
                     key="h3_change",
@@ -354,7 +359,7 @@ def render_heat3d_app():
                 key="h3_outer",
             )
             inner = st.number_input(
-                "Максимум циклов прогонок",
+                "Максимум итераций линейного решателя",
                 min_value=1,
                 max_value=100000,
                 value=20000,
@@ -478,6 +483,15 @@ def render_heat3d_app():
         st.write(
             "Даже запрос одной точки оплачивает все необходимые пространственные поля и временные слои. Оценка рабочих массивов и измеренный пик памяти различаются."
         )
+        if any(method in ("mc_counts", "mass_transport") for method in methods):
+            st.latex(r"u_i=r_i+\sum_j p_{ij}u_j")
+            st.write(
+                "MC с переносом количества частиц случайно распределяет число частиц "
+                "узла между соседями и поглощением. Перенос весов распределяет "
+                "вещественную массу по тем же вероятностям без случайных чисел. "
+                "Для полного поля он вычисляет эквивалентный ряд одновременно "
+                "для всех стартовых узлов. r — выплата, p — вероятности переходов."
+            )
     if run:
         bar = st.progress(0.0, text="Расчёт всех временных слоёв…")
         try:

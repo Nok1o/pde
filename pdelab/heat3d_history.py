@@ -10,6 +10,9 @@ WORK_COUNTERS = (
     "transitions",
     "validation_walks",
     "coarse_iterations",
+    "node_updates",
+    "transport_sweeps",
+    "edge_transfers",
 )
 
 

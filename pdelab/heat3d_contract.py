@@ -92,6 +92,13 @@ class LinearResult3D:
     iterations: int = 0  # complete xyz cycles; one full solve for a direct backend
     walks: int = 0  # paths started, including an unfinished path on failure
     transitions: int = 0  # executed transitions, including failed paths
+    node_updates: int = 0  # occupied-node updates, not individual particle moves
+    transport_sweeps: int = 0
+    edge_transfers: int = (
+        0  # processed nonzero couplings; counting rule is backend-specific
+    )
+    tail_error_bound: float | None = None  # current frozen linear solve only
+    preparation_seconds: float = 0.0  # optional backend preparation, inside total time
 
 
 class LinearBackend3D(Protocol):
@@ -148,3 +155,6 @@ class HeatRunResult3D:
     conductivity_fallbacks: int = 0  # rejected lagged updates followed by a fresh one
     history_mode: str = "full"  # all outer records, or the latest record of each layer
     history_records_discarded: int = 0  # intermediate diagnostics removed, not work
+    node_updates: int = 0
+    transport_sweeps: int = 0
+    edge_transfers: int = 0

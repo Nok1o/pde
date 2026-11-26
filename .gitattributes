@@ -12,3 +12,7 @@ benchmarks/results/heat3d-final-acceptance/**/*.json -text linguist-generated=tr
 benchmarks/results/heat3d-final-acceptance/**/*.log -text whitespace=cr-at-eol linguist-generated=true
 benchmarks/results/heat3d-final/**/*.csv -text whitespace=cr-at-eol linguist-generated=true
 benchmarks/results/heat3d-final/**/*.json -text linguist-generated=true
+benchmarks/results/heat3d-transport/**/*.csv -text whitespace=cr-at-eol linguist-generated=true
+benchmarks/results/heat3d-transport/**/*.json -text linguist-generated=true
+benchmarks/results/heat3d-transport/**/*.jsonl -text linguist-generated=true
+benchmarks/results/heat3d-transport/**/*.log -text whitespace=cr-at-eol linguist-generated=true

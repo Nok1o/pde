@@ -30,9 +30,11 @@ METHOD_NAMES = {
     "lod": METHOD_NAME,
     "block": "Пикар + матричная прогонка (3D)",
     "mc": "Пикар + обычный MC (3D)",
-    "mc_grouped": "Пикар + групповой MC (3D)",
+    "mc_grouped": "Пикар + MC с пакетами отдельных частиц (3D)",
     "mc_control": "Пикар + грубая сетка и MC-поправка (3D)",
-    "mc_control_grouped": "Пикар + грубая сетка и групповая MC-поправка (3D)",
+    "mc_control_grouped": "Пикар + грубая сетка и MC-поправка пакетами (3D)",
+    "mc_counts": "Пикар + MC с переносом количества частиц (3D)",
+    "mass_transport": "Пикар + перенос весов (детерминированный, 3D)",
 }
 BLOCK_DIAGNOSTICS = (
     "assembly_seconds",
@@ -54,6 +56,9 @@ OPTIMIZATION_DIAGNOSTICS = (
     "history_records_discarded",
     "conductivity_reuses",
     "conductivity_fallbacks",
+    "node_updates",
+    "transport_sweeps",
+    "edge_transfers",
 )
 STATUS_LABELS = {
     "not_requested": "Проверка не выбрана",
@@ -223,6 +228,24 @@ def _metadata(config, settings, points):
         versions=_versions(),
         timing="Solver seconds include preparation, all physical layers, Picard iterations, and independent MC checks. JIT warmup_seconds, external references and UI/export are separate. Preparation, block assembly/factorization/solve and coarse/interpolation/defect times are subsets of solver seconds.",
         memory="workspace_bytes is an estimated numerical working set; peak_rss_bytes is null unless measured, never inferred from workspace_bytes.",
+        transport_counters={
+            method: explanation
+            for method, explanation in {
+                "mc_counts": (
+                    "node_updates counts occupied-node updates; transport_sweeps sums "
+                    "generations over starting nodes; edge_transfers counts nonzero "
+                    "integer group transfers; transitions counts individual particle moves."
+                ),
+                "mass_transport": (
+                    "The full-field deterministic backend uses the equivalent Jacobi series. "
+                    "node_updates counts free-row updates; transport_sweeps counts full-field "
+                    "iterations; edge_transfers counts processed nonzero transition "
+                    "coefficients, including terms whose current iterate is zero. "
+                    "No finite particle population, random seed or particle moves is used."
+                ),
+            }.items()
+            if method in config.methods
+        },
     )
 
 
@@ -480,6 +503,10 @@ def _study_diagnostics(study, method, diagnostics, settings):
                     settings.batch_size if method in GROUPED_MC_METHODS else None
                 ),
             )
+            if method == "mass_transport" and collection == "trials":
+                # The generic protocol generates repeat seeds, but this solver
+                # uses no random generator or finite population of particles.
+                row["seed"] = None
             if method in MC_METHODS:
                 row.update(
                     budget_kind="walks_per_free_node_per_solve",
@@ -598,7 +625,7 @@ def study_heat3d(
                 else "relative_residual_tolerance"
             ),
             walks_applicable=stochastic,
-            retain_values=stochastic and len(points) == 1,
+            retain_values=len(points) == 1,
             progress=_method_progress(progress, method, index, len(config.methods)),
         )
         _study_diagnostics(study, method, diagnostics, settings.for_method(method))

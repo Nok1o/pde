@@ -1,0 +1,27 @@
+{
+  "recorded_utc": "2026-11-26T15:19:50.864334+00:00",
+  "stages": [
+    {
+      "stage": "frozen-n8",
+      "attempts": 170,
+      "solver_seconds": 0.20338588402955793,
+      "statuses": {
+        "completed": 170
+      },
+      "source_commit": "ec12d1ebececffea430e81863f6318ea7b77c3b9"
+    },
+    {
+      "stage": "full-n8",
+      "attempts": 270,
+      "solver_seconds": 10.454844963041978,
+      "statuses": {
+        "completed": 244,
+        "outer_limit": 26
+      },
+      "source_commit": "ec12d1ebececffea430e81863f6318ea7b77c3b9"
+    }
+  ],
+  "solver_seconds_all_attempts": 10.658230847071536,
+  "threshold_seconds": 120,
+  "full_n16_allowed": true
+}

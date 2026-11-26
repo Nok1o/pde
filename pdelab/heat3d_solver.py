@@ -7,6 +7,7 @@ only after the whole time interval has completed; failed layers remain diagnosti
 import warnings
 from contextlib import contextmanager
 from dataclasses import dataclass, replace
+from functools import partial
 from sys import getsizeof
 from time import perf_counter
 
@@ -37,6 +38,7 @@ from .heat3d_reference import (
     newton_scale3d,
     newton_system3d,
 )
+from .heat3d_transport import solve_mass_lines3d, warmup_transport3d
 from .problem3d import DIRECT_MAX_N, validate_points3d
 
 
@@ -189,6 +191,10 @@ class _Layer:
     conductivity_reuses: int = 0
     conductivity_fallbacks: int = 0
     lagged_conductivity: bool = False
+    node_updates: int = 0
+    transport_sweeps: int = 0
+    edge_transfers: int = 0
+    transport_attempt: dict | None = None
 
 
 @contextmanager
@@ -223,6 +229,9 @@ def _record(
         accepted=accepted,
         walks=0,
         transitions=0,
+        node_updates=0,
+        transport_sweeps=0,
+        edge_transfers=0,
         reason="completed" if accepted else layer.reason,
         lagged_conductivity=layer.lagged_conductivity,
         conductivity_reuses=layer.conductivity_reuses,
@@ -233,6 +242,9 @@ def _record(
     if layer.mc_attempt is not None:
         row.update(layer.mc_attempt)
         layer.mc_attempt = None
+    if layer.transport_attempt is not None:
+        row.update(layer.transport_attempt)
+        layer.transport_attempt = None
     stored_bytes, discarded = store_record(layer.history, row, layer.history_mode)
     layer.history_storage += stored_bytes
     layer.history_records_discarded += discarded
@@ -259,6 +271,16 @@ def _deterministic_update(layer, backend, operator, values, settings):
         max_iterations=int(settings.max_inner),
     )
     layer.inner_iterations += linear.iterations
+    if linear.node_updates or linear.transport_sweeps:
+        layer.node_updates += linear.node_updates
+        layer.transport_sweeps += linear.transport_sweeps
+        layer.edge_transfers += linear.edge_transfers
+        layer.transport_attempt = dict(
+            node_updates=linear.node_updates,
+            transport_sweeps=linear.transport_sweeps,
+            edge_transfers=linear.edge_transfers,
+            linear_tail_error_bound=linear.tail_error_bound,
+        )
     for name in (
         "assembly_seconds",
         "factorization_seconds",
@@ -268,6 +290,7 @@ def _deterministic_update(layer, backend, operator, values, settings):
     ):
         setattr(layer, name, getattr(layer, name) + getattr(linear, name, 0))
     layer.preparation_seconds += getattr(linear, "assembly_seconds", 0)
+    layer.preparation_seconds += linear.preparation_seconds
     if linear.status != "completed":
         layer.status, layer.reason = linear.status, linear.reason
     return linear
@@ -533,7 +556,7 @@ def solve_heat3d(
     settings.validate()
     if is_mc:
         settings.validate_mc(method)
-    if method not in ("lod", "block", "newton", *MC_METHODS):
+    if method not in ("lod", "block", "mass_transport", "newton", *MC_METHODS):
         raise ValueError("Неизвестный метод 3D-теплопроводности")
     batch_size = int(settings.batch_size) if method in GROUPED_MC_METHODS else None
     points = validate_points3d(
@@ -572,7 +595,7 @@ def solve_heat3d(
         storage += (
             768 * size + 512 * (settings.coarse_n + 1) ** 3
             if method in CONTROL_MC_METHODS
-            else 384 * size
+            else (448 if method == "mc_counts" else 384) * size
         )
         storage += 24 * size + getsizeof(set())
         if batch_size is not None:
@@ -583,7 +606,9 @@ def solve_heat3d(
     warmup_seconds = 0.0
     if T > 0 and not unsupported and storage <= settings.max_workspace_bytes:
         warm_start = perf_counter()
-        if is_mc:
+        if method in ("mc_counts", "mass_transport"):
+            warmup_transport3d()
+        elif is_mc:
             warmup_mc3d(batch_size=batch_size)
         if method in CONTROL_MC_METHODS or (
             method == "lod" and backend is solve_lines3d
@@ -649,6 +674,8 @@ def solve_heat3d(
         backend = BlockThomasSolver3D(
             max_workspace_bytes=int(settings.max_workspace_bytes)
         )
+    if method == "mass_transport" and backend is solve_lines3d:
+        backend = partial(solve_mass_lines3d, deadline=deadline)
     try:
         with _preparing(result):
             times, steps = time_grid(dt, T)
@@ -727,6 +754,9 @@ def solve_heat3d(
             result.preparation_seconds += layer.preparation_seconds
             result.conductivity_reuses += layer.conductivity_reuses
             result.conductivity_fallbacks += layer.conductivity_fallbacks
+            result.node_updates += layer.node_updates
+            result.transport_sweeps += layer.transport_sweeps
+            result.edge_transfers += layer.edge_transfers
             for name in (
                 "assembly_seconds",
                 "factorization_seconds",
