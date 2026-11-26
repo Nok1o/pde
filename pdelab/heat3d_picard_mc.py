@@ -6,8 +6,9 @@ import numpy as np
 
 from .heat3d_control import _controlled_estimate
 from .heat3d_mc import solve_frozen_mc3d
+from .heat3d_transport import solve_frozen_counts3d
 
-MC_METHODS = ("mc", "mc_grouped", "mc_control", "mc_control_grouped")
+MC_METHODS = ("mc", "mc_grouped", "mc_control", "mc_control_grouped", "mc_counts")
 CONTROL_MC_METHODS = ("mc_control", "mc_control_grouped")
 GROUPED_MC_METHODS = ("mc_grouped", "mc_control_grouped")
 
@@ -83,6 +84,8 @@ class PicardSampler3D:
             diagnostics["coarse_iterations"] = (
                 diagnostics.get("coarse_iterations", 0) + sampled.coarse_iterations
             )
+        elif result.method == "mc_counts":
+            sampled = solve_frozen_counts3d(operator, self.points, **options)
         else:
             sampled = solve_frozen_mc3d(operator, self.points, **options)
         layer.preparation_seconds += sampled.preparation_seconds
@@ -94,6 +97,10 @@ class PicardSampler3D:
         result.walks += sampled.walks
         result.completed_walks += completed
         result.transitions += sampled.transitions
+        for key in ("node_updates", "transport_sweeps", "edge_transfers"):
+            count = getattr(sampled, key, 0)
+            setattr(result, key, getattr(result, key) + count)
+            diagnostics[key] = diagnostics.get(key, 0) + count
         for key, count in (
             ("walks", sampled.walks),
             ("completed_walks", completed),

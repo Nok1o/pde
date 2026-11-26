@@ -10,7 +10,7 @@ from pdelab.heat3d_mc_cli import main as frozen_main
 from pdelab.heat3d_solver import HeatSettings3D
 
 
-def test_all_six_material_methods_enter_independent_accuracy_study():
+def test_all_material_methods_enter_independent_accuracy_study():
     config = HeatConfig3D(
         case="polynomial",
         n=5,
@@ -32,11 +32,14 @@ def test_all_six_material_methods_enter_independent_accuracy_study():
     )
     assert result["metadata"]["configuration"]["capacity_gamma"] == 0.4
     assert result["metadata"]["configuration"]["reaction_sigma"] == 0.25
-    assert len(result["rows"]) == 18
+    assert len(result["rows"]) == 3 * len(METHOD_NAMES)
     for method in METHOD_NAMES:
         trials = [row for row in result["trials"] if row["method"] == method]
         assert {row["phase"] for row in trials} == {"pilot", "final"}
-        assert len({row["seed"] for row in trials}) == len(trials)
+        if method == "mass_transport":
+            assert all(row["seed"] is None for row in trials)
+        else:
+            assert len({row["seed"] for row in trials}) == len(trials)
         for row in trials:
             assert row["status"] == "completed"
             assert row["completed_until"] == config.T
