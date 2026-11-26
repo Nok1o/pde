@@ -1,0 +1,24 @@
+{
+  "purpose": "Current stationary 3D comparison, including wins, losses and unconfirmed targets; fixed before running",
+  "targets_pct": [1, 5, 10],
+  "repeats": 10,
+  "seed": 42,
+  "methods": ["lod_serial", "mc", "mc_grouped", "mc_control", "graded", "wos"],
+  "walk_budgets": [64, 256, 1024, 4096, 16384],
+  "tolerances": [0.1, 0.03, 0.01, 0.003, 0.001, 0.0001, 0.000001, 0.00000001, 0.0000000001],
+  "calibration_fraction": 0.8,
+  "seconds_per_phase": 20,
+  "max_iter": 20000,
+  "batch_size": 128,
+  "protocol": "Public study_stationary3d: pilot then independent fixed final, no retuning after final; sequential fresh process per scenario; one thread",
+  "scope": "Analytic reference, point errors use mean absolute relative error per run, field uses mean relative L2 error per run. Timing includes method preparation, excludes common input arrays, reference, JIT and export. No time ratios between different studies.",
+  "cases": [
+    {"id": "S01", "problem": "sine", "n": 8, "mode": "point", "point": [4,4,4], "coarse_n": 4},
+    {"id": "S02", "problem": "sine", "n": 16, "mode": "point", "point": [8,8,8], "coarse_n": 4},
+    {"id": "S03", "problem": "sine", "n": 32, "mode": "point", "point": [16,16,16], "coarse_n": 8},
+    {"id": "S04", "problem": "sine", "n": 64, "mode": "point", "point": [32,32,32], "coarse_n": 16},
+    {"id": "S05", "problem": "sine", "n": 64, "mode": "point", "point": [1,24,32], "coarse_n": 16},
+    {"id": "S06", "problem": "affine", "n": 32, "mode": "point", "point": [8,12,16], "coarse_n": 8},
+    {"id": "S07", "problem": "sine", "n": 8, "mode": "field", "coarse_n": 4, "walk_budgets": [64,256,1024]}
+  ]
+}
