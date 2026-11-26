@@ -16,3 +16,7 @@ benchmarks/results/heat3d-transport/**/*.csv -text whitespace=cr-at-eol linguist
 benchmarks/results/heat3d-transport/**/*.json -text linguist-generated=true
 benchmarks/results/heat3d-transport/**/*.jsonl -text linguist-generated=true
 benchmarks/results/heat3d-transport/**/*.log -text whitespace=cr-at-eol linguist-generated=true
+benchmarks/results/scenario-comparison/**/*.json -text linguist-generated=true
+benchmarks/results/scenario-comparison/**/*.log -text linguist-generated=true
+benchmarks/results/scenario-comparison/*.json -text linguist-generated=true
+benchmarks/results/scenario-comparison/*.pdf binary linguist-generated=true
