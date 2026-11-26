@@ -1,0 +1,13 @@
+{
+  "kind": "sparse_direct_same_frozen_operator",
+  "values": [
+    2.276330366015706
+  ],
+  "relative_residual": 2.3480771561181253e-15,
+  "construction_seconds": 0.0007509999995818362,
+  "matrix_assembly_seconds": 0.00023354199947789311,
+  "direct_seconds": 0.0019762919982895255,
+  "process_peak_rss_bytes": 116899840,
+  "operator_sha256": "b0e7829c2a8ac21c4e9d3fade93da1f9587a9be008656e6da9bfe863c4493eff",
+  "note": "Independent linear solver for a fixed A*u=b; not an analytic reference in T"
+}

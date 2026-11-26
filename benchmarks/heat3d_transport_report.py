@@ -123,6 +123,14 @@ def collect_stage(root, stage):
                         if len(selected) > 1
                         else None
                     ),
+                    mean_preparation_seconds=(
+                        row["preparation_seconds"] / len(selected) if selected else None
+                    ),
+                    mean_construction_seconds=(
+                        row["construction_seconds"] / len(selected)
+                        if selected and row.get("construction_seconds") is not None
+                        else None
+                    ),
                     study_pilot_seconds=study["pilot_seconds"],
                     study_final_seconds=study["final_seconds"],
                 )
@@ -229,7 +237,9 @@ def report(root):
             "Затраты/пути относятся к выбранной серии и повторяются между целями. "
             "Для суммы используйте trials.csv. RSS — пик процесса со всеми повторами, не одного решения. "
             "Неприменимые/неизвестные показатели отмечены прочерком. "
-            "Подробные подготовка, фаза, разброс и единицы счётчиков сохранены в CSV.\n\n"
+            "В CSV preparation_seconds/construction_seconds — суммы серии; "
+            "mean_preparation_seconds/mean_construction_seconds — средние на записанную попытку. "
+            "Подробные фаза, разброс и единицы счётчиков сохранены в CSV.\n\n"
             + markdown(
                 rows,
                 {
@@ -267,7 +277,13 @@ def plots(root, targets):
     from matplotlib.ticker import FuncFormatter, LogLocator, NullLocator
 
     colors = dict(zip(METHODS, plt.get_cmap("tab10").colors, strict=False))
-    for stage in STAGES:
+    for stage, target_pct in (
+        ("frozen-n8", 1),
+        ("frozen-n8", 5),
+        ("full-n8", 5),
+        ("full-n16", 5),
+    ):
+        frozen = stage.startswith("frozen")
         cases = list(
             dict.fromkeys(r["scenario"] for r in targets if r["stage"] == stage)
         )
@@ -284,24 +300,33 @@ def plots(root, targets):
                 for r in targets
                 if r["stage"] == stage
                 and r["scenario"] == case
-                and r["target_pct"] == 5
+                and r["target_pct"] == target_pct
             ]
             for row in selected:
                 if row["status"] == "confirmed":
                     ax.scatter(
-                        row["seconds"],
+                        row["seconds"] * (1000 if frozen else 1),
                         row["relative_error_pct"],
                         color=colors[row["method"]],
                         label=METHODS[row["method"]],
                     )
             ax.set(
                 title=case,
-                xlabel="Полное время при цели 5%, с",
+                xlabel=f"Полное время при цели {target_pct}%, "
+                + ("мс" if frozen else "с"),
                 ylabel="Средняя ошибка, %",
-                xscale="log",
+                xscale="linear" if frozen else "log",
             )
-            ax.xaxis.set_major_locator(LogLocator(base=10, subs=(1, 2, 5)))
-            ax.xaxis.set_major_formatter(FuncFormatter(lambda value, _: f"{value:g}"))
+            if frozen:
+                confirmed_times = [
+                    r["seconds"] * 1000 for r in selected if r["status"] == "confirmed"
+                ]
+                ax.set_xlim(0, 1.1 * max(confirmed_times, default=1))
+            else:
+                ax.xaxis.set_major_locator(LogLocator(base=10, subs=(1, 2, 5)))
+                ax.xaxis.set_major_formatter(
+                    FuncFormatter(lambda value, _: f"{value:g}")
+                )
             ax.xaxis.set_minor_locator(NullLocator())
             ax.grid(alpha=0.2)
             if ax.collections:
@@ -314,9 +339,12 @@ def plots(root, targets):
                     transform=ax.transAxes,
                     ha="center",
                 )
-        fig.suptitle(stage + " · полные подтверждающие серии; отказы в таблицах")
+        fig.suptitle(
+            f"{stage} · цель {target_pct}% · полные подтверждающие серии; отказы в таблицах"
+        )
         fig.tight_layout()
-        fig.savefig(root / (stage + ".png"), dpi=150)
+        suffix = "-target1" if target_pct == 1 else ""
+        fig.savefig(root / (stage + suffix + ".png"), dpi=150)
         plt.close(fig)
 
 

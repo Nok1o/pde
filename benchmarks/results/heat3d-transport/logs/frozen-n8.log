@@ -1,0 +1,10 @@
+reference sine-centre-kind1
+reference polynomial-all-kind3
+worker sine-centre-kind1--lod
+worker sine-centre-kind1--mc
+worker sine-centre-kind1--mc_counts
+worker sine-centre-kind1--mass_transport
+worker polynomial-all-kind3--lod
+worker polynomial-all-kind3--mc
+worker polynomial-all-kind3--mc_counts
+worker polynomial-all-kind3--mass_transport

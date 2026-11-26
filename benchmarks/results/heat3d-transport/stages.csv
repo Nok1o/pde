@@ -1,0 +1,4 @@
+﻿stage,status,attempts,solver_seconds,statuses
+frozen-n8,measured,170,0.20338588402955793,"{""completed"": 170}"
+full-n8,measured,270,10.454844963041978,"{""completed"": 244, ""outer_limit"": 26}"
+full-n16,measured,115,152.04038504501295,"{""completed"": 71, ""outer_limit"": 38, ""time_limit"": 6}"

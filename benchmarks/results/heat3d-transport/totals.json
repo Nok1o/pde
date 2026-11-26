@@ -1,0 +1,48 @@
+{
+  "attempts": 555,
+  "statuses": {
+    "completed": 485,
+    "outer_limit": 64,
+    "time_limit": 6
+  },
+  "targets": {
+    "confirmed": 81,
+    "validation_failed": 1,
+    "not_reached": 8,
+    "validation_incomplete": 3,
+    "pilot_incomplete": 3
+  },
+  "solver_seconds": 162.6986158920845,
+  "stages": [
+    {
+      "stage": "frozen-n8",
+      "status": "measured",
+      "attempts": 170,
+      "solver_seconds": 0.20338588402955793,
+      "statuses": {
+        "completed": 170
+      }
+    },
+    {
+      "stage": "full-n8",
+      "status": "measured",
+      "attempts": 270,
+      "solver_seconds": 10.454844963041978,
+      "statuses": {
+        "completed": 244,
+        "outer_limit": 26
+      }
+    },
+    {
+      "stage": "full-n16",
+      "status": "measured",
+      "attempts": 115,
+      "solver_seconds": 152.04038504501295,
+      "statuses": {
+        "completed": 71,
+        "outer_limit": 38,
+        "time_limit": 6
+      }
+    }
+  ]
+}
